@@ -1,0 +1,23 @@
+<h1>RP Home</h1>
+<div>
+  <% if flash[:notice] %>
+    <p>
+      <%= flash[:notice] %>
+    </p>
+  <% end %>
+
+  <% if current_user %>
+    <p>Logged in as <strong><%= current_user.email %></strong></p>
+    <p><%= link_to 'Logout', logout_path, id: 'logout' %></p>
+
+    <div>Re Auth
+      <%= form_tag('/auth/my_op', method: 'post') do %>
+        <button type='submit'>Re Login</button>
+      <% end %>
+    </div>
+  <% else %>
+    <%= form_tag('/auth/my_op', method: 'post') do %>
+      <button type='submit'>Login</button>
+    <% end %>
+  <% end %>
+</div>
