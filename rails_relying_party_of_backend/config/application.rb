@@ -36,3 +36,6 @@ module RailsRelyingPartyOfBackend
     config.generators.system_tests = nil
   end
 end
+
+# 中身を見やすくするよう、JSON形式で保存
+ActiveRecord::SessionStore::Session.serializer = :json

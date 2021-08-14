@@ -40,3 +40,19 @@ end
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
+
+# 追加
+# omniauthまわり
+gem 'omniauth'
+gem 'omniauth-oauth2'
+gem 'omniauth-rails_csrf_protection'
+
+# セッションの中身を見やすくするよう、セッションを ActiveRecord で管理
+gem 'activerecord-session_store'
+
+# OPからもらった client_id と client_secret を .env ファイルから読み込むため
+gem 'dotenv-rails', groups: [:development, :test]
+
+group :development do
+  gem 'annotate'
+end
