@@ -101,10 +101,14 @@ Doorkeeper.configure do
   #
   # authorization_code_expires_in 10.minutes
 
+  # =======> 変更開始
+  # 動作確認をしやすくするため、access_token は1分で失効
+  access_token_expires_in 1.minute
   # Access token expiration time (default: 2 hours).
   # If you want to disable expiration, set this to `nil`.
   #
   # access_token_expires_in 2.hours
+  # <======= 変更終了
 
   # Assign custom TTL for access tokens. Will be used instead of access_token_expires_in
   # option if defined. In case the block returns `nil` value Doorkeeper fallbacks to

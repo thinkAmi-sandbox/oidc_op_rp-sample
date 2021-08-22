@@ -1,0 +1,11 @@
+<h1>Introspections#index</h1>
+
+<% if flash[:notice] %>
+  <p>
+    <%= flash[:notice] %>
+  </p>
+<% end %>
+
+<%= form_tag('/auth/introspection', method: 'post') do %>
+  <button type='submit'>Login</button>
+<% end %>

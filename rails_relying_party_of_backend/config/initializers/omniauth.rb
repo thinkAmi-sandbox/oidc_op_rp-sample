@@ -5,6 +5,11 @@ Rails.application.config.middleware.use OmniAuth::Builder do
            ENV['CLIENT_ID_OF_MY_OP'],
            ENV['CLIENT_SECRET_OF_MY_OP']
 
+  provider :my_op,
+           ENV['CLIENT_ID_OF_INTROSPECTION'],
+           ENV['CLIENT_SECRET_OF_INTROSPECTION'],
+           name: 'introspection'
+
   # ストラテジーの設定内容を上書きする場合は、以下のように追加しても良い
   # 参考: https://github.com/auth0/omniauth-auth0#additional-authentication-parameters
   # {
