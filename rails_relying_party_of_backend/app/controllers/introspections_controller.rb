@@ -81,12 +81,12 @@ class IntrospectionsController < ApplicationController
     }
     response = Faraday.post("#{ENV['OIDC_PROVIDER_HOST']}/oauth/revoke", params)
     response.tap do |r|
-      puts '======> introspection'
+      puts '======> revocation'
       # puts r.header.all # 必要に応じてレスポンスヘッダを確認
       # puts '----------------'
       puts "STATUS: #{r.status}"
       puts "BODY  : #{r.body}"
-      puts '<====== introspection'
+      puts '<====== revocation'
     end
   end
 end

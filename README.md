@@ -37,4 +37,4 @@ Note: Make sure it's for practice and not a problem when you use it in productio
 ## Related Blog (Written in Japanese)
 
 - [Railsとdoorkeeper-openid_connectやOmniAuth を使って、OpenID Connectの OpenID Provider と Relying Party を作ってみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/08/14/224121)
-
+- [doorkeeper-openid_connect製OpenID Providerにて、色々な状態のアクセストークンを使って Introspection・UserInfoエンドポイントの挙動を確認してみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/08/22/182659)
