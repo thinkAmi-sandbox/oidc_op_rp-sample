@@ -246,6 +246,7 @@ Doorkeeper.configure do
   # https://doorkeeper.gitbook.io/guides/ruby-on-rails/scopes
 
   default_scopes :openid
+  optional_scopes :introspection
   # default_scopes  :public
   # optional_scopes :write, :update
   # <======= 変更終了
@@ -449,6 +450,7 @@ Doorkeeper.configure do
   #   client.superapp? or resource_owner.admin?
   # end
 
+  # =======> 変更開始
   # Configure custom constraints for the Token Introspection request.
   # By default this configuration option allows to introspect a token by another
   # token of the same application, OR to introspect the token that belongs to
@@ -495,6 +497,25 @@ Doorkeeper.configure do
   #     true
   #   end
   # end
+  allow_token_introspection do |token, authorized_client, authorized_token|
+    if authorized_token
+      # customize: require `introspection` scope
+      authorized_token.application == token&.application ||
+        authorized_token.scopes.include?("introspection")
+    elsif token.application
+      # DBにprotected_resourceという列は存在しないため、
+      # authorized_clientとtoken.applicationの比較だけを条件にして
+      # introspectionを許可するかどうかを判断する
+      # `protected_resource` is a new database boolean column, for example
+      # authorized_client == token.application || authorized_client.protected_resource?
+      authorized_client == token.application
+    else
+      # public token (when token.application is nil, token doesn't belong to any application)
+      true
+    end
+  end
+  # <====== 変更終了
+
   #
   # Or you can completely disable any token introspection:
   #
