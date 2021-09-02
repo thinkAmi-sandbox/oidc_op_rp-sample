@@ -3,7 +3,7 @@
 Doorkeeper::OpenidConnect.configure do
 
   # =======> 変更開始
-  issuer { 'my_op' }
+  issuer 'http://localhost:3780'
   # issuer do |resource_owner, application|
   #   'issuer string'
   # end
