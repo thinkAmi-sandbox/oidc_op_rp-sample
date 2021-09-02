@@ -3,15 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "DEBUG=express:* node server.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "connect-redis": "^6.0.0",
+    "express": "^4.17.1",
+    "express-openid-connect": "^2.5.0",
     "next": "11.1.2",
     "react": "17.0.2",
-    "react-dom": "17.0.2"
+    "react-dom": "17.0.2",
+    "redis": "^3.1.2"
   },
   "devDependencies": {
     "eslint": "7.32.0",
