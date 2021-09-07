@@ -1,0 +1,8 @@
+version: '3'
+services:
+  redis:
+    image: "redis:latest"
+    ports:
+      - "16379:6379"
+    volumes:
+      - "./data/redis:/data"
