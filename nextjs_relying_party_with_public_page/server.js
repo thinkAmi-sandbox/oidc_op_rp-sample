@@ -37,7 +37,12 @@ app.prepare().then(() => {
       name: 'sessionOfExpressJs', // sessionの名前を変える
       store: new RedisStore({client: redisClient}) // セッションストアをRedisにする
     },
+    authRequired: false,
   }));
+
+  server.get('/', (req, res) => {
+    return handle(req, res)
+  })
 
   server.all('*', requiresAuth(), (req, res) => {
     return handle(req, res)
