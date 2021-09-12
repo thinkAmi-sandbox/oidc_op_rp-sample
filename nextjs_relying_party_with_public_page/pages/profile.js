@@ -5,10 +5,14 @@ export const getServerSideProps = async function ({ req, res }) {
   // https://github.com/auth0/express-openid-connect/blob/v2.5.0/middleware/requiresAuth.js#L40
   // https://github.com/auth0/express-openid-connect/blob/v2.5.0/middleware/requiresAuth.js#L4
   if (!req.oidc.isAuthenticated()) {
+
+    // これだと、最初に `/profile` へアクセスしたとしても、ログイン後は `/` に戻ってしまう
     return {
       redirect: {
         // 途中のエラーが表示される
-        destination: '/login',
+        // destination: '/login',
+        // Next.js の外としてルーティング
+        destination: `${process.env.NEXT_HOST}:${process.env.PORT}/login`,
         permanent: false
       },
     }
