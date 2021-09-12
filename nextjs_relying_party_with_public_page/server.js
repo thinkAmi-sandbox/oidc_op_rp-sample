@@ -3,7 +3,6 @@ const { auth } = require('express-openid-connect');
 const next = require('next');
 // Redisの設定
 const redis = require('redis');
-const {requiresAuth} = require('express-openid-connect');
 const RedisStore = require('connect-redis')(auth);
 
 const dev = process.env.NODE_ENV !== 'production'
@@ -34,17 +33,13 @@ app.prepare().then(() => {
       scope: 'openid',
     },
     session: {
-      name: 'sessionOfExpressJs', // sessionの名前を変える
+      name: 'sessionOfExpressPublic', // sessionの名前を変える
       store: new RedisStore({client: redisClient}) // セッションストアをRedisにする
     },
     authRequired: false,
   }));
 
-  server.get('/', (req, res) => {
-    return handle(req, res)
-  })
-
-  server.all('*', requiresAuth(), (req, res) => {
+  server.all('*', (req, res) => {
     return handle(req, res)
   })
 
