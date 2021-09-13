@@ -52,3 +52,4 @@ Note: Make sure it's for practice and not a problem when you use it in productio
 - [Railsとdoorkeeper-openid_connectやOmniAuth を使って、OpenID Connectの OpenID Provider と Relying Party を作ってみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/08/14/224121)
 - [doorkeeper製 OAuth 2.0 のAuthorization Serverにて、色々な状態のアクセストークンを使って Introspection エンドポイントの挙動を確認してみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/08/22/182659)
 - [Next.js + express-openid-connect を使って、バックエンドで OpenID Provider と通信する Relying Party を作ってみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/09/07/232621)
+- [Next.js と express-openid-connect を使って、認証が必要/不要な各ページを持つ Relying Party を作ってみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/09/13/233923)
