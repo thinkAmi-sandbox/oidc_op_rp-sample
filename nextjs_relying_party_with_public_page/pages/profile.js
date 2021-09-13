@@ -7,14 +7,29 @@ export const getServerSideProps = async function ({ req, res }) {
   if (!req.oidc.isAuthenticated()) {
 
     // これだと、最初に `/profile` へアクセスしたとしても、ログイン後は `/` に戻ってしまう
+    // return {
+    //   redirect: {
+    //     // 途中のエラーが表示される
+    //     // destination: '/login',
+    //     // Next.js の外としてルーティング
+    //     destination: `${process.env.NEXT_HOST}:${process.env.PORT}/login`,
+    //     permanent: false
+    //   },
+    // }
+
+    // ログインしても `/profile` へ遷移するようにした
+    // ただ、クライアントサイドでの遷移が発生すると、CORSエラーが出る
+    // CORS error: Cross-Origin Resource Sharing error: MissingAllowOriginHeader
+    if (!res.oidc.errorOnRequiredAuth && req.accepts('html')) {
+      await res.oidc.login()
+      return {
+        props: {
+          email: ''
+        }
+      }
+    }
     return {
-      redirect: {
-        // 途中のエラーが表示される
-        // destination: '/login',
-        // Next.js の外としてルーティング
-        destination: `${process.env.NEXT_HOST}:${process.env.PORT}/login`,
-        permanent: false
-      },
+      notFound: true
     }
   }
 
