@@ -1,6 +1,9 @@
 // import Link from 'next/link'
 
-export const getServerSideProps = async function ({ req, res }) {
+import {GetServerSideProps} from "next";
+
+// 特に型を拡張してないので、GetServerSidePropsが使える
+export const getServerSideProps: GetServerSideProps = async function () {
   return {
     props: {
       host: process.env.NEXT_HOST,
@@ -10,7 +13,12 @@ export const getServerSideProps = async function ({ req, res }) {
 }
 
 
-export default function Home({ host, port }) {
+type Props = {
+  host: string
+  port: string
+}
+
+export default function Home({ host, port }: Props): JSX.Element {
   return (
     <>
       <h1>Index page</h1>
