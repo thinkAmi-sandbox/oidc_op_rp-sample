@@ -24,6 +24,12 @@ Note: Make sure it's for practice and not a problem when you use it in productio
     - Next.js 11.1.2
     - express 4.17.1
     - express-openid-connect 2.5.0
+- Relying Party by Next.js and TypeScript
+  - `nextjs_relying_party_of_express_with_all_required`
+    - Next.js 11.1.2
+    - express 4.17.1
+    - express-openid-connect 2.5.0
+    - TypeScript 4.4.3
 
 　  
 ## How to use
@@ -53,3 +59,4 @@ Note: Make sure it's for practice and not a problem when you use it in productio
 - [doorkeeper製 OAuth 2.0 のAuthorization Serverにて、色々な状態のアクセストークンを使って Introspection エンドポイントの挙動を確認してみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/08/22/182659)
 - [Next.js + express-openid-connect を使って、バックエンドで OpenID Provider と通信する Relying Party を作ってみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/09/07/232621)
 - [Next.js と express-openid-connect を使って、認証が必要/不要な各ページを持つ Relying Party を作ってみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/09/13/233923)
+- [Next.js と express-openid-connect を使った Relying Party を TypeScript 化してみた - メモ的な思考的な](https://thinkami.hatenablog.com/entry/2021/09/19/225604)
