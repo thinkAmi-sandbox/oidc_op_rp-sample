@@ -1,0 +1,10 @@
+{
+  // 参考： https://qiita.com/chocomintkusoyaro/items/9df366fd5c119ab6b90e
+  "extends": "./tsconfig.json", // tsconfig.jsonの設定を継承する
+  "compilerOptions": {
+    "module": "commonjs", // Next.jsとExpressの両方を連携させるために、commmonjsを利用する
+    "outDir": "dist", // ビルドファイルの出力先
+    "noEmit": false // Next.jsはBabelを使用してTypeScriptをコンパイルするので、TSコンパイラはjsを出力しない。設定を上書きする。
+  },
+  "include": ["server"] // TSコンパイラにserverディレクトリのみをコンパイル対象として認識させる。
+}
