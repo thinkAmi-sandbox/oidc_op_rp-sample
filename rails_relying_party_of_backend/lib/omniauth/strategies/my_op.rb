@@ -44,7 +44,7 @@ module OmniAuth
         # raw_infoには、/userinfo エンドポイントから取得できる情報を入れる
         # 参考：userinfoエンドポイントのレスポンス
         #   {"sub"=>"1", "email"=>"foo@example.com"}
-        @raw_info ||= access_token.get("#{ENV['oidc_provider_host']}/oauth/userinfo").parsed
+        @raw_info ||= access_token.get("#{ENV['OIDC_PROVIDER_HOST']}/oauth/userinfo").parsed
       end
 
       def authorize_params
