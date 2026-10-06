@@ -1,0 +1,3 @@
+# .ruby-version を Ruby のバージョンの正本にするため、mise に読ませる
+[settings]
+idiomatic_version_file_enable_tools = ["ruby"]
