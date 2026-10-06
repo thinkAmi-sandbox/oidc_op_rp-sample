@@ -14,6 +14,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する
 2. 現在のブランチを確認する。作業ブランチは `epic/rails-8.1-upgrade` から切る
 3. クローン直後は `git config core.hooksPath .githooks` を実行して git hooks を有効にする
+4. Ruby は mise で管理する。各アプリの `mise.toml`（`.ruby-version` を読ませる設定）は、初回に各アプリのディレクトリで `mise trust` を実行しないと読まれない
 
 ## アップグレードのルール
 

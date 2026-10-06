@@ -76,12 +76,15 @@
 
 Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動かせないため、Ruby 3.1 に上げて起動できる状態に戻す。コードは変えず、バージョンの変更に留める。
 
-- [ ] mise で Ruby 3.1 の最新パッチを入れ、3 アプリの `.ruby-version` と Gemfile の `ruby` を更新
-- [ ] Rails を 6.1.7.10 に更新
-- [ ] mail を 2.8 系に更新（2.7 は Ruby 3.1 で net-smtp を読み込めない）
-- [ ] `bundle lock --add-platform arm64-darwin`
-- [ ] `filter_parameter_logging` に OIDC 関連（`code`、`id_token`、`access_token`、`refresh_token`、`client_secret`、`code_verifier` など）を追加し、ログへの漏れを発生源で防ぐ
-- [ ] 3 アプリの `rails s` / `rails c` が起動することを確認し、ブラウザで一通り手動確認
+- [x] mise で Ruby 3.1 の最新パッチ（3.1.7）を入れ、3 アプリの `.ruby-version` と Gemfile の `ruby` を更新
+- [x] 各アプリに `mise.toml` を追加し、mise に `.ruby-version` を読ませる（利用者のグローバル設定に依存させない）
+- [x] Rails を 6.1.7.10 に更新
+- [x] mail を 2.8 系（2.8.1）に更新（2.7 は Ruby 3.1 で net-smtp を読み込めない）
+- [x] `bundle lock --add-platform arm64-darwin`
+- [x] Ruby 3.1 / clang 17 / OpenSSL 3 で動かない gem を最小限更新（nokogiri 1.18.10、sqlite3 1.7.3、nio4r 2.5.9、msgpack 1.4.5、RP の jwt 2.5.0、OP の json-jwt 1.14.0。理由は LOG.md）
+- [x] `filter_parameter_logging` に `:code` を追加（`id_token`・`access_token`・`refresh_token`・`client_secret` は既存の `:token`・`:secret` の部分一致で対象済み）。OP の「Redirected to」行などに残る認可コードは、ローカル専用のため許容（LOG.md に記録）
+- [x] 公開物の安全チェックに、認可コード・トークン・client_secret の値を検出するルールを追加
+- [x] 3 アプリの `rails s` / `rails c` が起動することを確認し、ブラウザで一通り手動確認
 
 ### Step 0-b: アクセストークンの有効期限を 10 分にする（意図的な仕様変更）
 
@@ -114,6 +117,7 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
   - 既存違反は `rubocop --auto-gen-config` で `.rubocop_todo.yml` に凍結
   - バージョンを固定し、`NewCops: disable`
 - [ ] bundler-audit と brakeman。既存の警告は brakeman の除外ファイルに凍結し、新しい警告がないことを完了条件にする
+  - bundler-audit では 0-a で残した advisory（nokogiri 1.18 系の 1.19 でしか直らないもの、json-jwt 1.14.0 の CVE-2023-51774）が出る。解消予定の Step（Step 2 / 0-f）を理由に添えて無視リストに入れる
 - [ ] SimpleCov（`coverage/` は gitignore 対象）
 - [ ] WebMock
 - [ ] テスト（CLAUDE.md「テスト」の方針に従う）
@@ -139,6 +143,7 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 「8. 各 Step 共通の手順」に従う。Step 固有の作業はロードマップの表のとおり。補足:
 
 - **Step 1（Rails 7.0）**: `sprockets-rails` を Gemfile に明示（rails gem の依存から外れるため）。着手前に `bin/rails zeitwerk:check` を確認
+- **Step 2（Ruby 3.2）**: nokogiri を 1.19 系の最新に上げ、1.18 系に残る advisory（GHSA-c4rq-3m3g-8wgx ほか）を解消する。1.19 系は Ruby 3.2 以上が必要なため 0-a では上げられなかった
 - **Step 3（Rails 7.1）**: RP の独自ストラテジーを Zeitwerk に載せる（案 B）
   - `rails_relying_party_of_backend/config/application.rb` に以下を追加し、`app:update` が提案する `config.autoload_lib` は採用しない
     ```ruby
@@ -150,6 +155,7 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
   - 完了条件: `bin/rails zeitwerk:check`、RP の minitest、E2E のログインシナリオ
   - うまくいかない場合は案 A（`autoload_lib(ignore: %w[assets tasks omniauth])` ＋ `require`）に切り替え、LOG.md に理由を残す
 - **Step 5（Rails 7.2）**: Rails 7.2 にした後で sqlite3 を 2.x へ（Rails 8.0 は 2.1 以上が必須のため前倒し）。annotate を annotaterb に置き換え（annotate は Rails 8 未対応）
+  - Rails 7.2 から「Redirected to」行のクエリにも `filter_parameters` が適用される。OP のログでリダイレクト先の `code=` が `[FILTERED]` になることを確認する（0-a では Rails 6.1 の制約で残ることを許容した）
 - **Step 6（Rails 8.0）**: `app:update` が生成する Solid 系・Kamal 系・Thruster 関連のファイルは採用しない
 
 ### 仕上げ
@@ -157,6 +163,7 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 - [ ] GitHub Actions（minitest、E2E、RuboCop、oxlint、bundler-audit、brakeman、安全チェック）
 - [ ] Dependabot（bundler、npm、GitHub Actions をまとまった単位で更新）。CI ができてから有効にする
 - [ ] README の「Tested Environment」を更新。アップグレード前のコードはタグ `rails-6.1` にあること、Next.js 製 RP は新しい OP で確認していないことを書く
+- [ ] README の「How to use」に Ruby の入れ方を書く。各アプリの `mise.toml` は初回に `mise trust` が必要なこと、Ruby のバージョンは `.ruby-version` と Gemfile の `ruby` の両方にあること（mise は Gemfile を優先して読む）
 - [ ] 各バージョンのサポート終了時期の確認方法を本計画に追記（次回アップグレードへの備え）
 - [ ] epic → main をマージコミットで取り込む
 
@@ -170,7 +177,12 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 
 | gem | 現在 | 時期 | 注意点 |
 |---|---|---|---|
-| mail | 2.7.1 | 0-a | Ruby 3.1 で起動するために必要 |
+| mail | 2.7.1 | 0-a で 2.8.1（済） | Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした |
+| nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19 系最新 | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
+| jwt（RP、oauth2 経由の間接依存） | 2.2.3 | 0-a で 2.5.0（済）→ 0-f で 2.x 最新にして RP の Gemfile に明記 | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。RS は直接使わないので oauth2 の更新に任せる |
+| json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f で doorkeeper-openid_connect と一緒に外す | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だが、OP は署名だけで decode しないため影響なし。0-f の後も残るなら 1.16.6 以上にする |
+| nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済） | clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新 |
+| thor（railties 経由） | 1.1.0 | 0-f | Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし） |
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f（同時） | omniauth-oauth2 1.8 は oauth2 2.x が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。トークン取得時のクライアント認証方式の既定値の変化を確認 |
 | faraday | 1.7.0 | 0-f（oauth2 の後） | RP と RS が直接呼んでいる。順番は依存関係を見て決める |
 | doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f（この順） | openid_connect の新しい版は JWT のライブラリが json-jwt から jwt に変わる。ID トークンの署名と JWKS を RP の検証も含めて確認。新しいマイグレーションが必要か確認 |
@@ -180,7 +192,7 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 | spring | 2.1.1 | 0-f で削除 | Rails 7 から標準で入らない |
 | byebug / web-console / listen / rack-mini-profiler | — | 0-f | 開発・テスト用を先に上げる |
 | sprockets-rails | 3.2.2（間接） | Step 1 で明示 | Rails 7.0 から rails gem の依存から外れる |
-| sqlite3 | 1.4.2 | 0-f で 1.x 最新 → Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
+| sqlite3 | 1.4.2 | 0-a で 1.7.3（済。clang 17 で 1.4 系がビルドできないため 0-f から前倒し）→ Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
 | annotate | — | Step 5 で annotaterb に置換 | Rails 8 未対応 |
 | activerecord-session_store | 2.0.0 | 各 Step の最初 | Rails を上げた後に `bundle update` が通らなければ Rails と同時に上げる |
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
