@@ -14,6 +14,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する
 2. 現在のブランチを確認する。作業ブランチは `epic/rails-8.1-upgrade` から切る
 3. クローン直後は `git config core.hooksPath .githooks` を実行して git hooks を有効にする
+4. Ruby は mise で管理する。各アプリの `mise.toml`（`.ruby-version` を読ませる設定）は、初回に各アプリのディレクトリで `mise trust` を実行しないと読まれない
 
 ## アップグレードのルール
 
@@ -53,7 +54,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 | ユーザー名・ホスト名・プロンプト | 書かない。コマンドはプロンプトなしで書く |
 | メールアドレス | 書かない（例示が必要なら `user@example.com`） |
 | 環境情報 | 「macOS (arm64)」程度まで |
-| トークン・秘密情報 | `<ACCESS_TOKEN>` / `<ID_TOKEN>` / `<CLIENT_SECRET>` / `<REDACTED>` に置き換える。テスト用の値でもドキュメントには貼らない |
+| トークン・秘密情報 | `<AUTH_CODE>`（認可コード） / `<ACCESS_TOKEN>` / `<ID_TOKEN>` / `<CLIENT_SECRET>` / `<REDACTED>` に置き換える。テスト用の値でもドキュメントには貼らない。ログを貼るときは、`[FILTERED]` になっていない値（OP の「Redirected to」行の `code=` など）が残っていないか確認する |
 | 書いてよいもの | `localhost` のポート番号、gem / Ruby のバージョン、エラークラスとメッセージ |
 
 - スタックトレースは全文を貼らず、エラークラス・メッセージ・アプリ側の行（相対パス）・最初の gem の行だけを残す

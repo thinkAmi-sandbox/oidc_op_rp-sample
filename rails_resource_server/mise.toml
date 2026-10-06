@@ -1,0 +1,4 @@
+# mise が Ruby のバージョンファイル（.ruby-version と Gemfile の ruby 指定）を読むようにする。
+# 両方にあるときは Gemfile が優先されるので、Ruby を上げるときは両方を同じ値にする
+[settings]
+idiomatic_version_file_enable_tools = ["ruby"]
