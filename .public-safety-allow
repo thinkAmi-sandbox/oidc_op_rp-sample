@@ -1,0 +1,6 @@
+# scripts/check-public-safety の誤検出を除外する設定。
+# 書式: <rule-id または *> <パスの glob> <その行に含まれる文字列>
+# 追記には人間の承認が必要（AI が独断で追記したり、検出条件を緩めたりしないこと）。
+
+# doorkeeper-openid_connect の設定例コメント（鍵の中身は含まない）
+private-key rails_open_id_provider/config/initializers/doorkeeper_openid_connect.rb #   -----BEGIN RSA PRIVATE KEY-----

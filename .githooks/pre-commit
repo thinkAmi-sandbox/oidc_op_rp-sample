@@ -1,0 +1,4 @@
+#!/bin/sh
+# ステージ済み差分の追加行に、ローカル環境の情報や秘密情報が含まれていないか検査する。
+# 有効化: git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/check-public-safety" --staged
