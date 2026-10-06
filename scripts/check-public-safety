@@ -1,0 +1,367 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# 公開物（コミット・ドキュメント・PR 本文など）にローカル環境の情報や秘密情報が
+# 含まれていないかを検査する。git hooks と Claude Code hooks の両方から呼ばれる。
+#
+# 使い方:
+#   scripts/check-public-safety --staged                       ステージ済み差分の追加行を検査
+#   scripts/check-public-safety --files PATH...                ファイル全体を検査
+#   scripts/check-public-safety --fix --files PATH...          リポジトリ配下の絶対パスを相対パスへ自動置換してから検査
+#   scripts/check-public-safety --message PATH [--label NAME]  コミットメッセージや PR 本文を検査
+#   scripts/check-public-safety --claude-hook                  Claude Code hooks（stdin の JSON）から呼ぶ
+#
+# 終了コード: 0 = 問題なし / 2 = 問題あり（Claude Code hooks ではブロック扱い） / 1 = 使い方の誤り
+#
+# 検出ルールの意図と置き換え方は CLAUDE.md「公開物への記載ルール」を参照。
+# 誤検出は .public-safety-allow に追記する（追記は人間の承認が必要）。
+#
+# macOS 標準の Ruby でも動くよう、Ruby 2.6 の構文の範囲で書いている。
+
+require "json"
+require "open3"
+require "shellwords"
+
+module PublicSafety
+  EXIT_OK = 0
+  EXIT_USAGE = 1
+  EXIT_FOUND = 2
+
+  ALLOW_FILE = ".public-safety-allow"
+  SELF_PATH = "scripts/check-public-safety"
+  # 検査対象から外すファイル（検出パターンそのものを含むため）
+  SKIP_PATHS = [SELF_PATH, ALLOW_FILE].freeze
+
+  ALLOWED_EMAIL = /\A(?:noreply@anthropic\.com|[^@]+@users\.noreply\.github\.com|[^@]+@example\.(?:com|org|net))\z/i.freeze
+
+  Rule = Struct.new(:id, :pattern, :message, :suggest, :mask, keyword_init: true)
+
+  RULES = [
+    Rule.new(
+      id: "abs-path-home",
+      pattern: %r{(?<![\w.:/-])/(?:Users|home)/[^/\s]+/[^\s'"`)\]>]*},
+      message: "ホームディレクトリ配下の絶対パスが含まれています",
+      suggest: lambda do |text|
+        if (m = text.match(%r{/gems/([^/]+-\d[^/]*/.*)\z}))
+          m[1]
+        else
+          "gem 内なら `gem名-バージョン/` から書き、それ以外は <HOME> / <RUBY_PREFIX> / <TMP> に置き換えてください"
+        end
+      end,
+      mask: ->(text) { text.sub(%r{\A/(?:Users|home)/[^/]+}, "<HOME>") }
+    ),
+    Rule.new(
+      id: "tmp-path",
+      pattern: %r{(?<![\w.:/-])/(?:private/)?var/folders/[^\s'"`)\]>]*|(?<![\w.:/-])/private/tmp/[^\s'"`)\]>]*},
+      message: "OS の一時ディレクトリのパスが含まれています",
+      suggest: ->(_text) { "<TMP>/... に置き換えてください" },
+      mask: ->(text) { text.sub(%r{\A(/(?:private/)?(?:var/folders|tmp))/.*\z}, '\1/…') }
+    ),
+    Rule.new(
+      id: "homebrew-path",
+      pattern: %r{(?<![\w.:/-])/(?:opt/homebrew|usr/local/Cellar)/[^\s'"`)\]>]*},
+      message: "Homebrew のインストール先パスが含まれています",
+      suggest: ->(_text) { "<PREFIX>/... に置き換えるか、パス自体を省略してください" },
+      mask: ->(text) { text }
+    ),
+    Rule.new(
+      id: "email",
+      pattern: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
+      message: "メールアドレスが含まれています",
+      suggest: ->(_text) { "削除してください（例示が必要なら user@example.com を使ってください）" },
+      mask: ->(text) { text.sub(/\A[^@]+/, "***") }
+    ),
+    Rule.new(
+      id: "jwt",
+      pattern: /(?<![\w-])eyJ[\w-]{10,}\.[\w-]{10,}(?:\.[\w-]*)?/,
+      message: "JWT（ID トークン / アクセストークン）と思われる文字列が含まれています",
+      suggest: ->(_text) { "<ID_TOKEN> または <ACCESS_TOKEN> に置き換えてください" },
+      mask: ->(text) { "#{text[0, 8]}…(以下略)" }
+    ),
+    Rule.new(
+      id: "private-key",
+      pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+      message: "秘密鍵が含まれています",
+      suggest: ->(_text) { "秘密鍵はコミットしないでください。gitignore 対象の場所に置くか、生成スクリプトで都度作成してください" },
+      mask: ->(text) { text }
+    )
+  ].freeze
+
+  Finding = Struct.new(:path, :line, :col, :rule_id, :message, :detected, :suggestion, keyword_init: true)
+
+  class Checker
+    def initialize(repo_root)
+      @repo_root = repo_root
+      @allow_entries = load_allow_entries
+    end
+
+    attr_reader :repo_root
+
+    # text の各行を検査する。line_numbers を渡すと、その行番号で報告する（差分の追加行用）
+    def check_lines(path, lines, line_numbers = nil)
+      return [] if SKIP_PATHS.include?(path)
+
+      findings = []
+      lines.each_with_index do |line, index|
+        lineno = line_numbers ? line_numbers[index] : index + 1
+        findings.concat(check_line(path, line.chomp, lineno))
+      end
+      findings
+    end
+
+    def check_file(path)
+      relative = relative_path(path)
+      return [] if SKIP_PATHS.include?(relative)
+
+      content = File.binread(path)
+      return [] if content.include?("\x00") # バイナリは対象外
+
+      check_lines(relative, content.force_encoding(Encoding::UTF_8).scrub.lines)
+    end
+
+    # リポジトリ配下の絶対パスだけを相対パスに置き換える（意味が変わらない機械的な修正のみ）
+    def fix_file(path)
+      content = File.read(path)
+      fixed = content.gsub("#{repo_root}/", "").gsub(repo_root, ".")
+      File.write(path, fixed) if fixed != content
+      fixed != content
+    end
+
+    def relative_path(path)
+      absolute = File.expand_path(path)
+      absolute.start_with?("#{repo_root}/") ? absolute.delete_prefix("#{repo_root}/") : path
+    end
+
+    private
+
+    def check_line(path, line, lineno)
+      findings = []
+      covered = []
+
+      # リポジトリ配下の絶対パスは、相対パスの修正案を具体的に出す
+      offset = 0
+      while (pos = line.index(repo_root, offset))
+        token = line[pos..-1][%r{\A[^\s'"`)\]>]*}]
+        relative = token.delete_prefix(repo_root).delete_prefix("/")
+        relative = "." if relative.empty?
+        covered << (pos...(pos + token.length))
+        findings << Finding.new(
+          path: path, line: lineno, col: pos + 1, rule_id: "abs-path-repo",
+          message: "リポジトリ配下の絶対パスが含まれています",
+          detected: "<HOME>/…/#{relative}",
+          suggestion: "#{relative}（`--fix` で自動置換できます）"
+        )
+        offset = pos + token.length
+      end
+
+      RULES.each do |rule|
+        line.scan(rule.pattern) do
+          match = Regexp.last_match
+          range = match.begin(0)...match.end(0)
+          next if covered.any? { |c| c.cover?(range.first) }
+
+          text = match[0]
+          next if rule.id == "email" && text.match?(ALLOWED_EMAIL)
+          next if allowed?(rule.id, path, line)
+
+          findings << Finding.new(
+            path: path, line: lineno, col: range.first + 1, rule_id: rule.id,
+            message: rule.message, detected: rule.mask.call(text), suggestion: rule.suggest.call(text)
+          )
+        end
+      end
+      findings.reject { |f| f.rule_id == "abs-path-repo" && allowed?(f.rule_id, path, line) }
+    end
+
+    def allowed?(rule_id, path, line)
+      @allow_entries.any? do |entry|
+        (entry[:rule] == "*" || entry[:rule] == rule_id) &&
+          File.fnmatch?(entry[:glob], path, File::FNM_PATHNAME | File::FNM_EXTGLOB) &&
+          line.include?(entry[:literal])
+      end
+    end
+
+    # 書式: <rule-id|*> <path-glob> <行に含まれる文字列>   （# 以降はコメント）
+    def load_allow_entries
+      file = File.join(repo_root, ALLOW_FILE)
+      return [] unless File.exist?(file)
+
+      File.readlines(file, chomp: true).each_with_object([]) do |raw, entries|
+        next if raw.strip.empty? || raw.lstrip.start_with?("#")
+
+        rule, glob, literal = raw.strip.split(/\s+/, 3)
+        next if literal.nil? || literal.empty?
+
+        entries << { rule: rule, glob: glob, literal: literal }
+      end
+    end
+  end
+
+  module_function
+
+  def repo_root
+    out, status = Open3.capture2("git", "rev-parse", "--show-toplevel")
+    abort("git リポジトリの中で実行してください") unless status.success?
+    out.strip
+  end
+
+  # ステージ済み差分の追加行だけを取り出す
+  def staged_added_lines
+    out, status = Open3.capture2("git", "diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--diff-filter=ACMR")
+    abort("git diff --cached に失敗しました") unless status.success?
+
+    files = Hash.new { |h, k| h[k] = { lines: [], numbers: [] } }
+    current = nil
+    lineno = nil
+    out.force_encoding(Encoding::UTF_8).scrub.each_line do |raw|
+      line = raw.chomp
+      if line.start_with?("+++ ")
+        current = line == "+++ /dev/null" ? nil : line.sub(%r{\A\+\+\+ b/}, "")
+      elsif (m = line.match(/\A@@ -\S+ \+(\d+)(?:,\d+)? @@/))
+        lineno = m[1].to_i
+      elsif current && lineno && line.start_with?("+")
+        files[current][:lines] << line[1..-1]
+        files[current][:numbers] << lineno
+        lineno += 1
+      end
+    end
+    files
+  end
+
+  def report(findings, io = $stderr)
+    findings.each do |f|
+      io.puts "#{f.path}:#{f.line}:#{f.col}: [#{f.rule_id}] #{f.message}"
+      io.puts "  検出: #{f.detected}"
+      io.puts "  修正案: #{f.suggestion}"
+    end
+    io.puts "参照: CLAUDE.md「公開物への記載ルール」"
+    io.puts "誤検出の場合は #{ALLOW_FILE} への追記を人間に依頼してください（AI が独断で追記したり、検出条件を緩めたりしないこと）"
+    io.puts "#{findings.size} 件の問題が見つかりました（exit #{EXIT_FOUND}）"
+  end
+
+  def finish(findings)
+    return EXIT_OK if findings.empty?
+
+    report(findings)
+    EXIT_FOUND
+  end
+
+  def ignored_by_git?(root, path)
+    _out, status = Open3.capture2("git", "-C", root, "check-ignore", "-q", path)
+    status.success?
+  end
+
+  # Claude Code hooks からの呼び出し。stdin に hook の JSON が渡される
+  def run_claude_hook(checker)
+    payload = JSON.parse($stdin.read)
+    input = payload["tool_input"] || {}
+
+    case payload["hook_event_name"]
+    when "PostToolUse"
+      path = input["file_path"] || input["notebook_path"]
+      return EXIT_OK if path.nil? || !File.file?(path)
+
+      absolute = File.expand_path(path)
+      # リポジトリ外（作業用の一時ファイルなど）と gitignore 対象は公開されないので対象外
+      return EXIT_OK unless absolute.start_with?("#{checker.repo_root}/")
+      return EXIT_OK if ignored_by_git?(checker.repo_root, absolute)
+
+      finish(checker.check_file(absolute))
+    when "PreToolUse"
+      check_bash_command(checker, input["command"].to_s)
+    else
+      EXIT_OK
+    end
+  end
+
+  def check_bash_command(checker, command)
+    tokens = begin
+      Shellwords.split(command)
+    rescue ArgumentError
+      nil
+    end
+
+    if skips_git_hooks?(command, tokens)
+      $stderr.puts "git commit の --no-verify / -n は使わないでください。git hooks（公開物の安全チェック）を迂回してしまいます。"
+      $stderr.puts "参照: CLAUDE.md「公開物への記載ルール」"
+      return EXIT_FOUND
+    end
+
+    return EXIT_OK unless command.match?(/\bgh\s+pr\s+(?:create|edit)\b/)
+
+    findings = []
+    if tokens.nil?
+      findings.concat(checker.check_lines("gh pr コマンド", command.lines))
+    else
+      tokens.each_with_index do |token, index|
+        value = tokens[index + 1]
+        next if value.nil?
+
+        case token
+        when "--body-file", "-F"
+          findings.concat(checker.check_lines("PR 本文（#{File.basename(value)}）", File.readlines(value))) if File.file?(value)
+        when "--body", "-b"
+          findings.concat(checker.check_lines("PR 本文", value.lines))
+        when "--title", "-t"
+          findings.concat(checker.check_lines("PR タイトル", value.lines))
+        end
+      end
+    end
+    finish(findings)
+  end
+
+  CONTROL_OPERATORS = ["&&", "||", ";", "|"].freeze
+
+  # git commit の引数（次の制御演算子まで）に --no-verify / -n があるか
+  def skips_git_hooks?(command, tokens)
+    return command.match?(/\bgit\b[^;&|]*\bcommit\b[^;&|]*--no-verify/) if tokens.nil?
+
+    tokens.each_with_index.any? do |token, index|
+      next false unless token == "commit" && tokens[0...index].include?("git")
+
+      args = tokens[(index + 1)..-1].take_while { |t| !CONTROL_OPERATORS.include?(t) }
+      args.include?("--no-verify") || args.include?("-n")
+    end
+  end
+
+  def main(argv)
+    checker = Checker.new(repo_root)
+    mode = argv.first
+
+    case mode
+    when "--staged"
+      findings = staged_added_lines.flat_map do |path, data|
+        checker.check_lines(path, data[:lines], data[:numbers])
+      end
+      finish(findings)
+    when "--files", "--fix"
+      fix = argv.delete("--fix")
+      argv.delete("--files")
+      return usage if argv.empty?
+
+      paths = argv.select { |p| File.file?(p) }
+      paths.each { |p| $stderr.puts "自動置換しました: #{checker.relative_path(p)}" if checker.fix_file(p) } if fix
+      finish(paths.flat_map { |p| checker.check_file(p) })
+    when "--message"
+      path = argv[1]
+      return usage if path.nil? || !File.file?(path)
+
+      label_index = argv.index("--label")
+      label = label_index ? argv[label_index + 1] : File.basename(path)
+      # git のコメント行（# から始まる行）はコミットメッセージに残らないので除外する
+      lines = File.readlines(path).map { |l| l.start_with?("#") ? "" : l }
+      finish(checker.check_lines(label, lines))
+    when "--claude-hook"
+      run_claude_hook(checker)
+    else
+      usage
+    end
+  end
+
+  def usage
+    $stderr.puts File.readlines(__FILE__).drop(3).take_while { |l| l.start_with?("#") }.map { |l| l.sub(/\A# ?/, "") }.join
+    EXIT_USAGE
+  end
+end
+
+exit(PublicSafety.main(ARGV.dup)) if $PROGRAM_NAME == __FILE__

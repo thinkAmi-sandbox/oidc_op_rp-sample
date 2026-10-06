@@ -1,0 +1,4 @@
+#!/bin/sh
+# コミットメッセージに、ローカル環境の情報や秘密情報が含まれていないか検査する。
+# 有効化: git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/check-public-safety" --message "$1" --label "コミットメッセージ"
