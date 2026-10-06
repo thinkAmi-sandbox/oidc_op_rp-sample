@@ -163,7 +163,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-b: アクセストークンの有効期限を 10 分にする（2026-10-06）
 
-- ブランチ / PR: `upgrade/step0b-access-token-expiry` / （PR 作成後に追記）
+- ブランチ / PR: `upgrade/step0b-access-token-expiry` / [#11](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/11)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 意図的な仕様変更
