@@ -88,8 +88,8 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 
 ### Step 0-b: アクセストークンの有効期限を 10 分にする（意図的な仕様変更）
 
-- [ ] OP の `access_token_expires_in` を `1.minute` → `10.minutes`
-- [ ] LOG.md に「意図的な仕様変更」として記録
+- [x] OP の `access_token_expires_in` を `1.minute` → `10.minutes`
+- [x] LOG.md に「意図的な仕様変更」として記録
 - 理由: 一般的な長さに合わせる。1 分だと E2E のデバッグ中（Playwright の一時停止など）に期限切れになり、結果が不安定になる
 - ID トークンの有効期限（doorkeeper-openid_connect の `expiration`、未設定で gem の既定値）は変更しない
 
@@ -122,8 +122,10 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 - [ ] WebMock
 - [ ] テスト（CLAUDE.md「テスト」の方針に従う）
   - OP: discovery、JWKS、Devise のログイン、認可コード → トークン → ID トークンの検証、userinfo、introspect（有効・期限切れ・失効済み・他クライアントのトークン）、revoke
+    - 期限切れは境目の 2 本にし、0-b で決めた 10 分をテストに残す。「発行から 10 分ちょうどは `active: true`」「10 分を 1 秒過ぎると `active: false`」（doorkeeper 5.5.2 の判定は `現在時刻 > created_at + expires_in`）
   - RP: 独自ストラテジーの ID トークン検証（テスト内で生成した RSA 鍵 ＋ JWKS を WebMock で差し替え）、ログイン後の画面遷移、introspection 画面（OP・RS の応答を WebMock で差し替え）
   - RS: `apples/show` を有効・無効なトークンで呼んだとき（introspect の応答を WebMock で差し替え）
+- [ ] OP の期限切れのテストを追加したら、`rails_relying_party_of_backend/app/controllers/introspections_controller.rb` のコメントアウトした期限切れの確認（`sleep 70`）を同じ PR で削除する。手動確認の名残で、期限切れの判定は OP の minitest、`active: false` の拒否は RS の minitest、3 アプリの通しは E2E の revoke で置き換わる
 
 ### Step 0-e: 既存コードの RuboCop 違反の修正
 
@@ -190,7 +192,7 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 | dotenv-rails | 2.7.6 | 0-f | 3.x で読み込み方が変わる |
 | puma | 5.4 | 0-f で 6 系 | 7 系は後の Step で判断 |
 | spring | 2.1.1 | 0-f で削除 | Rails 7 から標準で入らない |
-| byebug / web-console / listen / rack-mini-profiler | — | 0-f | 開発・テスト用を先に上げる |
+| byebug / web-console / listen / rack-mini-profiler | — | 0-f | 開発・テスト用を先に上げる。listen 3.6.0 では `EventedFileUpdateChecker` の finalizer で `ThreadError` の警告が出る（LOG.md の Step 0-b）。更新後に出なくなるか確認 |
 | sprockets-rails | 3.2.2（間接） | Step 1 で明示 | Rails 7.0 から rails gem の依存から外れる |
 | sqlite3 | 1.4.2 | 0-a で 1.7.3（済。clang 17 で 1.4 系がビルドできないため 0-f から前倒し）→ Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
 | annotate | — | Step 5 で annotaterb に置換 | Rails 8 未対応 |
