@@ -74,7 +74,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-a: 起動できる状態に戻す（2026-10-06）
 
-- ブランチ / PR: `upgrade/step0a-boot-ruby31` / （PR 作成後に追記）
+- ブランチ / PR: `upgrade/step0a-boot-ruby31` / [#10](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/10)
 - バージョン: Ruby 3.0.1 → 3.1.7 / Rails 6.1.4（RS は 6.1.4.1）→ 6.1.7.10
 - 環境: macOS (arm64)、Apple clang 17、Ruby は mise（ruby-build）で Homebrew の OpenSSL 3 を使ってビルド
 
