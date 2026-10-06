@@ -40,9 +40,10 @@ module PublicSafety
   ALLOWED_EMAIL = /\A(?:noreply@anthropic\.com|[^@]+@users\.noreply\.github\.com|[^@]+@example\.(?:com|org|net))\z/i.freeze
 
   # doorkeeper の認可コード・アクセストークン・client_secret などは JWT ではないランダムな文字列のため、
-  # 値そのものではなくキー名で検出する。CLIENT_SECRET_OF_MY_OP のような環境変数名も対象にする
-  OAUTH_PARAM_KEY = '(?:[a-z]+_)*(?:client_secret|access_token|refresh_token|id_token|code_verifier)(?:_[a-z]+)*|code'
-  OAUTH_PARAM_VALUE = '[\w.~%+/=-]{8,}'
+  # 値そのものではなくキー名で検出する。CLIENT_SECRET_OF_MY_OP のような環境変数名も対象にする。
+  # token は introspection / revocation の引数名。eyJ で始まる値は jwt ルールに任せる（二重に報告しない）
+  OAUTH_PARAM_KEY = '(?:[a-z]+_)*(?:client_secret|access_token|refresh_token|id_token|code_verifier)(?:_[a-z]+)*|code|token'
+  OAUTH_PARAM_VALUE = '(?!eyJ)[\w.~%+/=-]{8,}'
 
   Rule = Struct.new(:id, :pattern, :message, :suggest, :mask, keyword_init: true)
 
@@ -90,15 +91,14 @@ module PublicSafety
     ),
     Rule.new(
       id: "oauth-param",
-      # key=値（クエリ・フォーム・.env）、"key":"値"（JSON）、"key"=>"値"（Rails のログの Parameters）。
+      # key=値（クエリ・フォーム・.env）、"key":"値"（JSON）、"key"=>"値"（Rails のログの Parameters）、
+      # key: "値"（Ruby のシンボルキー）、Bearer 値（Authorization ヘッダー）。
       # <REDACTED> などのプレースホルダーと [FILTERED] は値の文字種に含まれないので検出しない
-      pattern: /(?<![\w-])(?:"(?:#{OAUTH_PARAM_KEY})"\s*(?::|=>)\s*"|(?:#{OAUTH_PARAM_KEY})=)#{OAUTH_PARAM_VALUE}/i,
+      pattern: /(?<![\w-])(?:"(?:#{OAUTH_PARAM_KEY})"\s*(?::|=>)\s*"|(?:#{OAUTH_PARAM_KEY})=|(?:#{OAUTH_PARAM_KEY}):\s*"|Bearer\s+)#{OAUTH_PARAM_VALUE}/i,
       message: "認可コード・トークン・client_secret などの値と思われる文字列が含まれています",
       suggest: ->(_text) { "値を <AUTH_CODE> / <ACCESS_TOKEN> / <ID_TOKEN> / <CLIENT_SECRET> / <REDACTED> に置き換えてください" },
-      mask: lambda do |text|
-        key, value = text.match(/\A(.*?(?:=>?|:)\s*"?)(.*)\z/).captures
-        "#{key}#{value[0, 4]}…(以下略)"
-      end
+      # 秘密の値なので、先頭の数文字も出さない
+      mask: ->(text) { text.sub(/(?<=[=:"\s])[\w.~%+\/=-]{8,}\z/, "…(値は省略)") }
     ),
     Rule.new(
       id: "private-key",
