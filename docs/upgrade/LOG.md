@@ -149,4 +149,14 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
   - トークン失効: revoke が 200 → introspect が `active: false` → RS が 401
   - ログアウト: 「ログアウトしました」が表示され、ログインボタンに戻る
 - minitest・E2E・RuboCop・bundler-audit・brakeman は 0-c / 0-d で導入するため未実施
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `oauth-param` ルールが、introspection / revocation の `token=`、`Authorization: Bearer`、Ruby のシンボルキー（`code: "..."`）を見逃す | 検出対象に追加した |
+| 検出時の表示に値の先頭 4 文字が出る | 値は表示しないようにした |
+| `id_token=eyJ...` が jwt ルールと二重に報告される | `eyJ` で始まる値は jwt ルールに任せた |
+| `mise.toml` のコメントが「`.ruby-version` が正本」と書いているが、mise は Gemfile を優先する | コメントを実際の挙動に合わせた |
+| `:code` は部分一致なので `code_challenge_method` なども伏せられ、デバッグしにくい | 対応しない。計画で部分一致と決めており、伏せすぎる不便より漏れにくさを優先する |
 - 安全チェック: `oauth-param` ルールの追加後、追跡しているファイル全体で新しい検出なし
