@@ -22,6 +22,11 @@ require "json"
 require "open3"
 require "shellwords"
 
+# git hooks や Claude Code hooks は LANG が未設定のまま呼ばれることがあり、
+# その場合 Ruby は外部ファイルを US-ASCII として読むため、日本語で例外になる
+Encoding.default_external = Encoding::UTF_8
+$stdin.set_encoding(Encoding::UTF_8)
+
 module PublicSafety
   EXIT_OK = 0
   EXIT_USAGE = 1
@@ -104,7 +109,8 @@ module PublicSafety
       findings = []
       lines.each_with_index do |line, index|
         lineno = line_numbers ? line_numbers[index] : index + 1
-        findings.concat(check_line(path, line.chomp, lineno))
+        # 不正なバイト列があっても例外にせず検査を続ける
+        findings.concat(check_line(path, line.chomp.scrub, lineno))
       end
       findings
     end
@@ -202,7 +208,7 @@ module PublicSafety
   def repo_root
     out, status = Open3.capture2("git", "rev-parse", "--show-toplevel")
     abort("git リポジトリの中で実行してください") unless status.success?
-    out.strip
+    out.force_encoding(Encoding::UTF_8).strip
   end
 
   # ステージ済み差分の追加行だけを取り出す
@@ -325,6 +331,8 @@ module PublicSafety
   end
 
   def main(argv)
+    # 引数も LANG 未設定だと UTF-8 として扱われないため、明示する
+    argv = argv.map { |arg| arg.dup.force_encoding(Encoding::UTF_8).scrub }
     checker = Checker.new(repo_root)
     mode = argv.first
 
