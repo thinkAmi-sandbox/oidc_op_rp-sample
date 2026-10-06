@@ -102,8 +102,9 @@ Doorkeeper.configure do
   # authorization_code_expires_in 10.minutes
 
   # =======> 変更開始
-  # 動作確認をしやすくするため、access_token は1分で失効
-  access_token_expires_in 1.minute
+  # access_token は一般的な長さの10分で失効させる
+  # （以前は動作確認のため1分だったが、E2E のデバッグ中に期限切れになり結果が不安定になるため延ばした）
+  access_token_expires_in 10.minutes
   # Access token expiration time (default: 2 hours).
   # If you want to disable expiration, set this to `nil`.
   #
