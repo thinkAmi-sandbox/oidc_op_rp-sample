@@ -4,3 +4,6 @@
 
 # doorkeeper-openid_connect の設定例コメント（鍵の中身は含まない）
 private-key rails_open_id_provider/config/initializers/doorkeeper_openid_connect.rb #   -----BEGIN RSA PRIVATE KEY-----
+
+# E2E 用のダミーの client_secret（rails_open_id_provider/db/seeds.rb と同じ値で、本物の secret ではない）
+oauth-param rails_{relying_party_of_backend,resource_server}/.env_e2e =e2e-dummy-
