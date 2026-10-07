@@ -35,7 +35,7 @@
 | 固定 | `main`（タグ `rails-6.1`）。作業中は変更しない |
 | epic | `epic/rails-8.1-upgrade`（`main` から作成。開始を示す空コミットあり） |
 | 作業ブランチ | `upgrade/<step>-<内容>`。epic から切り、PR の向き先は epic |
-| PR の単位 | Step 0 はサブステップ（0-a〜0-f。0-d は 0-d-1 と 0-d-2 に分ける）ごと。0-f の gem 更新は 1 PR 内で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR |
+| PR の単位 | Step 0 はサブステップ（0-a〜0-f。0-d は 0-d-1・0-d-2・0-d-3 に分ける）ごと。0-f の gem 更新は 1 PR 内で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR |
 | 取り込み | 最後に epic → main をマージコミットで取り込む（squash しない） |
 | worktree | 作業用 worktree は epic を元にする |
 | main への外部 PR | 入った場合は epic に main を取り込む |
@@ -48,7 +48,7 @@
 | 0-a | **3.1.x** | **6.1.7.10** | 起動できる状態に戻す（必要最小限の gem のみ） |
 | 0-b | 3.1 | 6.1 | **意図的な仕様変更**: アクセストークンの有効期限を 1 分 → 10 分 |
 | 0-c | 3.1 | 6.1 | E2E（Playwright / oxlint / oxfmt）、seeds、OP の応答のスナップショットの保存 |
-| 0-d | 3.1 | 6.1 | RuboCop・bundler-audit・brakeman・SimpleCov の導入（既存違反は凍結）、minitest |
+| 0-d | 3.1 | 6.1 | RuboCop・bundler-audit・brakeman・SimpleCov の導入（既存違反は凍結）、minitest、脆弱性のある gem の更新（0-d-3） |
 | 0-e | 3.1 | 6.1 | 既存コードの RuboCop 違反の修正 |
 | 0-f | 3.1 | 6.1 | 周辺 gem の更新 |
 | 1 | 3.1 | **7.0.x** | `sprockets-rails` 明示、`app:update`、`load_defaults 7.0` |
@@ -122,7 +122,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
   - バージョンを固定し、`NewCops: disable`
 - [x] bundler-audit と brakeman。既存の advisory と警告は無視リスト（各アプリの `.bundler-audit.yml`、`config/brakeman.ignore`）に凍結し、新しいものがないことを完了条件にする
   - bundler-audit の既存の advisory は 1 アプリ 93〜94 件（20〜21 gem）で、当初の想定（nokogiri と json-jwt）より大幅に多い。gem ごとに解消する時期を書いて無視リストに入れた（内訳は LOG.md の Step 0-d-1）
-  - Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（rack、puma、loofah など）をいつ上げるかは未定（14 章）
+  - Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（rack、puma、loofah など）は、0-d-3 で上げる（14 章で決定）
 - [x] RS の既存のテスト（トークンなしで 200 を期待して落ちていた）を、現在の挙動（401）に直す
 
 #### 0-d-2: minitest
@@ -138,6 +138,19 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
   - RS: `apples/show` を有効・無効なトークンで呼んだとき（introspect の応答を WebMock で差し替え）
 - [ ] テスト環境の `config.active_support.deprecation = :raise`（10 章の完了条件）
 - [ ] OP の期限切れのテストを追加したら、`rails_relying_party_of_backend/app/controllers/introspections_controller.rb` のコメントアウトした期限切れの確認（`sleep 70`）を同じ PR で削除する。手動確認の名残で、期限切れの判定は OP の minitest、`active: false` の拒否は RS の minitest、3 アプリの通しは E2E の revoke で置き換わる
+
+#### 0-d-3: 脆弱性のある gem の更新
+
+0-d-1 で無視リストに凍結した advisory のうち、Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem を上げる（人間の判断。LOG.md の Step 0-d-1）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」にあたる。0-d-2 の minitest ができてから行い、0-e より先に行う。
+
+- [ ] 対象: rack、puma、loofah・crass・rails-html-sanitizer、websocket-driver、globalid、mail、msgpack、faraday 1.x（RP・RS）、bcrypt（OP）。修正版は LOG.md の Step 0-d-1
+- [ ] 1 gem ずつ（loofah・crass・rails-html-sanitizer は依存関係のため 1 組で）上げ、そのたびに minitest と E2E を流してからコミットする。コミットはアプリごとに分ける
+- [ ] 上げた gem の advisory を `.bundler-audit.yml` から消し、bundler-audit で報告されないことを確かめる
+- 着手時の調査で決めること
+  - 上げる先: 修正版の最小か、同じマイナー内の最新か
+  - default gem の置き換え: mail は logger、websocket-driver は base64 を新しく lock に入れる（0-d-1 の `bundle lock` で確認）。json と同じく、アプリが読む default gem の版が変わらないようにするか
+  - メジャー・マイナーをまたぐもの: globalid（0.5 → 1.x）、websocket-driver（0.7 → 0.8）、loofah（2.12 → 2.25）、faraday（1.7 → 1.10）は CHANGELOG を読む
+  - PR を 1 つにするか、分けるか
 
 ### Step 0-e: 既存コードの RuboCop 違反の修正
 
@@ -299,7 +312,7 @@ Step 1 を一度手作業で通した後に、`/rails-upgrade` を入口とす�
 ## 14. 未決事項
 
 - [ ] 最終的に Ruby 4.0 まで上げるか（Step 8 完了時に判断）
-- [ ] advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（7 章の表）を、いつ上げるか。0-d の後に脆弱性の修正だけのサブステップを設けるか、0-f に含めるか
+- [x] advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（7 章の表）を、いつ上げるか（Step 0-d-1 で人間が判断）: 脆弱性の修正だけのサブステップ 0-d-3 を設け、0-d-2 の後、0-e の前に上げる
 - [x] `rails_open_id_provider/jwtRS256.key.example` の扱い（Step 0-c で判断）: 鍵の中身のないプレースホルダーで、どこからも参照されていなかったため、`.pub.example` と一緒に削除した
 
 ## 15. 決定済みの事項
