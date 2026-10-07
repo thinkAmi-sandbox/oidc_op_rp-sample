@@ -38,23 +38,6 @@ Rails/Output:
     - 'app/controllers/introspections_controller.rb'
     - 'lib/omniauth/strategies/my_op.rb'
 
-# Offense count: 12
-# Configuration parameters: AllowedConstants.
-Style/Documentation:
-  Exclude:
-    - 'app/controllers/application_controller.rb'
-    - 'app/controllers/home_controller.rb'
-    - 'app/controllers/introspections_controller.rb'
-    - 'app/controllers/sessions_controller.rb'
-    - 'app/helpers/application_helper.rb'
-    - 'app/helpers/home_helper.rb'
-    - 'app/helpers/introspections_helper.rb'
-    - 'app/helpers/sessions_helper.rb'
-    - 'app/mailers/application_mailer.rb'
-    - 'app/models/application_record.rb'
-    - 'app/models/op_user.rb'
-    - 'lib/omniauth/strategies/my_op.rb'
-
 # Offense count: 3
 # This cop supports safe autocorrection (--autocorrect).
 # Configuration parameters: EnforcedStyle.
@@ -65,7 +48,7 @@ Style/EmptyMethod:
     - 'app/controllers/introspections_controller.rb'
     - 'lib/omniauth/strategies/my_op.rb'
 
-# Offense count: 18
+# Offense count: 17
 # This cop supports unsafe autocorrection (--autocorrect-all).
 # Configuration parameters: EnforcedStyle.
 # SupportedStyles: always, always_true, never
@@ -87,17 +70,15 @@ Style/FrozenStringLiteralComment:
     - 'app/mailers/application_mailer.rb'
     - 'app/models/application_record.rb'
     - 'app/models/op_user.rb'
-    - 'config.ru'
     - 'lib/omniauth/strategies/my_op.rb'
 
-# Offense count: 2
+# Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
 # Configuration parameters: EnforcedStyle, ConsistentQuotesInMultiline.
 # SupportedStyles: single_quotes, double_quotes
 Style/StringLiterals:
   Exclude:
     - 'Rakefile'
-    - 'config.ru'
 
 # Offense count: 3
 # This cop supports safe autocorrection (--autocorrect).

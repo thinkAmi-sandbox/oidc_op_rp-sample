@@ -16,12 +16,17 @@ AllCops:
   NewCops: disable
   SuggestExtensions: false
   # このファイルのパスはリポジトリ直下からの相対になるので、どのアプリでも合うように **/ から書く。
-  # config/・bin/・db/ は rails app:update で上書きされる雛形なので対象外
+  # config/・bin/・db/・config.ru は rails app:update で上書きされる雛形なので対象外
   Exclude:
     - "**/config/**/*"
     - "**/bin/**/*"
     - "**/db/**/*"
+    - "**/config.ru"
     - "**/vendor/**/*"
     - "**/tmp/**/*"
     - "**/log/**/*"
     - "**/node_modules/**/*"
+
+# クラスの説明は、クラス名と中のコメントで足りる。違反の多くは生成物の基底クラス（ApplicationRecord など）
+Style/Documentation:
+  Enabled: false

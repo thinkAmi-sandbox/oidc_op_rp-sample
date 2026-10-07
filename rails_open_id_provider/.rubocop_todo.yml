@@ -41,15 +41,7 @@ Rails/RakeEnvironment:
   Exclude:
     - 'lib/tasks/auto_annotate_models.rake'
 
-# Offense count: 3
-# Configuration parameters: AllowedConstants.
-Style/Documentation:
-  Exclude:
-    - 'app/helpers/application_helper.rb'
-    - 'app/mailers/application_mailer.rb'
-    - 'app/models/application_record.rb'
-
-# Offense count: 12
+# Offense count: 11
 # This cop supports unsafe autocorrection (--autocorrect-all).
 # Configuration parameters: EnforcedStyle.
 # SupportedStyles: always, always_true, never
@@ -65,17 +57,15 @@ Style/FrozenStringLiteralComment:
     - 'app/mailers/application_mailer.rb'
     - 'app/models/application_record.rb'
     - 'app/models/user.rb'
-    - 'config.ru'
     - 'lib/tasks/auto_annotate_models.rake'
 
-# Offense count: 2
+# Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
 # Configuration parameters: EnforcedStyle, ConsistentQuotesInMultiline.
 # SupportedStyles: single_quotes, double_quotes
 Style/StringLiterals:
   Exclude:
     - 'Rakefile'
-    - 'config.ru'
 
 # Offense count: 2
 # This cop supports safe autocorrection (--autocorrect).
