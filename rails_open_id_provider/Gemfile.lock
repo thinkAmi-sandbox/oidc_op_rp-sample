@@ -156,7 +156,7 @@ GEM
       racc
     prism (1.9.0)
     public_suffix (6.0.2)
-    puma (5.6.9)
+    puma (6.6.1)
       nio4r (~> 2.0)
     racc (1.5.2)
     rack (2.2.24)
@@ -280,7 +280,7 @@ DEPENDENCIES
   doorkeeper-openid_connect
   jbuilder (~> 2.7)
   listen (~> 3.3)
-  puma (~> 5.0)
+  puma (~> 6.0)
   rack-mini-profiler (~> 4.0)
   rails (~> 6.1.4)
   rubocop (= 1.91.0)

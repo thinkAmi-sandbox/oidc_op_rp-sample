@@ -55,7 +55,7 @@ ignore:
   - GHSA-wjv4-x9w8-wm3h # >= 1.19.4
   - GHSA-wx95-c6cv-8532 # >= 1.19.1
 
-  # puma 5.6.9: 5.5.0 で入った PROXY protocol v1 の不具合で、5.4.0 は対象外だった。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない。修正版は 7.2.1 以上だけ。puma を 7.2.1 以上に上げるときに解消する（PLAN.md 7 章）
+  # puma 6.6.1: 5.5.0 で入った PROXY protocol v1 の不具合で、5.4.0 は対象外だった。6.x も対象。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない。修正版は 7.2.1 以上だけ。puma を 7.2.1 以上に上げるときに解消する（PLAN.md 7 章）
   - CVE-2026-47736 # ~> 7.2.1 / >= 8.0.2
   - CVE-2026-47737 # ~> 7.2.1 / >= 8.0.2
 
