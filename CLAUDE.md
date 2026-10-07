@@ -35,6 +35,16 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 - PR 本文は `--body-file` で渡す（Claude Code hooks が本文を検査するため）
 - epic → main の取り込みはマージコミットで行い、squash しない
 
+## 人間との分担
+
+- 判断が必要なことは、1 回に 1 つの論点だけ、根拠（ファイルと行、調べた事実）と見立てを添えて、テキストで質問する
+- 各 Step は、調査して作業計画を出し、人間の承認を待ってからファイルを変更する
+- ダウンロードが発生するもの（gem、npm パッケージ、Playwright のブラウザ、Ruby / Node など）は、入れる前に名前・バージョン・サイズを示して確認する
+- 手動確認用のローカル環境（各アプリの development DB、`.env`、OP の署名鍵）を消す・作り直す操作（`db:drop`、`db:reset`、seeds の投入など）は、実行する前に確認する
+- ブラウザでのパスワードの入力と、OP の同意画面の「Authorize」は人間が行う。依頼するときは、ブラウザペインが画面に出ているかを確かめてから声をかける
+- コミットメッセージ・ドキュメント・PR 本文では、まだ存在しないもの（これから作るテストなど）を現在形で書かない
+- push と PR の作成は人間が行う。AI は PR のタイトルと本文を提案し、本文は `scripts/check-public-safety --message` を通してからチャットにも出す
+
 ## テスト
 
 - アプリ内のテストは minitest（RSpec は導入しない）。外部通信は WebMock で差し替える

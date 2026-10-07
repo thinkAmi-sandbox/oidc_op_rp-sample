@@ -1,0 +1,27 @@
+# 3 つの Rails アプリ（rails_*）で共通の設定。各アプリの .rubocop.yml から inherit_from で読む。
+# rubocop 系の gem は各アプリの Gemfile にあるので、各アプリのディレクトリで bundle exec rubocop を実行する。
+
+plugins:
+  - rubocop-minitest
+  - rubocop-rails
+
+inherit_mode:
+  merge:
+    - Exclude
+
+AllCops:
+  TargetRubyVersion: 3.1
+  TargetRailsVersion: 6.1
+  # 新しいルールは、rubocop を更新するコミットで内容を見てから有効にする
+  NewCops: disable
+  SuggestExtensions: false
+  # このファイルのパスはリポジトリ直下からの相対になるので、どのアプリでも合うように **/ から書く。
+  # config/・bin/・db/ は rails app:update で上書きされる雛形なので対象外
+  Exclude:
+    - "**/config/**/*"
+    - "**/bin/**/*"
+    - "**/db/**/*"
+    - "**/vendor/**/*"
+    - "**/tmp/**/*"
+    - "**/log/**/*"
+    - "**/node_modules/**/*"

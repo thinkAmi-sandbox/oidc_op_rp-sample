@@ -227,7 +227,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-c: E2E と OP の応答のスナップショット（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0c-e2e-baseline` / （PR 作成後に追記）
+- ブランチ / PR: `upgrade/step0c-e2e-baseline` / [#12](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/12)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）。E2E 用に Node 24.21.0 を mise で固定
 
 ### 作業計画からの変更点
@@ -321,3 +321,106 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 | ダミーの client_id / secret・ユーザー・パスワードが seeds、`.env_e2e`、`e2e/support/users.ts` に重複している | 対応しない。seeds が E2E のファイルを読むと、OP が `e2e/` に依存する。食い違えばログインやトークンの取得で E2E が失敗するので、気づける |
 | `e2e/tests/servers.spec.ts` の discovery の確認が、スナップショットの比較と重複している | 対応しない。起動の失敗が分かりやすい確認として残すと決めた（「作業計画からの変更点」） |
 | introspect のたびに RS のクライアントでトークンを取り直している | 対応しない。RS と同じ呼び方を再現するためで、E2E 用の DB は毎回作り直す |
+
+## Step 0-d-1: 静的解析と脆弱性チェックの導入（2026-10-07）
+
+- ブランチ / PR: `upgrade/step0d-lint-audit-tests` / PR は未作成
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 作業計画からの変更点
+
+計画の段階で調べた事実をもとに、PLAN.md の 0-d から次のように変えた（作業計画として承認済み）。
+
+| 項目 | PLAN.md の当初の記述 | 実際 | 理由 |
+|---|---|---|---|
+| PR の単位 | 0-d で 1 PR | 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）の 2 PR | bundler-audit の無視リストが 1 アプリ 93〜94 件になり、理由を添えた一覧だけでレビューの量が大きい。テストとはレビューの観点も違う |
+| bundler-audit の既存の advisory | 0-a で残した nokogiri と json-jwt の 2 件を無視リストに入れる | 1 アプリ 93〜94 件（20〜21 gem）をすべて無視リストに入れ、gem ごとに解消する時期を書いた | 下の「bundler-audit」 |
+| RS の既存のテスト | 0-d のテストに含める | 0-d-1 の最初のコミットで「トークンなしは 401」に直した | 下の「遭遇した問題」1。テストが通らない状態でコミットしないため、最初に直した |
+
+### 導入したもの
+
+| gem | バージョン | 備考 |
+|---|---|---|
+| rubocop | 1.91.0 | 3 アプリとも development / test グループに `require: false`。rubocop 系はバージョンを固定 |
+| rubocop-minitest | 0.41.0 | |
+| rubocop-rails | 2.38.0 | |
+| brakeman | 7.1.1 | 8.x は Ruby 3.1 では入らない |
+| bundler-audit | 0.9.3 | advisory DB は `~/.local/share/ruby-advisory-db` |
+
+- 依存として lock に新しく入った gem は 13 個（rubocop-ast、parser、prism、json など）。3 アプリとも Gemfile.lock の既存の行は変わっていない
+- rubocop は json に依存する。そのままでは json 3.0.2 が lock に入り、アプリが今使っている Ruby 3.1.7 の default gem の json 2.6.1 が置き換わる。0-a と同じ一時固定で 2.6.1 にして、固定は外した（PLAN.md 7 章に追記）
+
+### RuboCop
+
+- リポジトリ直下の `.rubocop.yml` を各アプリの `.rubocop.yml` が継承し、各アプリは自分の `.rubocop_todo.yml` を持つ
+- 直下の設定ファイルのパスは直下からの相対になるので、対象外は `**/config/**/*` の形で書き、`inherit_mode: merge: [Exclude]` で既定の除外（`vendor/**` など）も残した。各アプリの `vendor/bundle` に gem があるため。`rubocop --list-target-files` で、`config/`・`bin/`・`db/`・`vendor/` が対象外になっていることを確認した
+- 既存の違反は `--auto-gen-config --no-exclude-limit` で凍結した。既定の上限（15 ファイル）を超えたルールは `Enabled: false` になり、新しいコードも検査されなくなるため。生成した todo に `Enabled: false` はない。新しいファイルを置くと検査されることを確認した
+
+| アプリ | 凍結した違反 |
+|---|---|
+| RS | 38 件（13 ファイル、10 ルール） |
+| RP | 58 件（18 ファイル、10 ルール） |
+| OP | 68 件（12 ファイル、9 ルール） |
+
+- 3 アプリとも Gemfile に `Bundler/OrderedGems` などの既存の違反がある。gem は既存の `group :development, :test` に足し、新しい `Bundler/DuplicatedGroup` を作らないようにした（RP と OP の `Bundler/DuplicatedGroup` は、annotate 用の 2 つ目の `group :development` による既存のもの）
+
+### bundler-audit
+
+- 無視リストは各アプリの `.bundler-audit.yml`。gem ごとのコメントに解消する時期、各行のコメントに修正版を書いた。1 行消すと、その advisory が報告されることを確認した
+- 件数は RS 93、RP 93、OP 94。nokogiri と sqlite3 は lock の 2 つのプラットフォームの分だけ二重に報告されるが、無視リストには 1 回だけ書いた
+- 解消する時期の内訳
+
+  | 区分 | gem | 解消する時期 |
+  |---|---|---|
+  | Rails 6.1 系に修正版がない | actionpack | Step 1（7.0.8.7） |
+  | | activerecord、activestorage の CVE-2025-24293 | Step 3（7.1.5.2） |
+  | | actionview、activesupport、activestorage の残り | Step 5（7.2.3.1 / 7.2.3.2） |
+  | Ruby や Rails の制約がある | concurrent-ruby | 1.3.5 以上は Rails 6.1 で起動しない（Step 0-a の gem ごとの対応）。Rails 7.0.8.7 の `active_support/logger_thread_safe_level.rb` も `logger` を require せず、require するのは 7.1.0 から。Step 3 の後 |
+  | | devise（OP） | 修正版は 5.x だけで、5.x は Rails 7.0 以上が必要（railties >= 7.0）。Step 1 の後 |
+  | | nokogiri | 1.19 系は Ruby 3.2 以上が必要。Step 2 |
+  | | sqlite3 | 修正版は 2.x だけ。Step 5 |
+  | 0-f で上げる予定のもの | oauth2、jwt、json-jwt（OP） | 0-f（PLAN.md 7 章のとおり） |
+  | | doorkeeper（OP） | 修正版は 5.6.6 以上。doorkeeper-openid_connect 1.8.0 が doorkeeper 5.6 未満を要求するので、0-f で一緒に上げる |
+  | Rails 6.1・Ruby 3.1 のまま上げられる | rack（2.2.23）、puma（5.6.9）、loofah（2.25.2）・crass（1.0.7）・rails-html-sanitizer（1.7.1）、websocket-driver（0.8.2）、globalid（1.0.1）、mail（2.9.1）、msgpack（1.8.2）、faraday（RP・RS、1.10.6）、bcrypt（OP、3.1.22） | 0-d-3（下の「判断」） |
+
+- 「Rails 6.1・Ruby 3.1 のまま上げられる」は、Gemfile と lock のコピーで `bundle lock --update <gem> --conservative` を実行し、修正版以上に解決できることで確かめた（起動とテストはしていない）。rails-html-sanitizer は単独では loofah を据え置くため 1.4.3 止まりで、loofah・crass と一緒なら 1.7.1 になる。mail は logger、websocket-driver は base64 が新しく lock に入る
+- 計画の段階で GitHub の advisory DB を照会した結果（24 gem・約 96 件）と、gem の顔ぶれはほぼ同じだった
+
+### brakeman
+
+- 3 アプリとも警告は同じ 3 件で、brakeman の既定の無視ファイル `config/brakeman.ignore` に `note` を付けて入れた
+  - Ruby 3.1 のサポート終了（EOLRuby）と Rails 6.1 のサポート終了（EOLRails）: このアップグレードで解消する
+  - rails-html-sanitizer の CVE-2022-32209（SanitizeConfigCve、Weak）: bundler-audit でも報告されるもの
+- `config/` は RuboCop の対象外だが、`brakeman.ignore` は Ruby のコードではないので影響しない
+
+### 判断
+
+- Rails 6.1・Ruby 3.1 のまま上げられる gem は、脆弱性の修正だけのサブステップ 0-d-3 を新設して上げる（人間の判断）。0-d-2（minitest）の後、0-e の前に行う
+  - 選択肢は「0-d-3 を新設する」と「0-f の周辺 gem の更新に含める」だった。Claude の見立ては新設で、理由は、rack と puma は外部からの入力を直接受けること、0-f は oauth2 や doorkeeper のような壊れやすいメジャー更新が中心で、混ぜると修正が遅れることだった
+  - 名前は、LOG.md から何度も参照されている 0-e・0-f の番号を振り直さないよう、0-d-3 にした
+  - 上げる先の版、default gem の置き換え（mail が logger、websocket-driver が base64 を lock に入れる）の扱いなどは、0-d-3 の着手時に調べて決める（PLAN.md の 0-d-3）
+
+### 遭遇した問題
+
+1. RS の既存のテスト（`rails_resource_server/test/controllers/apples_controller_test.rb`）は、トークンなしで `apples/show` を呼んで 200 を期待していて、401 で落ちていた（`1 runs, 1 failures`）。テストは、トークンを確かめる `before_action` を持つ `ApplesController` と同じコミットで追加された、ジェネレーターの生成物のままで、追加された時点から通っていなかった。テストは現在の挙動を記録するものなので、401 を期待するように直した。トークンが有効・無効の場合は introspect を WebMock で差し替える必要があるので、0-d-2 で書く
+2. RS の `test/test_helper.rb` の `parallelize(workers: :number_of_processors)` のままでは、`bin/rails test` が終わらなかった（ワーカーのプロセスが消え、親プロセスが待ち続けた。3 分以上止まったので止めた）。`PARALLEL_WORKERS=1` では 0.03 秒で終わる。テストの件数が少なく、並列にする必要がないので `parallelize` の行を消した
+3. `rubocop --auto-gen-config` は、各アプリの `.rubocop.yml` の `inherit_from` を `.rubocop_todo.yml` → `../.rubocop.yml` の順に書く。この順では、todo の Rails のルールを rubocop-rails のプラグインを読む前に読むので、`Error: Rails cops have been extracted to the rubocop-rails gem.` で止まる。直下の設定 → todo の順に直した
+
+### 確認結果
+
+- RuboCop: 3 アプリとも `no offenses detected`
+- bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）
+- brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 3`
+- minitest: RS 1 runs、0 failures。OP と RP にはまだテストがない（0-d-2 で追加する）
+- E2E: gem を追加した各コミットの前に流して、どれも 10 passed
+- 3 アプリとも `bin/rails runner` で起動し、development で RuboCop を読み込まない（`defined?(RuboCop)` が nil）。json は 2.6.1 のまま
+- 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する。RS の `db/test.sqlite3` は、計画の段階で RS のテストを流したときに作られた（gitignore 対象）
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| concurrent-ruby の解消時期を「Step 1（Rails 7.0）の後」としたが、Rails 7.0.8.7 の `activesupport-7.0.8.7/lib/active_support/logger_thread_safe_level.rb` も `logger` を require しない（require するのは 7.1.0 から）。1.3.5 以上は Rails 7.0 でも起動しない | 3 アプリの無視リスト、本ファイル、PLAN.md 7 章を「Step 3 の後」に直した。rails/rails の v7.0.8.7 と v7.1.0 のタグで、該当ファイルを見比べて確かめた |
+| 「依存として lock に新しく入った gem は 20 個」は誤り。増えた spec は 18 個で、直接足した 5 個を除くと 13 個 | 13 個に直した |
+| 0-d-1 の最初のコミットで書き換えた RS のテストの違反が、`.rubocop_todo.yml` に既存の違反として凍結されていた | テストを違反なしの書き方にし、todo を作り直した。`test/test_helper.rb` は生成物から行を消しただけなので、凍結に残した |
+| PLAN.md の 0-d-2 に、まだない `.env.test` などを現在形で書いていた | 「予定:」と書き、`.public-safety-allow` への追記は承認を得てから行うこと、承認されない場合の代案も書いた |
