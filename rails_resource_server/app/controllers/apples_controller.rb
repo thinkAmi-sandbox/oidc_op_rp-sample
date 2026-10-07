@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ApplesController < ApplicationController
   before_action :validate_bearer_token
   def show
