@@ -4,19 +4,19 @@
     {
       "name": "op",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd rails_open_id_provider && DISABLE_SPRING=1 exec mise exec -- bin/rails s -p 3780"],
+      "runtimeArgs": ["-c", "cd rails_open_id_provider && exec mise exec -- bin/rails s -p 3780"],
       "port": 3780
     },
     {
       "name": "rp",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd rails_relying_party_of_backend && DISABLE_SPRING=1 exec mise exec -- bin/rails s -p 3781"],
+      "runtimeArgs": ["-c", "cd rails_relying_party_of_backend && exec mise exec -- bin/rails s -p 3781"],
       "port": 3781
     },
     {
       "name": "rs",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd rails_resource_server && DISABLE_SPRING=1 exec mise exec -- bin/rails s -p 3782"],
+      "runtimeArgs": ["-c", "cd rails_resource_server && exec mise exec -- bin/rails s -p 3782"],
       "port": 3782
     }
   ]
