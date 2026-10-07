@@ -7,10 +7,10 @@
 
 # 同意画面は、同じアプリ・ユーザー・scope の revoke されていないトークンがあると省かれる。
 # シナリオの実行順や単独実行で同意画面の有無が変わらないよう、シナリオごとにユーザーを分ける
-E2E_PASSWORD = 'e2e-dummy-password'
+e2e_password = 'e2e-dummy-password'
 %w[login logout resource baseline].each do |scenario|
   User.find_or_create_by!(email: "e2e-#{scenario}@example.com") do |user|
-    user.password = E2E_PASSWORD
+    user.password = e2e_password
   end
 end
 
