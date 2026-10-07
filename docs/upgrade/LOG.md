@@ -636,7 +636,7 @@ gem ごとに RS → RP → OP の順で `bundle lock --update <gem> --conservat
 
 ## Step 0-e: 既存コードの RuboCop 違反の修正（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0e-rubocop-violations` / PR は未作成
+- ブランチ / PR: `upgrade/step0e-rubocop-violations` / [#16](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/16)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 着手時の件数
@@ -718,3 +718,114 @@ PLAN.md の 0-e で「着手時の調査で決める」とした論点は、次�
 | 同じプロセスで eager load すると、後に流れるテストでは定数がすべて読み込み済みになり、autoload の漏れが隠れうる | 対応しない。ガイドの例も同じプロセスで動かす。ファイル名と定数名の食い違いは、このテスト自体と `bin/rails zeitwerk:check` で見つかる |
 | 行カバレッジ 100% は、読み込むだけで通る行を含む | 「テストの追加」に、以降の Step ではメソッドの中の行で判断することを書き足した |
 | RS の `gsub('Bearer ', '')` は `Bearer ` の接頭辞を確かめないので、`Basic` などのヘッダーの値もそのまま introspect に渡る | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う |
+
+## Step 0-f-1: spring の削除と、開発・テスト用などの gem の更新（2026-10-07）
+
+- ブランチ / PR: `upgrade/step0f-gem-updates` / PR は未作成
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 作業計画で決めたこと
+
+着手時に、0-f 全体（0-f-1〜0-f-3）を調べて作業計画を出し、承認を得た。`bundle outdated` を 3 アプリで確認し、PLAN.md 7 章の順で振り分けた。依存の範囲は rubygems の API と gemspec、挙動の変化は CHANGELOG とタグ間のソースで確かめた（サブエージェント）。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| PR の単位 | 0-f-1（spring の削除、開発・テスト用などの gem）、0-f-2（RS・RP の oauth2 系）、0-f-3（OP の doorkeeper 系）の 3 つに分ける | 0-d と同じく、レビューの観点（クライアント側と OP 側）と量が違う |
+| 上げる先 | Ruby 3.1・Rails 6.1 で使える最新の版。ただし doorkeeper は 5.7.1、doorkeeper-openid_connect は 1.8.9 で止める | doorkeeper-openid_connect 1.8.10 は CHANGELOG に「Drop support for Rails 6」とあり、doorkeeper は 5.8.1 で CI から Rails 6 を外した。5.7.1 / 1.8.9 は Rails 6 を外していない最後の組み合わせで、doorkeeper の advisory（5.6.6 で修正）も解消できる |
+| 上げない gem | annotate（3.2.0 は注釈の出力が変わる。Step 5 で置き換える）、omniauth-rails_csrf_protection（2.0 の変化は Rails 8.1 だけ。Step 7）、sqlite3・rails | 時期は PLAN.md 7 章 |
+| Ruby 3.2 以上が必要な版 | 上げない（byebug 13、web-console 4.3、rack-mini-profiler 5、brakeman 8、simplecov 1、doorkeeper-openid_connect 1.10.2 以上） | Step 2 の後 |
+| 間接依存の gem | 上の更新で必要になったものしか動かさない（`--conservative`） | i18n・zeitwerk・minitest などは Rails を上げるときに動く |
+| default gem を置き換える依存 | 一時固定する（cgi 0.3.7、0-f-2 の faraday-net_http 3.0.2） | json・bigdecimal・logger・base64 と同じく、アプリが読む版を変えない |
+| 挙動が変わる更新 | 設定で元の挙動に固定する。テストや E2E で守られていない挙動は、gem を上げる前にテストを足す（0-f-2・0-f-3） | アップグレード中は挙動を変えない |
+| discovery に `code_challenge_methods_supported` が増える（0-f-3） | 「意図的な仕様変更」として受け入れ、スナップショットを更新する | doorkeeper-openid_connect 1.8.3 以上は PKCE の列があると出し、設定で消すと PKCE も止まる |
+| spring を消すときの `bin/` | `bin/spring`・`config/spring.rb` を消し、`bin/rails`・`bin/rake` を Rails 7.0 の雛形の形にする | Rails 7.0 の `app:update` は `bin/rails`・`bin/rake` を書き換えるが、`bin/spring` と `config/spring.rb` は消さない |
+| ダウンロード | gem の名前・版・サイズを PR ごとにまとめて示し、承認を得た | CLAUDE.md の「人間との分担」 |
+
+0-f-2・0-f-3 の調査の結果（oauth2 2.x の既定値、faraday-net_http の依存、doorkeeper-openid_connect の版ごとの違いなど）は、PLAN.md の 0-f と 7 章に書いた。
+
+### gem ごとの対応
+
+gem ごとに RS → RP → OP の順で `bundle update <gem> --conservative` を実行し、アプリごとにコミットした。
+
+| gem | バージョン | アプリ | 対応 |
+|---|---|---|---|
+| spring | 2.1.1 → 削除 | 3 アプリ | 下の「spring の削除」 |
+| byebug | 11.1.3 → 12.0.0 | 3 アプリ | メジャー更新。C 拡張は clang 17 でビルドできた |
+| web-console | 4.1.0 → 4.2.1 | RP・OP | |
+| listen | 3.6.0（RS は 3.7.0）→ 3.10.1 | 3 アプリ | logger が依存に入るが、lock の logger は 1.5.0 のまま。警告は下の「listen の finalizer の警告」 |
+| rack-mini-profiler | 2.3.2 → 4.0.1 | RP・OP | メジャー更新。Gemfile を `~> 2.0` → `~> 4.0` |
+| thor | 1.1.0 → 1.5.0 | 3 アプリ | `DidYouMean::SPELL_CHECKERS.merge!` の警告が出なくなった（Step 0-a） |
+| bootsnap | 1.7.7 → 1.26.0 | 3 アプリ | |
+| jbuilder | 2.11.2 → 2.13.0 | RP・OP | `.jbuilder` のビューはない |
+| puma | 5.6.9 → 6.6.1 | 3 アプリ | メジャー更新。Gemfile を `~> 5.0` → `~> 6.0`。advisory 2 件は 6.6.1 も対象（下の「確認結果」） |
+| dotenv / dotenv-rails | 2.7.6 → 3.2.0 | RS・RP | メジャー更新 |
+| activerecord-session_store | 2.0.0 → 2.1.0 | RP | cgi 0.3.7 が lock に入る。一時固定しないと 0.5.2 が入り、Ruby 3.1.7 の default gem（0.3.7）を置き換える（lock のコピーで確かめた） |
+| devise / responders | 4.8.0 / 3.0.1 → 4.9.4 / 3.1.1 | OP | advisory 2 件は 4.9.4 も対象（5.x でしか直らない）。無視リストのコメントの版を直した |
+
+- 一時固定は、過去の Step と同じく Gemfile に `gem '<名前>', '<版>'` を足して lock → 外して lock した
+- 作業の後の 3 アプリの lock を epic と比べ、変わったのは上の gem と cgi だけで、default gem（json 2.6.1・bigdecimal 3.1.1・logger 1.5.0・base64 0.1.1 など）と concurrent-ruby 1.1.9 が動いていないことを確かめた
+
+### CHANGELOG で確かめたこと
+
+アプリの挙動に関わりうるものだけを残す。
+
+| gem | 内容 | アプリへの影響 |
+|---|---|---|
+| byebug 12 | 引数なしの `break` が今の行に止まる | アプリのコードは byebug を呼ばない |
+| web-console 4.2 | Ruby 3.0 以上で `binding.eval` が動く。応答ヘッダーを小文字に | エラー画面だけに出る。E2E はエラー画面を開かない |
+| rack-mini-profiler 3〜4 | 3.0 で snapshot の保存の API が変わり `snapshots_limit` が消えた。4.0 で応答ヘッダーが小文字（`x-miniprofiler-ids` など）。4.0.1 で Rack 2 に再び対応 | 設定はしていない。4.0.1 でも development のページに `<script id="mini-profiler">` が挿入され、応答ヘッダーは小文字になる（E2E 用の DB を指定した `rails runner` から、RP のトップと OP のログイン画面で確かめた。2.3.2 では確かめていない）。E2E はこの状態で通る |
+| thor 1.2〜1.5 | 1.2.0 で `DidYouMean` の警告を出さない。1.2.2 で MD5 → SHA256、1.4.0 で YAML の遅延読み込み | `rails --help`・`rails g --help`・`rails routes` が警告なしで動く |
+| bootsnap 1.8〜1.26 | Psych 4 対応、`Kernel.load` を装飾しない（classic autoloader だけに関係）、JSON のキャッシュの削除 | 空のキャッシュの場所を指定して 2 回起動し、1 回目に書いたキャッシュを 2 回目に使えることを確かめた |
+| puma 6 | 標準の 8 つ以外の HTTP メソッドは 501。`PUMA_` で始まる環境変数。エラーの応答で Puma と名乗らない。Rack 2 のハンドラーは残る | `config/puma.rb` で使っている設定（threads・worker_timeout・port・environment・pidfile・tmp_restart）はすべて有効。`workers` は使っていない |
+| dotenv 3 | 読むファイルの順番と、既にある環境変数を上書きしないことは同じ。テストのたびに ENV を戻す。引用符の中の `\n` を改行にしない。Rails のログに `[dotenv]` の行（読んだファイル、設定した変数名）を出す | 下の「dotenv」 |
+| activerecord-session_store 2.1 | `session_class` を `class_attribute` に。Rack 3 に対応 | RP は `session_store :active_record_store` と JSON の serializer だけを使う。E2E のログインがセッションを使う |
+| devise 4.9 / responders 3.1 | responders の `error_status`（既定 200）・`redirect_status`（既定 302）。devise は `config.responder` を設定しなければ従来の値を使う。`:turbo_stream` を navigational format に追加 | OP の `config/initializers/devise.rb` は `config.responder` を設定していない。`Devise.responder` の値は `:ok` / `:found` で、誤ったパスワードは今と同じく 200（OP のテスト） |
+
+### spring の削除
+
+- 3 アプリの Gemfile から spring を外し、`bin/spring` と `config/spring.rb` を消した。`bin/rails`・`bin/rake` の `load File.expand_path("spring", __dir__)` の行を消し、Rails 7.0 の雛形（`railties-7.0.8.7/lib/rails/generators/rails/app/templates/bin/rails.tt`・`rake.tt`）と同じ形にした
+- `e2e/scripts/start-server.sh` と `.claude/launch.json` の `DISABLE_SPRING` を消した。LOG.md の過去の記録は変えていない。PLAN.md の 0-d-2 には、spring を消した後は `bin/rails test` だけでよいと書き足した
+- `.claude/launch.json` の変更は E2E では確かめられないので、3 アプリを launch.json のコマンドで起動し、起動のログで Puma 6.6.1 であることを確かめた。OP の discovery は 200、トークンなしの RS は 401 を返した。RP は手動確認用の DB を変えないよう、リクエストを送っていない（RP のトップページを 1 回開くと、セッションの行が 1 件増えることを E2E 用の DB で確かめた）
+
+### listen の finalizer の警告
+
+- Step 0-b・0-d-3 で観測した `ThreadError: can't be called from trap context` は、listen 3.10.1 でも出る
+- 再現の手順: `bin/rails runner` で `ActiveSupport::EventedFileUpdateChecker` を作って参照を外し、`Signal.trap('USR1') { GC.start }` を仕込んで自分に USR1 を送る。シグナルのハンドラーの中で GC が finalizer を呼び、listen の `stop` の `Mutex#synchronize` が失敗する。listen 3.6.0（更新前の OP）でも 3.10.1（更新後の RS）でも、同じ警告が出た
+  - gem 側: `activesupport-6.1.7.10/lib/active_support/evented_file_update_checker.rb:93`（finalizer）→ `listen-3.10.1/lib/listen/fsm.rb:78`（`synchronize`）
+- listen 側の issue（guard/listen#565）は未解決。Rails 側の issue（rails/rails#46785）は、Rails の main では出なかったというコメントの後、返事がないため bot が自動で閉じた（どの変更で出なくなったかは確かめていない）。Rails 7.0 の development.rb の雛形には `config.file_watcher` の行がない（Rails 6.1 の雛形は `EventedFileUpdateChecker`）。Step 1 の `app:update` の差分で、この行の扱いを判断する（PLAN.md 7 章）
+
+### dotenv
+
+- 上げる前と後で、`bin/rails runner` から次の 3 通りに、変数がどのファイル由来かを出して比べた（値は出していない）。RS は `CLIENT_ID_OF_RESOURCE_SERVER`、RP は `CLIENT_ID_OF_MY_OP` と `OIDC_PROVIDER_HOST`
+
+  | 環境 | 結果（前後とも） |
+  |---|---|
+  | test | `.env.test` |
+  | development | `.env` |
+  | development で同じ名前の環境変数を渡す | 渡した値（E2E の `webServer.env` と同じ） |
+
+- 3.x から、Rails のログ（`log/test.log`・`log/development.log`）に `[dotenv] Loaded .env.test`、`[dotenv] Set <変数名>`、テストのたびの `Saved a snapshot of ENV` が出る。`Set` の行に値が含まれないことを確かめた
+
+### 遭遇した問題
+
+1. development の Rails を `Rack::MockRequest` で呼ぶと、Host ヘッダーがないため `ActionDispatch::HostAuthorization` に 403（`Blocked host: localhost`）で止められた。`HTTP_HOST` に `localhost:<ポート>` を渡して確かめた
+2. bundler-audit の advisory DB を更新しようとしたが、0-d-3 のときの DB（2026-10-06）が最新で、新しい advisory はなかった
+
+### 確認結果
+
+- minitest: 各コミットの前に流して、どれも RS 8 runs、RP 17 runs、OP 18 runs、0 failures（非推奨警告は `:raise` のまま）
+- E2E: 各コミットの前に流して、どれも 10 passed
+- RuboCop: 3 アプリとも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）。brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 2`
+- 3 アプリとも `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動とプレビューで確認し、Puma 6.6.1 で起動する
+- 無視リストを空にした bundler-audit で、puma 6.6.1 が CVE-2026-47736 / 47737、devise 4.9.4 が CVE-2026-32700 / 40295 の対象のままであることを確かめた
+- 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| launch.json から OP・RS が Puma 6.6.1 で動くと書いているが、Puma の版を起動のログで確かめたのは OP だけ | RS も launch.json のコマンドで起動し、起動のログで Puma 6.6.1 を確かめた。RP と合わせて書き直した |
+| rack-mini-profiler の挿入が「変わらない」と書いているが、2.3.2 では確かめていない | 4.0.1 で確かめたことだけを書いた |
+| RP のトップページがセッションを DB に書くというのは推測 | E2E 用の DB で、トップページを 1 回開くとセッションの行が 1 件増えることを確かめた |
+| gem 内のパスを `gem名-バージョン/` から書いていない（`railties-7.0.8.7` の `templates/bin/rails.tt`） | `railties-7.0.8.7/lib/rails/generators/rails/app/templates/bin/rails.tt` に直した |
+| cgi 0.3.7 は lock にしか残らないので、`--conservative` を付けない `bundle update` で黙って 0.5.2 に変わる | 対応しない。json・bigdecimal・logger・base64 と同じ一時固定のやり方で、Ruby を上げる各 Step で合わせ直す（PLAN.md 8 章の 4）。default gem の版は gem を上げるたびに lock で確かめている |

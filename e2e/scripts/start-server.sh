@@ -20,8 +20,6 @@ case "${DATABASE_URL:-}" in
 esac
 
 export RAILS_ENV=development
-# E2E の終了後に spring のサーバーが残らないよう、spring を使わない
-export DISABLE_SPRING=1
 
 cd "$(dirname "$0")/../../$app"
 
