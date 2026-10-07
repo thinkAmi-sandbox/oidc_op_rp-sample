@@ -40,7 +40,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 - アプリ内のテストは minitest（RSpec は導入しない）。外部通信は WebMock で差し替える
 - テストは「現在の挙動を記録する」ためのもの。仕様は変えない。落ちたらまずアプリ側の変化を疑う
 - 1 テスト 1 振る舞い。準備・実行・確認の順に書く。時間に依存するテストは `travel_to` で固定し、`sleep` は使わない
-- 3 アプリ通しの E2E はリポジトリ直下の `e2e/`（Playwright）。E2E が通ることを各 Step の完了条件にする
+- 3 アプリ通しの E2E はリポジトリ直下の `e2e/`（Playwright）。E2E が通ることを各 Step の完了条件にする。実行方法は `e2e/README.md`
 
 ## 公開物への記載ルール
 
