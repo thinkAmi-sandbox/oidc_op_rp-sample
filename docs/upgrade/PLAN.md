@@ -95,19 +95,19 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 
 ### Step 0-c: E2E と基準応答
 
-- [ ] OP の `db/seeds.rb`: テスト用ユーザーと Doorkeeper アプリケーション 3 つ（`my_op` 用 RP、introspection 用 RP、RS）を、一目でダミーと分かる固定の client_id / secret で作成
-- [ ] RP / RS の E2E 用環境変数のひな形（`.env.*` は gitignore 対象なので `.env_e2e_template` のような名前にする）
-- [ ] OP の署名鍵は E2E の準備スクリプトで毎回生成し、gitignore 対象にする（秘密鍵はコミットしない）
-- [ ] `e2e/` に Playwright を導入。`webServer` で 3 アプリを起動
-- [ ] `.gitignore` に `e2e/test-results/`、`e2e/playwright-report/`、`e2e/blob-report/`、`e2e/.auth/`、生成した鍵を追加（トレースやログイン状態には Cookie・トークンが入る）
-- [ ] oxlint ＋ oxfmt を導入（詳細は「9. Linter / Formatter」）
-- [ ] シナリオ
-  - [ ] ログイン: RP → OP でログイン → 同意 → RP に戻りユーザー情報が表示される（RP 側の ID トークン検証も通る）
-  - [ ] リソース取得: introspection 用 RP でログイン → RS の API → OP の introspect → りんごの情報が表示される
-  - [ ] トークン失効: revoke 後、RS がそのトークンを拒否する（期限切れと同じ「introspect が `active: false`」の経路を確認する）
-  - [ ] ログアウト: セッションが破棄される
-  - [ ] 基準応答との比較: discovery、JWKS、userinfo、introspect、トークン応答
-- [ ] 基準応答の比較ルール: 時刻・トークンなど毎回変わる値は伏せる。JWKS は鍵が毎回変わるので `kid` と `n` を伏せ、`kty`・`alg`・`use` などの構造を比べる。ID トークンは項目と `alg` を必ず比べる。トークン応答の `expires_in: 600` は伏せずに比べる
+- [x] OP の `db/seeds.rb`: Doorkeeper アプリケーション 3 つ（`my_op` 用 RP、introspection 用 RP、RS）を、一目でダミーと分かる固定の client_id / secret で作成。ユーザーはシナリオごとに 1 人（同意画面の有無が実行順で変わらないようにするため）
+- [x] RP / RS の E2E 用の環境変数 `.env_e2e`（ひな形ではなく E2E がそのまま読むファイルなので、`.env_e2e_template` から名前を変えた）。ダミーの secret は `.public-safety-allow` で除外（人間が承認）
+- [x] OP の署名鍵は、E2E の起動時に `jwtRS256.key` がなければ生成し、あれば手動確認用の鍵を使う（毎回生成するには OP のコードの変更が必要なため、計画から変更）。秘密鍵はコミットしない
+- [x] `e2e/` に Playwright を導入。`webServer` で 3 アプリを development 環境のまま起動し、`DATABASE_URL` で E2E 専用の DB（`db/e2e.sqlite3`）を毎回作り直す。手動確認用のサーバーが動いていれば起動に失敗する
+- [x] `.gitignore` に `e2e/test-results/`、`e2e/playwright-report/`、`e2e/blob-report/`、`e2e/.auth/` を追加（生成した鍵は OP の `.gitignore` で無視済み）
+- [x] oxlint ＋ oxfmt を導入（詳細は「9. Linter / Formatter」）
+- [x] シナリオ
+  - [x] ログイン: RP → OP でログイン → 同意 → RP に戻りユーザー情報が表示される（RP 側の ID トークン検証も通る）
+  - [x] リソース取得: RP の introspection 画面は RS の応答を表示しない（標準出力に出すだけ）ため、E2E から RS を直接呼んで確かめる。E2E 自身が `my_op` 用 RP のクライアントとして取ったトークンで RS が 200 でりんごの情報を返す
+  - [x] トークン失効: E2E が revoke した後、RS がそのトークンを拒否する。introspection 用 RP の画面から流した場合も、RP が revoke したトークンを RS が 401 で拒否し、introspect が `active: false` になる
+  - [x] ログアウト: RP のセッションが破棄される。OP のセッションは残り、再ログインでは OP のログイン画面を経ない（現在の挙動の記録）
+  - [x] 基準応答との比較: discovery、JWKS、トークン応答、ID トークン（ヘッダーとペイロード）、userinfo、introspect（有効・revoke 後）
+- [x] 基準応答の比較ルール: 時刻・トークン・nonce・ユーザー ID は伏せる。JWKS と ID トークンのヘッダーは `kid` と `n` を伏せ、`kty`・`alg`・`use`・`e` を比べる。ID トークンは項目と `alg` を比べる。有効期間は `exp - iat` として残す（ID トークン 120、introspect 600）。トークン応答の `expires_in: 600` は伏せずに比べる。基準応答は `e2e/baseline/` にあり、更新は `npx playwright test --update-snapshots`
 
 ### Step 0-d: 静的解析・脆弱性チェック・minitest
 
@@ -239,7 +239,7 @@ oxlint / oxfmt の導入条件:
 - [ ] RuboCop で新しい違反がない
 - [ ] bundler-audit と brakeman で新しい警告がない
 - [ ] `bin/rails zeitwerk:check` が通る（Step 1 以降）
-- [ ] `db:drop db:setup` で空から作り直して E2E が通る
+- [ ] `db:drop db:setup` で空から作り直して E2E が通る（E2E の起動時に E2E 用の DB で毎回行われる。RS は `schema.rb` がないので `db:drop db:create`）
 - [ ] 公開物の安全チェック（`scripts/check-public-safety --staged`）が通る
 - [ ] LOG.md と本計画のチェックリストを更新した
 
@@ -283,7 +283,7 @@ Step 1 を一度手作業で通した後に、`/rails-upgrade` を入口とす�
 ## 14. 未決事項
 
 - [ ] 最終的に Ruby 4.0 まで上げるか（Step 8 完了時に判断）
-- [ ] `rails_open_id_provider/jwtRS256.key.example`（コミット済みのサンプル秘密鍵）の扱い（Step 0-c で判断）
+- [x] `rails_open_id_provider/jwtRS256.key.example` の扱い（Step 0-c で判断）: 鍵の中身のないプレースホルダーで、どこからも参照されていなかったため、`.pub.example` と一緒に削除した
 
 ## 15. 決定済みの事項
 
