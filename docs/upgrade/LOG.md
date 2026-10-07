@@ -227,7 +227,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-c: E2E と OP の応答のスナップショット（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0c-e2e-baseline` / （PR 作成後に追記）
+- ブランチ / PR: `upgrade/step0c-e2e-baseline` / [#12](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/12)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）。E2E 用に Node 24.21.0 を mise で固定
 
 ### 作業計画からの変更点
