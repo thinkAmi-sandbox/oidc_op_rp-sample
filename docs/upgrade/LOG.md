@@ -427,7 +427,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-d-2: minitest（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0d2-minitest` / PR は未作成
+- ブランチ / PR: `upgrade/step0d2-minitest` / [#14](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/14)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 作業計画からの変更点
