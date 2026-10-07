@@ -227,12 +227,12 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
 | brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初 | brakeman 8 系は Ruby 3.1 では入らない |
 | simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初 | simplecov 1.x は Ruby 3.2 以上が必要（Step 2 の後に上げられる） |
-| json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
-| bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
+| json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
+| bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
 | concurrent-ruby（Rails 経由） | 1.1.9 | Step 3 の後 | 1.3.5 以上は Rails 6.1 でも 7.0 でも起動しない（LOG.md の Step 0-a、Step 0-d-1）。advisory は 1.3.7 で解消する |
 | rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / bcrypt | — | 0-d-3（済） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられた。上げた版は LOG.md の Step 0-d-3（mail・msgpack・faraday・puma は上の行） |
-| logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
-| base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
+| logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
+| base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
 
 annotate の Rails 8 対応状況と、oauth2 1.4 系の faraday 2 対応範囲は記憶ベース。Step 0-f の調査で gemspec を確認して確定させる。
 
@@ -246,6 +246,7 @@ annotate の Rails 8 対応状況と、oauth2 1.4 系の faraday 2 対応範囲�
    - `new_framework_defaults_X_Y.rb` を 1 つずつ有効化してテスト → 全部有効になったら `load_defaults` を上げてファイルを削除
    - RuboCop の `TargetRailsVersion` を上げ、新しい指摘は別コミットで直す
 4. **Ruby を上げる場合**: Ruby を上げてコミット → `TargetRubyVersion` を上げて新しい指摘を直す（別コミット）
+   - lock に入れた default gem（json・bigdecimal・logger・base64）を、新しい Ruby の default gem の版に一時固定で合わせ直す。その Ruby で default gem でなくなったものは 7 章の表に従う
 5. **確認**: 「10. 完了条件」
 6. **記録**: LOG.md を更新 → `/code-review` → PR（向き先は epic）
 
