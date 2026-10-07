@@ -427,7 +427,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-d-2: minitest（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0d2-minitest` / PR は未作成
+- ブランチ / PR: `upgrade/step0d2-minitest` / [#14](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/14)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 作業計画からの変更点
@@ -542,3 +542,94 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 | `.public-safety-allow` の除外は、行のどこかに `=test-dummy-` があれば効くので、本物の secret の行の後ろに書いたコメントでも素通りする | 対応しない。0-c で承認された `.env_e2e` の除外と同じ形で、除外の条件を変えるには人間の承認が必要 |
 | SimpleCov の `rails` プロファイルは `config/` を対象外にするので、OP の挙動のある initializer のカバレッジが取れない | 対応しない。この Step では計測の仕組みを入れるところまでとし、0-e でカバレッジを見るときに必要なら決める |
 | RS のテストで `stub_token_request` を 5 本で繰り返している | 対応しない。準備・実行・確認の順で、各テストの準備をテストの中に見えるようにしておく |
+
+## Step 0-d-3: 脆弱性のある gem の更新（2026-10-07）
+
+- ブランチ / PR: `upgrade/step0d3-security-updates` / PR は未作成
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 作業計画で決めたこと
+
+PLAN.md の 0-d-3 で「着手時の調査で決める」とした 4 点は、次のとおり作業計画に入れて承認を得た。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 上げる先 | 修正版を含むマイナー系列の最新。マイナーはまたがない | パッチ版の追加の修正（rack 2.2.24、msgpack 1.8.3〜1.8.5 のメモリ安全性の修正）は取り込み、機能追加やフォーマットの変更は入れない。globalid は `--conservative` だと 1.4.0 になる（1.2.0 で SignedGlobalID の生成フォーマットが変わる）ので、一時固定で 1.0.1 にした |
+| default gem | logger は 1.5.0、base64 は 0.1.1 に一時固定 | Ruby 3.1.7 の default gem と同じ版。json（0-d-1）・bigdecimal（0-d-2）と同じく、アプリが読む版を変えない |
+| puma の新しい advisory | 5.6.9 に上げ、新しく対象に入る 2 件を無視リストに入れる | 下の「puma」 |
+| PR | 1 つ | PLAN.md 4 章のとおり。区別はコミットでつける |
+
+- default gem については、0-a で mail 2.8.1 を入れたときに、`date 3.5.1`・`timeout 0.6.1`・`net-protocol 0.4.0` が lock に入り、Ruby 3.1.7 の default gem（3.2.2 / 0.2.0 / 0.1.2）を置き換えていたことが分かった（0-a では記録していなかった）。0-d-3 では直近の json・bigdecimal の扱いに揃え、0-a の分は変えていない
+
+### gem ごとの対応
+
+gem ごとに RS → RP → OP の順で `bundle lock --update <gem> --conservative` を実行し、アプリごとにコミットした（24 コミット）。3 アプリとも Gemfile は変わっていない。
+
+| gem | バージョン | アプリ | 解消した advisory | 対応 |
+|---|---|---|---|---|
+| rack | 2.2.3 → 2.2.24 | 3 アプリ | 32 件 | |
+| puma | 5.4.0 → 5.6.9 | 3 アプリ | 6 件 | 新しく 2 件が対象に入る（下の「puma」） |
+| loofah / crass / rails-html-sanitizer | 2.12.0 / 1.0.6 / 1.3.0（RS は 1.4.1）→ 2.25.2 / 1.0.7 / 1.7.1 | 3 アプリ | 4 / 4 / 6 件 | 1 組で更新。brakeman の SanitizeConfigCve（CVE-2022-32209）が出なくなったので、`config/brakeman.ignore` から消した |
+| websocket-driver | 0.7.5 → 0.8.2 | 3 アプリ | 4 件 | base64 0.1.1 が lock に入る |
+| globalid | 0.5.2 → 1.0.1 | 3 アプリ | 1 件 | 一時固定 |
+| mail | 2.8.1 → 2.9.1 | 3 アプリ | 1 件 | logger 1.5.0 が lock に入る |
+| msgpack | 1.4.5 → 1.8.5 | 3 アプリ | 1 件 | bootsnap 1.7.7 の要求は `~> 1.0` |
+| faraday | 1.7.0 → 1.10.6 | RS・RP | 2 件 | faraday-multipart 1.2.0・faraday-retry 1.0.4 が lock に入る（1.9 で multipart と retry が別 gem になった）。oauth2 1.4.7 の要求（`< 2.0`）は満たす |
+| bcrypt | 3.1.16 → 3.1.22 | OP | 1 件 | advisory は JRuby の実装だけが対象 |
+
+- 一時固定は、0-a・0-d-1・0-d-2 と同じく Gemfile に `gem '<名前>', '<版>'` を足して `bundle lock` → 外して `bundle lock` → `git diff` で Gemfile が戻り、lock に意図しない `-    ` の行がないことを確かめた
+- 無視リストの件数は RS 93 → 34、RP 93 → 34、OP 94 → 36（puma の 2 件を足した後）。残りは Rails・nokogiri・sqlite3・concurrent-ruby・0-f で上げる gem・puma の新しい 2 件
+- advisory DB（2026-10-06 時点）と照らし合わせると、上げた先の版で報告されるのは puma の 2 件だけ
+
+### puma
+
+- 5.6.9 にすると、5.4.0 では対象外だった 2 件の対象に入る。どちらも 5.5.0 で入った PROXY protocol v1 の対応の不具合で、`unaffected_versions` は `< 5.5.0`、修正版は 7.2.1 / 8.0.2 だけ
+  - CVE-2026-47736: PROXY protocol v1 の行を読むバッファーに上限がなく、メモリを使い尽くされる
+  - CVE-2026-47737: keep-alive の接続で PROXY protocol のヘッダーを繰り返し受け付け、`REMOTE_ADDR` を偽装される
+- どちらも非既定の `set_remote_address proxy_protocol: :v1` を設定したときだけ影響する。3 アプリの `config/puma.rb` には設定がない
+- 既存の 6 件を解消できることを優先し、2 件は無視リストに入れた（コメントに上の理由と、7.2.1 以上で解消することを書いた）。代案は 5.4.0 に据え置いて 7.2.1 以上に直接上げることだった
+
+### CHANGELOG で確かめたこと
+
+サブエージェントで CHANGELOG とタグ間のソースの差分を読んだ。アプリの挙動に関わりうるものだけを残す。
+
+| gem | 内容 | アプリへの影響 |
+|---|---|---|
+| rack 2.2.x | 2.2.14 以降、クエリのパラメーター数（既定 4096）と本文（既定 4MB）、multipart のパート数・ヘッダーなどに上限が入った。超えると `Rack::QueryParser::QueryLimitError` | Rails 6.1 はこの例外を `ActionController::BadRequest` に変換しない（`actionpack-6.1.7.10/lib/action_dispatch/http/request.rb` が rescue するのは `ParameterTypeError` と `InvalidParameterError` だけ）ので、超えたときは 500 になる（下の「コードレビュー」）。OIDC の通常の通信では届かない |
+| puma 5.5〜5.6 | 5.5.1 から `APP_ENV` を `RACK_ENV` / `RAILS_ENV` より優先する。ヘッダーの行末の LF 単独を受け付けない | 手元のシェルに `APP_ENV` はない |
+| rails-html-sanitizer 1.6〜1.7 | HTML4 / HTML5 の名前空間ができたが、Rails 6.1 では HTML4 の sanitizer のまま。警告は出ない | OP の `rails_open_id_provider/app/views/doorkeeper/applications/index.html.erb` が `simple_format(application.redirect_uri)` を使う（下の「確認結果」） |
+| websocket-driver 0.8 | バイナリフレームの受信が Array から String に変わる。0.8.1 でリクエスト行とヘッダーの合計を 32K に制限 | ActionCable の実チャネルはない |
+| globalid 1.0.1 | ReDoS の修正と fixture のヘルパーだけ | ActiveJob・SignedGlobalID は使っていない |
+| mail 2.9 | ヘッダー名 `Mime-Version` → `MIME-Version`。SMTP の設定処理の書き直し（`tls` / `ssl` と starttls を併記すると `ArgumentError`） | ヘッダー名の大文字小文字は区別されない。ActionMailer 6.1 の SMTP の既定値は併記にあたらない |
+| faraday 1.8〜1.10 | `url_encoded.rb`・`utils.rb`・`adapter/net_http.rb` は 1.7.0 と差分なし。非推奨の警告は環境変数 `FARADAY_DEPRECATE` がないと出ない。1.10.5 は `//` で始まる URL、1.10.6 は decode 時のネストの深さ（100）だけが対象 | アプリは絶対 URL とハッシュの本文で呼ぶだけ |
+| bcrypt 3.1.17〜3.1.22 | 既存の `$2a$` のハッシュはそのまま照合できる。3.1.19 で `hash_secret` の第 3 引数が非推奨 | Devise 4.8.0 は第 3 引数を渡さない |
+
+### 確認結果
+
+- minitest: 各コミットの前に流して、どれも RS 7 runs、RP 16 runs、OP 17 runs、0 failures（非推奨警告は `:raise` のまま）
+- E2E: 各コミットの前に流して、どれも 10 passed
+- RuboCop: 3 アプリとも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）。brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 2`
+- gem ごとの追加の確認
+  - rails-html-sanitizer（OP）: seeds の 3 つの redirect_uri に `simple_format` をかけた出力が、上げる前と同じ
+  - websocket-driver（RS）: development で起動した RS の `/cable` に WebSocket のハンドシェイクを送ると、上げる前と同じく 101 と ActionCable の `{"type":"welcome"}` が返る
+  - mail（OP）: ActionMailer で組み立てたメッセージ（送信はしない）のヘッダーは、`Mime-Version` が `MIME-Version` になった以外は同じ
+  - logger / base64: 3 アプリとも `bin/rails runner` で logger 1.5.0、base64 0.1.1 が読み込まれる
+  - msgpack（RS）: 空のディレクトリを `BOOTSNAP_CACHE_DIR` にして `bin/rails runner` を 2 回起動し、bootsnap がキャッシュを書いて読めることを確かめた
+  - faraday（RS・RP）: `FARADAY_DEPRECATE=warn` を付けてテストを流しても、Faraday の非推奨の警告は出ない
+  - bcrypt（OP）: 3.1.16 で作ったハッシュが 3.1.22 で照合できる（正しい値で真、違う値で偽）
+- 3 アプリとも `bin/rails runner` で起動する。`bin/rails s` は E2E の起動で確認し、Puma 5.6.9 で起動する
+- 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する
+
+### 遭遇した問題
+
+1. websocket-driver の確認で RS を起動したとき、ブラウザペインが開いた `/favicon.ico` の 404 の処理中に、Step 0-b と同じ finalizer の警告（`ThreadError: can't be called from trap context`、`listen-3.7.0/lib/listen/fsm.rb:80`）が出た。0-b では OP（listen 3.6.0）で観測したもので、RS は listen 3.7.0。0-d-3 で上げた gem とは経路が違い、0-f で listen を更新するときに確認する
+2. Devise の reset password のメールを組み立てて mail の前後を比べようとしたが、OP には Devise の recoverable のルーティングがないため、テンプレートが `edit_password_url` で `NoMethodError` になった。ActionMailer で直接組み立てたメッセージで比べた
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `.bundler-audit.yml` の先頭のコメントが「Step 0-d で凍結した既存の advisory」のままで、0-d-3 で足した puma の 2 件に合わない | 「Step 0-d-1 で凍結した既存の advisory と、Step 0-d-3 の puma の更新で新しく対象に入った advisory」に直した（3 アプリ） |
+| 末尾の websocket-driver の項目を消したときに、直前の空行が残り、3 アプリの `.bundler-audit.yml` の末尾が空行 2 つになっている | 末尾の空行を消した |
+| rack の上限を超えたときに 500 になるという記述が、確かめていない見込みのまま | test 環境の OP の `/oauth/token` に `Rack::MockRequest` で POST し、パラメーター 2 個では doorkeeper が 400、4097 個では `Rack::QueryParser::QueryLimitError` で 500 になることを確かめた。セキュリティの修正による変化として受け入れ、テストは足していない |
+| logger・base64（と 0-d-1 の json、0-d-2 の bigdecimal）を Ruby 3.1.7 の default gem の版に固定したが、Ruby を上げたときに合わせ直す手順がない。そのままでは、Step 2 以降も lock の古い版が読まれ、新しい Ruby の default gem と食い違う | 人間の判断で、PLAN.md 8 章の 4（Ruby を上げる場合）に「新しい Ruby の default gem の版に一時固定で合わせ直す。default gem でなくなったものは 7 章の表に従う」を足した。7 章の表の 4 つの行の時期も「未定」から「Ruby を上げる各 Step で合わせ直す」に変えた。Ruby 3.4 で bundled gem になる base64・bigdecimal は、既存の「base64 / bigdecimal / mutex_m など」の行に従う |
