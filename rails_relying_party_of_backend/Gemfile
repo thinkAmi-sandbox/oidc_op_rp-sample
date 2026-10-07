@@ -61,6 +61,9 @@ gem 'omniauth'
 gem 'omniauth-oauth2'
 gem 'omniauth-rails_csrf_protection'
 
+# 独自ストラテジー（lib/omniauth/strategies/my_op.rb）で ID トークンを検証するため
+gem 'jwt'
+
 # セッションの中身を見やすくするよう、セッションを ActiveRecord で管理
 gem 'activerecord-session_store'
 
