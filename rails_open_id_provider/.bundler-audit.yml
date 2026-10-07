@@ -1,4 +1,4 @@
-# bundler-audit の無視リスト（Step 0-d で凍結した既存の advisory）。
+# bundler-audit の無視リスト（Step 0-d-1 で凍結した既存の advisory と、Step 0-d-3 の puma の更新で新しく対象に入った advisory）。
 # 新しい advisory だけが報告されるようにするためのもので、解消したら該当の行を消す。
 # gem ごとに、解消する時期をコメントに書く。各行のコメントは修正版。
 ignore:
@@ -62,4 +62,3 @@ ignore:
   # sqlite3 1.7.3: 修正版は 2.x だけで、Rails 7.1 までは 1.x にしか対応しない。Step 5 で解消する
   - CVE-2026-54619 # >= 2.9.5
   - GHSA-mwm8-39rw-8826 # >= 2.9.6
-
