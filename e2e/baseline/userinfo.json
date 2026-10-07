@@ -1,4 +1,4 @@
 {
   "email": "e2e-baseline@example.com",
-  "sub": "<USER_ID>"
+  "sub": "<USER_ID:string>"
 }

@@ -3,9 +3,9 @@
     {
       "alg": "RS256",
       "e": "AQAB",
-      "kid": "<KID>",
+      "kid": "<KID:string>",
       "kty": "RSA",
-      "n": "<MODULUS>",
+      "n": "<MODULUS:string>",
       "use": "sig"
     }
   ]

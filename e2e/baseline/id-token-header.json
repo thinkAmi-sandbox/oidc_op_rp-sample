@@ -1,5 +1,5 @@
 {
   "alg": "RS256",
-  "kid": "<KID>",
+  "kid": "<KID:string>",
   "typ": "JWT"
 }

@@ -1,6 +1,7 @@
 /**
  * 基準応答（e2e/baseline/*.json）と比べるための整形。
  * 毎回変わる値（トークン・時刻・nonce・鍵）は伏せ、構造と固定の値を比べる。
+ * 伏せた値も JSON の型は残す（例: `<TIMESTAMP:number>`）。gem の更新で型が変わったことを差分として検出するため。
  * キーは並べ替えて、項目の順番の違いを差分にしない。
  */
 
@@ -20,6 +21,18 @@ const MASKS: Record<string, string> = {
   n: "<MODULUS>",
 };
 
+function jsonType(value: unknown): string {
+  if (value === null) {
+    return "null";
+  }
+  return Array.isArray(value) ? "array" : typeof value;
+}
+
+/** `<TIMESTAMP>` を `<TIMESTAMP:number>` のように、元の値の型を付けた形にする */
+function withType(placeholder: string, value: unknown): string {
+  return placeholder.replace(/>$/, `:${jsonType(value)}>`);
+}
+
 function maskValue(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(maskValue);
@@ -30,7 +43,8 @@ function maskValue(value: unknown): unknown {
         .sort()
         .map((key) => {
           const child = (value as Record<string, unknown>)[key];
-          return [key, key in MASKS ? MASKS[key] : maskValue(child)];
+          // in 演算子は Object.prototype のキー（constructor など）にも一致するので、Object.hasOwn で判定する
+          return [key, Object.hasOwn(MASKS, key) ? withType(MASKS[key], child) : maskValue(child)];
         }),
     );
   }
