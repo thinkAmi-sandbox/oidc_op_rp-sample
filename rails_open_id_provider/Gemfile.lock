@@ -101,7 +101,7 @@ GEM
       json-jwt (>= 1.11.0)
     erubi (1.10.0)
     ffi (1.15.3)
-    globalid (0.5.2)
+    globalid (1.0.1)
       activesupport (>= 5.0)
     hashdiff (1.2.1)
     i18n (1.8.10)

@@ -41,9 +41,6 @@ ignore:
   # doorkeeper 5.5.2: 修正版は 5.6.6 以上。doorkeeper-openid_connect 1.8.0 が 5.6 未満を要求するので、0-f で doorkeeper-openid_connect と合わせて上げる（PLAN.md 7 章）
   - CVE-2023-34246 # >= 5.6.6
 
-  # globalid 0.5.2: 1.0.1 以上で解消する。Rails 6.1・Ruby 3.1 のまま依存関係を解決できる（Step 0-d に bundle lock で確認）。更新の時期は PLAN.md 7 章
-  - CVE-2023-22799 # >= 1.0.1
-
   # json-jwt 1.14.0: 0-f で doorkeeper-openid_connect と一緒に外す。残るなら 1.16.6 以上にする（PLAN.md 7 章）
   - CVE-2023-51774 # ~> 1.15.3, >= 1.15.3.1 / >= 1.16.6
 
