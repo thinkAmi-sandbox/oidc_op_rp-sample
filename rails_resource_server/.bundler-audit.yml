@@ -51,7 +51,7 @@ ignore:
   # oauth2 1.4.7: 修正版は 2.x（メジャー更新）。0-f で解消する（PLAN.md 7 章）
   - CVE-2026-54603 # >= 2.0.22
 
-  # puma 5.6.9: 5.5.0 で入った PROXY protocol v1 の不具合で、5.4.0 は対象外だった。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない。修正版は 7.2.1 以上だけ。puma を 7.2.1 以上に上げるときに解消する（PLAN.md 7 章）
+  # puma 6.6.1: 5.5.0 で入った PROXY protocol v1 の不具合で、5.4.0 は対象外だった。6.x も対象。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない。修正版は 7.2.1 以上だけ。puma を 7.2.1 以上に上げるときに解消する（PLAN.md 7 章）
   - CVE-2026-47736 # ~> 7.2.1 / >= 8.0.2
   - CVE-2026-47737 # ~> 7.2.1 / >= 8.0.2
 
