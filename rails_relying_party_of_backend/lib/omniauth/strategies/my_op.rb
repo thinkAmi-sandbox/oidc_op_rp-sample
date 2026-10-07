@@ -11,7 +11,12 @@ module OmniAuth
       # This is where you pass the options you would pass when
       # initializing your consumer from the OAuth gem.
       option :client_options, {
-        site: "#{ENV['OIDC_PROVIDER_HOST']}/oauth/authorize"
+        site: "#{ENV['OIDC_PROVIDER_HOST']}/oauth/authorize",
+        # oauth2 2.x の既定値は相対パスの URL と Basic 認証。
+        # site がパス付きなので URL は絶対パスで書き、client_id と secret は本文で送る
+        authorize_url: '/oauth/authorize',
+        token_url: '/oauth/token',
+        auth_scheme: :request_body
       }
 
       # scope=openid としてリクエスト
