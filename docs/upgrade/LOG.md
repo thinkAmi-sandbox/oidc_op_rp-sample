@@ -672,6 +672,7 @@ PLAN.md の 0-e で「着手時の調査で決める」とした論点は、次�
 
 - 3 アプリに `test/eager_load_test.rb`（`Rails.application.eager_load!` が例外を出さない）を足した。テストの環境は `eager_load = false` なので、どのテストからも使われない生成物の基底クラス（`application_cable/channel.rb`・`connection.rb`、`application_job.rb`、`application_mailer.rb`、RS の `application_record.rb`）は読み込まれず、カバレッジも 0 だった
 - 足した後の行カバレッジは 3 アプリとも 100%（RS 33 行、RP 112 行、OP 14 行）。分母が 0-d-2 の記録（RS 40・RP 118・OP 20）より小さいのは、読み込まれなかったファイルの行を SimpleCov が自前で数えていたため
+- 100% のうち、クラス本体・`def` の行・`devise` や `before_action` のようなマクロの行は、読み込むだけで通ったことになる。以降の Step で「テストが通っていない箇所」を SimpleCov で探すときは、メソッドの中の行で判断する
 - ActiveSupport の `assert_nothing_raised` はアサーションの件数を増やさないので、テストの件数（runs）だけが 1 ずつ増えた
 
 ### マジックコメント
@@ -707,3 +708,13 @@ PLAN.md の 0-e で「着手時の調査で決める」とした論点は、次�
 - 3 アプリとも `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動で確認
 - `.git-blame-ignore-revs` を有効にして `git blame` すると、引用符を直した `Rakefile` の行や、移した `annotate` の行が元のコミットに戻る
 - 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `.git-blame-ignore-revs` が効くのは、この PR を epic にマージコミットで取り込んだときだけ。その決まりはファイルのコメントにしかない。git 2.49 の `git blame` は ignore のファイルにある未知のハッシュを黙って無視するので、squash や rebase で取り込んでもエラーにならず、ignore だけが効かなくなる | 人間の判断で、CLAUDE.md の「ブランチと PR」の行を「epic への PR の取り込みも、epic → main の取り込みも、マージコミットで行う」に直した。これまでの PR もマージコミットで取り込んでいて、運用は変わらない。ファイルのコメントは CLAUDE.md を指すようにした |
+| eager load のテストの `assert_nothing_raised` は、アサーションの件数に入らない | 対応しない。Rails 7.0 の Testing ガイド（Testing Eager Loading）の例と同じ書き方 |
+| 同じプロセスで eager load すると、後に流れるテストでは定数がすべて読み込み済みになり、autoload の漏れが隠れうる | 対応しない。ガイドの例も同じプロセスで動かす。ファイル名と定数名の食い違いは、このテスト自体と `bin/rails zeitwerk:check` で見つかる |
+| 行カバレッジ 100% は、読み込むだけで通る行を含む | 「テストの追加」に、以降の Step ではメソッドの中の行で判断することを書き足した |
+| RS の `gsub('Bearer ', '')` は `Bearer ` の接頭辞を確かめないので、`Basic` などのヘッダーの値もそのまま introspect に渡る | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う |
