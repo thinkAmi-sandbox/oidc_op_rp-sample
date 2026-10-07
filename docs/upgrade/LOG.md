@@ -483,7 +483,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 計画の段階の見込みと違ったものを含む。どれも現在の挙動として記録し、コードは変えていない。
 
-1. RP の ID トークンの検証に失敗すると、omniauth 2.0.4 が例外を rescue する（`omniauth-2.0.4/lib/omniauth/strategy.rb:196` の `rescue StandardError` → `fail!`）。`FailureEndpoint` は `RACK_ENV` が `development` のときだけ例外を外へ出し（`omniauth-2.0.4/lib/omniauth/failure_endpoint.rb:20`、既定の `failure_raise_out_environments` は `['development']`）、それ以外では `/auth/failure?message=<例外のメッセージ>&strategy=my_op` へリダイレクトする。RP は `/auth/failure` を `/` へリダイレクトする。test 環境では `RACK_ENV` が未設定なので、リダイレクトになる
+1. RP の ID トークンの検証に失敗すると、omniauth 2.0.4 が例外を rescue する（`omniauth-2.0.4/lib/omniauth/strategy.rb:196` の `rescue StandardError` → `fail!`）。`FailureEndpoint` は `RACK_ENV` が `development` のときだけ例外を外へ出し（`omniauth-2.0.4/lib/omniauth/failure_endpoint.rb:20`、既定の `failure_raise_out_environments` は `['development']`）、それ以外では `/auth/failure?message=<例外のメッセージ>&strategy=my_op` へリダイレクトする。RP は `/auth/failure` を `/` へリダイレクトする。RP の `test/test_helper.rb` で `RACK_ENV` を `test` に固定しているので、テストではリダイレクトになる（下の「コードレビュー」）
 
    | ID トークン | 例外（`env['omniauth.error']`） |
    |---|---|
@@ -529,3 +529,16 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 - RuboCop: 3 アプリとも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）。brakeman: 3 アプリとも `Security Warnings: 0`
 - 安全チェック: 各コミットで指摘なし
 - 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する。RP と OP の `db/test.sqlite3` はテストで新しく作られた（gitignore 対象）
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| RP の ID トークンの検証失敗のテストは、`RACK_ENV` が `development` だと例外が外へ出て、記録したリダイレクトにならない | `RACK_ENV=development` を付けて流すと 6 errors になることを確かめた。RP の `test/test_helper.rb` で `RACK_ENV` を `test` に固定し、同じ条件で通ることを確かめた |
+| OP の `issue_tokens` が `application:` を受け取るのに、認可要求は既定のアプリ（my_op）で作っていて、別のアプリを渡すと認可コードとトークン要求のアプリが食い違う | 認可要求にも渡すように直した。introspection 用 RP を渡してトークンが取れることを一時的なテストで確かめた（今は渡すテストはない） |
+| RP のログアウトのテストが、ログインできていることを確かめていないので、ログインが黙って失敗しても通る | ログアウトの前にセッションのユーザーがあることを確かめるようにした |
+| RP の PKCE のテストで `code_verifier` が送られないと、比較の失敗ではなく `TypeError` になる | 送られないときは空文字列として比べ、比較の失敗になるようにした |
+| RP / RS の `.gitignore` のコメントが「`.env.test` の値はすべて `test-dummy-` で始まる」としているが、`OIDC_PROVIDER_HOST` などは違う | client_id と secret がダミーだと書き直した |
+| `.public-safety-allow` の除外は、行のどこかに `=test-dummy-` があれば効くので、本物の secret の行の後ろに書いたコメントでも素通りする | 対応しない。0-c で承認された `.env_e2e` の除外と同じ形で、除外の条件を変えるには人間の承認が必要 |
+| SimpleCov の `rails` プロファイルは `config/` を対象外にするので、OP の挙動のある initializer のカバレッジが取れない | 対応しない。この Step では計測の仕組みを入れるところまでとし、0-e でカバレッジを見るときに必要なら決める |
+| RS のテストで `stub_token_request` を 5 本で繰り返している | 対応しない。準備・実行・確認の順で、各テストの準備をテストの中に見えるようにしておく |
