@@ -64,6 +64,9 @@ gem 'omniauth-rails_csrf_protection'
 # 独自ストラテジー（lib/omniauth/strategies/my_op.rb）で ID トークンを検証するため
 gem 'jwt'
 
+# OP の JWKS の取得（lib/omniauth/strategies/my_op.rb）と、introspection 画面からの RS・OP の呼び出しのため
+gem 'faraday'
+
 # セッションの中身を見やすくするよう、セッションを ActiveRecord で管理
 gem 'activerecord-session_store'
 
