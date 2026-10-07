@@ -721,7 +721,7 @@ PLAN.md の 0-e で「着手時の調査で決める」とした論点は、次�
 
 ## Step 0-f-1: spring の削除と、開発・テスト用などの gem の更新（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0f-gem-updates` / PR は未作成
+- ブランチ / PR: `upgrade/step0f-gem-updates` / [#17](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/17)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 作業計画で決めたこと
