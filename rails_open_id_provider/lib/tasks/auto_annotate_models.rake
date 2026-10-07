@@ -5,7 +5,9 @@
 # NOTE: to have a dev-mode tool do its thing in production.
 if Rails.env.development?
   require 'annotate'
-  task :set_annotation_options do
+  # annotate の生成物のまま残す。:environment を足すとアプリを読み込む順番が変わる。
+  # Step 5 で annotaterb に置き換えるときに見直す
+  task :set_annotation_options do # rubocop:disable Metrics/BlockLength, Rails/RakeEnvironment
     # You can override any of these by setting an environment variable of the
     # same name.
     Annotate.set_defaults(
