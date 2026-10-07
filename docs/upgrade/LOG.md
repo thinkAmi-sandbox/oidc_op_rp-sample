@@ -636,7 +636,7 @@ gem ごとに RS → RP → OP の順で `bundle lock --update <gem> --conservat
 
 ## Step 0-e: 既存コードの RuboCop 違反の修正（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0e-rubocop-violations` / PR は未作成
+- ブランチ / PR: `upgrade/step0e-rubocop-violations` / [#16](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/16)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 着手時の件数
