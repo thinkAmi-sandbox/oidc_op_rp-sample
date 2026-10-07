@@ -8,7 +8,8 @@ class ApplesController < ApplicationController
 
   private
 
-  def validate_bearer_token
+  # トークンの取得から introspect の結果の判定までを 1 か所で読めるよう、メソッドを分けていない
+  def validate_bearer_token # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     # Bearer トークンを取得
     authorization_header = request.headers['Authorization']
     return render status: :unauthorized if authorization_header.blank?
@@ -27,12 +28,15 @@ class ApplesController < ApplicationController
     params = { token: access_token }
     response = Faraday.post("#{ENV['OIDC_PROVIDER_HOST']}/oauth/introspect", params, headers)
 
+    # introspect の応答を標準出力で確かめるための出力。logger にすると出力先が変わるので puts のまま残す
+    # rubocop:disable Rails/Output
     response.tap do |r|
       puts '======> introspection'
       puts "STATUS: #{r.status}"
       puts "BODY  : #{r.body}"
       puts '<====== introspection'
     end
+    # rubocop:enable Rails/Output
 
     body = JSON.parse(response.body)
     render status: :unauthorized if response.status == 401 || body['active'] == false
