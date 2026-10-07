@@ -1,5 +1,5 @@
 /**
- * 基準応答（e2e/baseline/*.json）と比べるための整形。
+ * OP の応答のスナップショット（e2e/baseline/*.json）と比べるための整形。
  * 毎回変わる値（トークン・時刻・nonce・鍵）は伏せ、構造と固定の値を比べる。
  * 伏せた値も JSON の型は残す（例: `<TIMESTAMP:number>`）。gem の更新で型が変わったことを差分として検出するため。
  * キーは並べ替えて、項目の順番の違いを差分にしない。
@@ -59,7 +59,7 @@ function withLifetime(value: Record<string, unknown>): Record<string, unknown> {
   return value;
 }
 
-/** 基準応答のファイルに書く形（伏せた JSON、末尾に改行）にする */
+/** スナップショットのファイルに書く形（伏せた JSON、末尾に改行）にする */
 export function toBaseline(value: Record<string, unknown>): string {
   return `${JSON.stringify(maskValue(withLifetime(value)), null, 2)}\n`;
 }
