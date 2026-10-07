@@ -143,14 +143,14 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 0-d-1 で無視リストに凍結した advisory のうち、Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem を上げる（人間の判断。LOG.md の Step 0-d-1）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」にあたる。0-d-2 の minitest ができてから行い、0-e より先に行う。
 
-- [ ] 対象: rack、puma、loofah・crass・rails-html-sanitizer、websocket-driver、globalid、mail、msgpack、faraday 1.x（RP・RS）、bcrypt（OP）。修正版は LOG.md の Step 0-d-1
-- [ ] 1 gem ずつ（loofah・crass・rails-html-sanitizer は依存関係のため 1 組で）上げ、そのたびに minitest と E2E を流してからコミットする。コミットはアプリごとに分ける
-- [ ] 上げた gem の advisory を `.bundler-audit.yml` から消し、bundler-audit で報告されないことを確かめる
-- 着手時の調査で決めること
-  - 上げる先: 修正版の最小か、同じマイナー内の最新か
-  - default gem の置き換え: mail は logger、websocket-driver は base64 を新しく lock に入れる（0-d-1 の `bundle lock` で確認）。json と同じく、アプリが読む default gem の版が変わらないようにするか
-  - メジャー・マイナーをまたぐもの: globalid（0.5 → 1.x）、websocket-driver（0.7 → 0.8）、loofah（2.12 → 2.25）、faraday（1.7 → 1.10）は CHANGELOG を読む
-  - PR を 1 つにするか、分けるか
+- [x] 対象: rack、puma、loofah・crass・rails-html-sanitizer、websocket-driver、globalid、mail、msgpack、faraday 1.x（RP・RS）、bcrypt（OP）。上げた版は LOG.md の Step 0-d-3
+- [x] 1 gem ずつ（loofah・crass・rails-html-sanitizer は依存関係のため 1 組で）上げ、そのたびに minitest と E2E を流してからコミットする。コミットはアプリごとに分ける
+- [x] 上げた gem の advisory を `.bundler-audit.yml` から消し、bundler-audit で報告されないことを確かめる
+- 着手時の調査で決めたこと（人間が承認。理由は LOG.md の Step 0-d-3）
+  - 上げる先: 修正版を含むマイナー系列の最新（マイナーはまたがない）。globalid だけは `--conservative` で 1.4.0 になるので、一時固定で 1.0.1 にした
+  - default gem: logger は 1.5.0、base64 は 0.1.1（Ruby 3.1.7 の default gem と同じ版）に一時固定し、アプリが読む版を変えない
+  - puma 5.6.9 で新しく対象に入る 2 件（PROXY protocol v1）は無視リストに入れ、7.2.1 以上に上げるときに解消する（7 章）
+  - PR は 1 つ
 
 ### Step 0-e: 既存コードの RuboCop 違反の修正
 
@@ -205,18 +205,18 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 | gem | 現在 | 時期 | 注意点 |
 |---|---|---|---|
-| mail | 2.7.1 | 0-a で 2.8.1（済） | Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした |
+| mail | 2.7.1 | 0-a で 2.8.1（済）→ 0-d-3 で 2.9.1（済） | 0-a は Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした。0-d-3 は advisory の修正 |
 | nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19 系最新 | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
 | jwt（RP、oauth2 経由の間接依存） | 2.2.3 | 0-a で 2.5.0（済）→ 0-f で 2.x 最新にして RP の Gemfile に明記 | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。RS は直接使わないので oauth2 の更新に任せる |
 | json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f で doorkeeper-openid_connect と一緒に外す | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だが、OP は署名だけで decode しないため影響なし。0-f の後も残るなら 1.16.6 以上にする |
-| nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済） | clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新 |
+| nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済）。msgpack は 0-d-3 で 1.8.5（済） | 0-a は clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新。0-d-3 は advisory の修正 |
 | thor（railties 経由） | 1.1.0 | 0-f | Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし） |
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f（同時） | omniauth-oauth2 1.8 は oauth2 2.x が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。トークン取得時のクライアント認証方式の既定値の変化を確認 |
-| faraday | 1.7.0 | 0-f（oauth2 の後） | RP と RS が直接呼んでいる。順番は依存関係を見て決める |
+| faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f（oauth2 の後） | RP と RS が直接呼んでいる。順番は依存関係を見て決める。0-d-3 は advisory の修正で、1.x の最新にした |
 | doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f（この順） | openid_connect の新しい版は JWT のライブラリが json-jwt から jwt に変わる。ID トークンの署名と JWKS を RP の検証も含めて確認。新しいマイグレーションが必要か確認。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正されるが、openid_connect 1.8.0 は doorkeeper 5.6 未満を要求するので、doorkeeper だけ先に 5.6 にはできない（0-d-1 で確認） |
 | devise | 4.8.0 | 0-f で 4.x の最新 → Step 1 の後に 5.x | Rails 8.1 対応は Step 7 の最初に再確認。4.8.0 の advisory 2 件は 5.x（5.0.4）でしか修正されず、5.x は Rails 7.0 以上が必要（0-d-1 で確認） |
 | dotenv-rails | 2.7.6 | 0-f | 3.x で読み込み方が変わる |
-| puma | 5.4 | 0-f で 6 系 | 7 系は後の Step で判断。5.4.0 の advisory は 5.6.9 で解消する |
+| puma | 5.4 | 0-d-3 で 5.6.9（済）→ 0-f で 6 系 → 7.2.1 以上 | 7 系に上げる時期は後の Step で判断。5.6.9 は PROXY protocol v1 の advisory 2 件（CVE-2026-47736 / 47737）の対象で、修正版は 7.2.1 / 8.0.2 だけ。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない（無視リストに入れた） |
 | spring | 2.1.1 | 0-f で削除 | Rails 7 から標準で入らない |
 | byebug / web-console / listen / rack-mini-profiler | — | 0-f | 開発・テスト用を先に上げる。listen 3.6.0 では `EventedFileUpdateChecker` の finalizer で `ThreadError` の警告が出る（LOG.md の Step 0-b）。更新後に出なくなるか確認 |
 | sprockets-rails | 3.2.2（間接） | Step 1 で明示 | Rails 7.0 から rails gem の依存から外れる |
@@ -230,7 +230,9 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
 | bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
 | concurrent-ruby（Rails 経由） | 1.1.9 | Step 3 の後 | 1.3.5 以上は Rails 6.1 でも 7.0 でも起動しない（LOG.md の Step 0-a、Step 0-d-1）。advisory は 1.3.7 で解消する |
-| rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / msgpack / mail / faraday 1.x / bcrypt | — | 未定（14 章） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる（`bundle lock --conservative` で確認。修正版は LOG.md の Step 0-d-1） |
+| rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / bcrypt | — | 0-d-3（済） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられた。上げた版は LOG.md の Step 0-d-3（mail・msgpack・faraday・puma は上の行） |
+| logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
+| base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
 
 annotate の Rails 8 対応状況と、oauth2 1.4 系の faraday 2 対応範囲は記憶ベース。Step 0-f の調査で gemspec を確認して確定させる。
 
