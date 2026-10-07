@@ -35,7 +35,7 @@
 | 固定 | `main`（タグ `rails-6.1`）。作業中は変更しない |
 | epic | `epic/rails-8.1-upgrade`（`main` から作成。開始を示す空コミットあり） |
 | 作業ブランチ | `upgrade/<step>-<内容>`。epic から切り、PR の向き先は epic |
-| PR の単位 | Step 0 はサブステップ（0-a〜0-f）ごと。0-f の gem 更新は 1 PR 内で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR |
+| PR の単位 | Step 0 はサブステップ（0-a〜0-f。0-d は 0-d-1 と 0-d-2 に分ける）ごと。0-f の gem 更新は 1 PR 内で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR |
 | 取り込み | 最後に epic → main をマージコミットで取り込む（squash しない） |
 | worktree | 作業用 worktree は epic を元にする |
 | main への外部 PR | 入った場合は epic に main を取り込む |
@@ -111,20 +111,32 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 
 ### Step 0-d: 静的解析・脆弱性チェック・minitest
 
-- [ ] RuboCop（rubocop / rubocop-minitest / rubocop-rails）
-  - リポジトリ直下に共通の `.rubocop.yml`、各アプリは `inherit_from: ../.rubocop.yml`。gem は各アプリの development / test グループ
+PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に分ける（理由は LOG.md の Step 0-d-1）。
+
+#### 0-d-1: 静的解析と脆弱性チェック
+
+- [x] RuboCop（rubocop / rubocop-minitest / rubocop-rails）
+  - リポジトリ直下に共通の `.rubocop.yml`、各アプリは `inherit_from: [../.rubocop.yml, .rubocop_todo.yml]`（この順）。gem は各アプリの development / test グループ
   - `config/`、`bin/`、`db/` は対象外（`app:update` で上書きされる雛形のため）
-  - 既存違反は `rubocop --auto-gen-config` で `.rubocop_todo.yml` に凍結
+  - 既存違反は `rubocop --auto-gen-config --no-exclude-limit` で `.rubocop_todo.yml` に凍結
   - バージョンを固定し、`NewCops: disable`
-- [ ] bundler-audit と brakeman。既存の警告は brakeman の除外ファイルに凍結し、新しい警告がないことを完了条件にする
-  - bundler-audit では 0-a で残した advisory（nokogiri 1.18 系の 1.19 でしか直らないもの、json-jwt 1.14.0 の CVE-2023-51774）が出る。解消予定の Step（Step 2 / 0-f）を理由に添えて無視リストに入れる
+- [x] bundler-audit と brakeman。既存の advisory と警告は無視リスト（各アプリの `.bundler-audit.yml`、`config/brakeman.ignore`）に凍結し、新しいものがないことを完了条件にする
+  - bundler-audit の既存の advisory は 1 アプリ 93〜94 件（20〜21 gem）で、当初の想定（nokogiri と json-jwt）より大幅に多い。gem ごとに解消する時期を書いて無視リストに入れた（内訳は LOG.md の Step 0-d-1）
+  - Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（rack、puma、loofah など）をいつ上げるかは未定（14 章）
+- [x] RS の既存のテスト（トークンなしで 200 を期待して落ちていた）を、現在の挙動（401）に直す
+
+#### 0-d-2: minitest
+
 - [ ] SimpleCov（`coverage/` は gitignore 対象）
 - [ ] WebMock
 - [ ] テスト（CLAUDE.md「テスト」の方針に従う）
+  - RP / RS のテスト用の環境変数は、ダミーの値の `.env.test` をコミットして渡す（dotenv は `.env` より先に読むので、手元の `.env` に左右されない）。secret の行は公開物の安全チェックで検出されるため、`.public-safety-allow` への追記が必要（人間の承認待ち）
+  - テストは `DISABLE_SPRING=1 bin/rails test` で流す（spring 経由ではアプリが SimpleCov より先に読み込まれ、起動時に読むファイルのカバレッジが取れない）
   - OP: discovery、JWKS、Devise のログイン、認可コード → トークン → ID トークンの検証、userinfo、introspect（有効・期限切れ・失効済み・他クライアントのトークン）、revoke
     - 期限切れは境目の 2 本にし、0-b で決めた 10 分をテストに残す。「発行から 10 分ちょうどは `active: true`」「10 分を 1 秒過ぎると `active: false`」（doorkeeper 5.5.2 の判定は `現在時刻 > created_at + expires_in`）
   - RP: 独自ストラテジーの ID トークン検証（テスト内で生成した RSA 鍵 ＋ JWKS を WebMock で差し替え）、ログイン後の画面遷移、introspection 画面（OP・RS の応答を WebMock で差し替え）
   - RS: `apples/show` を有効・無効なトークンで呼んだとき（introspect の応答を WebMock で差し替え）
+- [ ] テスト環境の `config.active_support.deprecation = :raise`（10 章の完了条件）
 - [ ] OP の期限切れのテストを追加したら、`rails_relying_party_of_backend/app/controllers/introspections_controller.rb` のコメントアウトした期限切れの確認（`sleep 70`）を同じ PR で削除する。手動確認の名残で、期限切れの判定は OP の minitest、`active: false` の拒否は RS の minitest、3 アプリの通しは E2E の revoke で置き換わる
 
 ### Step 0-e: 既存コードの RuboCop 違反の修正
@@ -187,10 +199,10 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 | thor（railties 経由） | 1.1.0 | 0-f | Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし） |
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f（同時） | omniauth-oauth2 1.8 は oauth2 2.x が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。トークン取得時のクライアント認証方式の既定値の変化を確認 |
 | faraday | 1.7.0 | 0-f（oauth2 の後） | RP と RS が直接呼んでいる。順番は依存関係を見て決める |
-| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f（この順） | openid_connect の新しい版は JWT のライブラリが json-jwt から jwt に変わる。ID トークンの署名と JWKS を RP の検証も含めて確認。新しいマイグレーションが必要か確認 |
-| devise | 4.8.0 | 0-f | Rails 8.1 対応は Step 7 の最初に再確認 |
+| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f（この順） | openid_connect の新しい版は JWT のライブラリが json-jwt から jwt に変わる。ID トークンの署名と JWKS を RP の検証も含めて確認。新しいマイグレーションが必要か確認。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正されるが、openid_connect 1.8.0 は doorkeeper 5.6 未満を要求するので、doorkeeper だけ先に 5.6 にはできない（0-d-1 で確認） |
+| devise | 4.8.0 | 0-f で 4.x の最新 → Step 1 の後に 5.x | Rails 8.1 対応は Step 7 の最初に再確認。4.8.0 の advisory 2 件は 5.x（5.0.4）でしか修正されず、5.x は Rails 7.0 以上が必要（0-d-1 で確認） |
 | dotenv-rails | 2.7.6 | 0-f | 3.x で読み込み方が変わる |
-| puma | 5.4 | 0-f で 6 系 | 7 系は後の Step で判断 |
+| puma | 5.4 | 0-f で 6 系 | 7 系は後の Step で判断。5.4.0 の advisory は 5.6.9 で解消する |
 | spring | 2.1.1 | 0-f で削除 | Rails 7 から標準で入らない |
 | byebug / web-console / listen / rack-mini-profiler | — | 0-f | 開発・テスト用を先に上げる。listen 3.6.0 では `EventedFileUpdateChecker` の finalizer で `ThreadError` の警告が出る（LOG.md の Step 0-b）。更新後に出なくなるか確認 |
 | sprockets-rails | 3.2.2（間接） | Step 1 で明示 | Rails 7.0 から rails gem の依存から外れる |
@@ -199,6 +211,10 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 | activerecord-session_store | 2.0.0 | 各 Step の最初 | Rails を上げた後に `bundle update` が通らなければ Rails と同時に上げる |
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
+| brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初 | brakeman 8 系は Ruby 3.1 では入らない |
+| json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
+| concurrent-ruby（Rails 経由） | 1.1.9 | Step 1 の後 | 1.3.5 以上は Rails 6.1 で起動しない（LOG.md の Step 0-a）。advisory は 1.3.7 で解消する |
+| rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / msgpack / mail / faraday 1.x / bcrypt | — | 未定（14 章） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる（`bundle lock --conservative` で確認。修正版は LOG.md の Step 0-d-1） |
 
 annotate の Rails 8 対応状況と、oauth2 1.4 系の faraday 2 対応範囲は記憶ベース。Step 0-f の調査で gemspec を確認して確定させる。
 
@@ -283,6 +299,7 @@ Step 1 を一度手作業で通した後に、`/rails-upgrade` を入口とす�
 ## 14. 未決事項
 
 - [ ] 最終的に Ruby 4.0 まで上げるか（Step 8 完了時に判断）
+- [ ] advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（7 章の表）を、いつ上げるか。0-d の後に脆弱性の修正だけのサブステップを設けるか、0-f に含めるか
 - [x] `rails_open_id_provider/jwtRS256.key.example` の扱い（Step 0-c で判断）: 鍵の中身のないプレースホルダーで、どこからも参照されていなかったため、`.pub.example` と一緒に削除した
 
 ## 15. 決定済みの事項
