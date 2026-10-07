@@ -38,9 +38,6 @@ ignore:
   # jwt 2.5.0: 0-f で解消する（PLAN.md 7 章。RP は 2.x の最新にして Gemfile に明記、RS は oauth2 の更新に合わせる）
   - CVE-2026-45363 # ~> 2.10.3 / >= 3.2.0
 
-  # msgpack 1.4.5: 1.8.2 以上で解消する。Rails 6.1・Ruby 3.1 のまま依存関係を解決できる（Step 0-d に bundle lock で確認）。更新の時期は PLAN.md 7 章
-  - CVE-2026-54522 # >= 1.8.2
-
   # nokogiri 1.18.10: 修正版の 1.19 系は Ruby 3.2 以上が必要。Step 2 で解消する
   - GHSA-5prr-v3j2-97mh # >= 1.19.4
   - GHSA-5v8h-3h3q-446p # >= 1.19.4
