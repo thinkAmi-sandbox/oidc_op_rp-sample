@@ -5,17 +5,3 @@
 # one by one as the offenses are removed from the code base.
 # Note that changes in the inspected code, or installation of new
 # versions of RuboCop, may require this file to be generated again.
-
-# Offense count: 3
-# Configuration parameters: CountComments, Max, CountAsOne, AllowedMethods, AllowedPatterns.
-Metrics/MethodLength:
-  Exclude:
-    - 'app/controllers/introspections_controller.rb'
-    - 'lib/omniauth/strategies/my_op.rb'
-
-# Offense count: 14
-# This cop supports unsafe autocorrection (--autocorrect-all).
-Rails/Output:
-  Exclude:
-    - 'app/controllers/introspections_controller.rb'
-    - 'lib/omniauth/strategies/my_op.rb'
