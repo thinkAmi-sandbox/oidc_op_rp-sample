@@ -773,7 +773,7 @@ gem ごとに RS → RP → OP の順で `bundle update <gem> --conservative` �
 |---|---|---|
 | byebug 12 | 引数なしの `break` が今の行に止まる | アプリのコードは byebug を呼ばない |
 | web-console 4.2 | Ruby 3.0 以上で `binding.eval` が動く。応答ヘッダーを小文字に | エラー画面だけに出る。E2E はエラー画面を開かない |
-| rack-mini-profiler 3〜4 | 3.0 で snapshot の保存の API が変わり `snapshots_limit` が消えた。4.0 で応答ヘッダーが小文字（`x-miniprofiler-ids` など）。4.0.1 で Rack 2 に再び対応 | 設定はしていない。development のページに `<script id="mini-profiler">` が挿入されることは変わらない（E2E 用の DB を指定した `rails runner` から RP のトップと OP のログイン画面で確かめた）。E2E はこの状態で通る |
+| rack-mini-profiler 3〜4 | 3.0 で snapshot の保存の API が変わり `snapshots_limit` が消えた。4.0 で応答ヘッダーが小文字（`x-miniprofiler-ids` など）。4.0.1 で Rack 2 に再び対応 | 設定はしていない。4.0.1 でも development のページに `<script id="mini-profiler">` が挿入され、応答ヘッダーは小文字になる（E2E 用の DB を指定した `rails runner` から、RP のトップと OP のログイン画面で確かめた。2.3.2 では確かめていない）。E2E はこの状態で通る |
 | thor 1.2〜1.5 | 1.2.0 で `DidYouMean` の警告を出さない。1.2.2 で MD5 → SHA256、1.4.0 で YAML の遅延読み込み | `rails --help`・`rails g --help`・`rails routes` が警告なしで動く |
 | bootsnap 1.8〜1.26 | Psych 4 対応、`Kernel.load` を装飾しない（classic autoloader だけに関係）、JSON のキャッシュの削除 | 空のキャッシュの場所を指定して 2 回起動し、1 回目に書いたキャッシュを 2 回目に使えることを確かめた |
 | puma 6 | 標準の 8 つ以外の HTTP メソッドは 501。`PUMA_` で始まる環境変数。エラーの応答で Puma と名乗らない。Rack 2 のハンドラーは残る | `config/puma.rb` で使っている設定（threads・worker_timeout・port・environment・pidfile・tmp_restart）はすべて有効。`workers` は使っていない |
@@ -783,9 +783,9 @@ gem ごとに RS → RP → OP の順で `bundle update <gem> --conservative` �
 
 ### spring の削除
 
-- 3 アプリの Gemfile から spring を外し、`bin/spring` と `config/spring.rb` を消した。`bin/rails`・`bin/rake` の `load File.expand_path("spring", __dir__)` の行を消し、Rails 7.0 の雛形（`railties-7.0.8.7` の `templates/bin/rails.tt`・`rake.tt`）と同じ形にした
+- 3 アプリの Gemfile から spring を外し、`bin/spring` と `config/spring.rb` を消した。`bin/rails`・`bin/rake` の `load File.expand_path("spring", __dir__)` の行を消し、Rails 7.0 の雛形（`railties-7.0.8.7/lib/rails/generators/rails/app/templates/bin/rails.tt`・`rake.tt`）と同じ形にした
 - `e2e/scripts/start-server.sh` と `.claude/launch.json` の `DISABLE_SPRING` を消した。LOG.md の過去の記録は変えていない。PLAN.md の 0-d-2 には、spring を消した後は `bin/rails test` だけでよいと書き足した
-- `.claude/launch.json` の変更は E2E では確かめられないので、OP・RS を Claude Code のプレビューから起動して Puma 6.6.1 で動くことを、RP は同じコマンドを直接実行して起動のログを確かめた。RP のトップページはセッションを DB に書くので開いていない
+- `.claude/launch.json` の変更は E2E では確かめられないので、3 アプリを launch.json のコマンドで起動し、起動のログで Puma 6.6.1 であることを確かめた。OP の discovery は 200、トークンなしの RS は 401 を返した。RP は手動確認用の DB を変えないよう、リクエストを送っていない（RP のトップページを 1 回開くと、セッションの行が 1 件増えることを E2E 用の DB で確かめた）
 
 ### listen の finalizer の警告
 
@@ -819,3 +819,13 @@ gem ごとに RS → RP → OP の順で `bundle update <gem> --conservative` �
 - 3 アプリとも `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動とプレビューで確認し、Puma 6.6.1 で起動する
 - 無視リストを空にした bundler-audit で、puma 6.6.1 が CVE-2026-47736 / 47737、devise 4.9.4 が CVE-2026-32700 / 40295 の対象のままであることを確かめた
 - 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| launch.json から OP・RS が Puma 6.6.1 で動くと書いているが、Puma の版を起動のログで確かめたのは OP だけ | RS も launch.json のコマンドで起動し、起動のログで Puma 6.6.1 を確かめた。RP と合わせて書き直した |
+| rack-mini-profiler の挿入が「変わらない」と書いているが、2.3.2 では確かめていない | 4.0.1 で確かめたことだけを書いた |
+| RP のトップページがセッションを DB に書くというのは推測 | E2E 用の DB で、トップページを 1 回開くとセッションの行が 1 件増えることを確かめた |
+| gem 内のパスを `gem名-バージョン/` から書いていない（`railties-7.0.8.7` の `templates/bin/rails.tt`） | `railties-7.0.8.7/lib/rails/generators/rails/app/templates/bin/rails.tt` に直した |
+| cgi 0.3.7 は lock にしか残らないので、`--conservative` を付けない `bundle update` で黙って 0.5.2 に変わる | 対応しない。json・bigdecimal・logger・base64 と同じ一時固定のやり方で、Ruby を上げる各 Step で合わせ直す（PLAN.md 8 章の 4）。default gem の版は gem を上げるたびに lock で確かめている |
