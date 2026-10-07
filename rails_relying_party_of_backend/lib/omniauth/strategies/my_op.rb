@@ -130,7 +130,6 @@ module OmniAuth
       end
 
       def client_id_of_my_op(provider_name)
-
       end
     end
   end
