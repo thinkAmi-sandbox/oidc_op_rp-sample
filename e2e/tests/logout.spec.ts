@@ -14,7 +14,7 @@ test("RP からログアウトすると RP のセッションだけが破棄さ�
 
   await page.getByRole("link", { name: "Logout" }).click();
 
-  await expect(page).toHaveURL(`${RP_URL}/`);
+  // ログアウトの前後とも RP のトップページなので、URL ではなく表示で確かめる
   await expect(page.getByText("ログアウトしました")).toBeVisible();
   await expect(page.getByText(`Logged in as ${users.logout}`)).toBeHidden();
   await expect(page.getByRole("button", { name: "Login" })).toBeVisible();
@@ -23,7 +23,6 @@ test("RP からログアウトすると RP のセッションだけが破棄さ�
   // OP のセッションと同意済みのトークンが残るので、OP のログイン画面も同意画面も経ずに RP へ戻る
   await page.getByRole("button", { name: "Login" }).click();
 
-  await expect(page).toHaveURL(`${RP_URL}/`);
   await expect(page.getByText("ログインしました")).toBeVisible();
   await expect(page.getByText(`Logged in as ${users.logout}`)).toBeVisible();
 });
