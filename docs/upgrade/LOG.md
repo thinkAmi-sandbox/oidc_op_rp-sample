@@ -324,7 +324,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-d-1: 静的解析と脆弱性チェックの導入（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0d-lint-audit-tests` / PR は未作成
+- ブランチ / PR: `upgrade/step0d-lint-audit-tests` / [#13](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/13)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 作業計画からの変更点
