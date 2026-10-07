@@ -40,10 +40,11 @@ test("認可コードフローのトークン応答・ID トークン・userinfo
   // 伏せる値のうち、他の応答や要求と一致すべきものは先に確かめる
   expect(idToken.payload.nonce).toBe(nonce);
   expect(userinfo.sub).toBe(idToken.payload.sub);
-  expect(toBaseline(tokenResponse)).toMatchSnapshot("token.json");
-  expect(toBaseline(idToken.header)).toMatchSnapshot("id-token-header.json");
-  expect(toBaseline(idToken.payload)).toMatchSnapshot("id-token-payload.json");
-  expect(toBaseline(userinfo)).toMatchSnapshot("userinfo.json");
-  expect(toBaseline(activeIntrospection)).toMatchSnapshot("introspect-active.json");
-  expect(toBaseline(revokedIntrospection)).toMatchSnapshot("introspect-revoked.json");
+  // 1 回のフローで得た応答をまとめて比べる。最初の差分で止まらず、すべての差分を報告するよう soft にする
+  expect.soft(toBaseline(tokenResponse)).toMatchSnapshot("token.json");
+  expect.soft(toBaseline(idToken.header)).toMatchSnapshot("id-token-header.json");
+  expect.soft(toBaseline(idToken.payload)).toMatchSnapshot("id-token-payload.json");
+  expect.soft(toBaseline(userinfo)).toMatchSnapshot("userinfo.json");
+  expect.soft(toBaseline(activeIntrospection)).toMatchSnapshot("introspect-active.json");
+  expect.soft(toBaseline(revokedIntrospection)).toMatchSnapshot("introspect-revoked.json");
 });
