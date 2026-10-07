@@ -129,8 +129,7 @@ module OmniAuth
         raise JWT::VerificationError
       end
 
-      def client_id_of_my_op(provider_name)
-      end
+      def client_id_of_my_op(provider_name); end
     end
   end
 end

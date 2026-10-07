@@ -1,6 +1,5 @@
 class IntrospectionsController < ApplicationController
-  def index
-  end
+  def index; end
 
   def callback
     auth_hash = request.env['omniauth.auth']
