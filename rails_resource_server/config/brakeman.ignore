@@ -1,25 +1,6 @@
 {
   "ignored_warnings": [
     {
-      "warning_type": "Cross-Site Scripting",
-      "warning_code": 124,
-      "fingerprint": "b2b8818e646bf1c277a27eae9a0e98766968d4d38e3b2e1e59b0fe1fa37218dc",
-      "check_name": "SanitizeConfigCve",
-      "message": "rails-html-sanitizer 1.4.1 is vulnerable to cross-site scripting when `select` and `style` tags are allowed (CVE-2022-32209). Upgrade to 1.4.3 or newer",
-      "file": "Gemfile.lock",
-      "line": 177,
-      "link": "https://groups.google.com/g/rubyonrails-security/c/ce9PhUANQ6s/m/S0fJfnkmBAAJ",
-      "code": null,
-      "render_path": null,
-      "location": null,
-      "user_input": null,
-      "confidence": "Weak",
-      "cwe_id": [
-        79
-      ],
-      "note": "bundler-audit の CVE-2022-32209 と同じ。rails-html-sanitizer の更新で解消する"
-    },
-    {
       "warning_type": "Unmaintained Dependency",
       "warning_code": 120,
       "fingerprint": "d84924377155b41e094acae7404ec2e521629d86f97b0ff628e3d1b263f8101c",
