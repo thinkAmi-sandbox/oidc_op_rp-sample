@@ -20,7 +20,9 @@ class ApplesController < ApplicationController
     # クライアントクレデンシャルフローで、Resource Serverのアクセストークンを取得する
     client = OAuth2::Client.new(ENV['CLIENT_ID_OF_RESOURCE_SERVER'],
                                 ENV['CLIENT_SECRET_OF_RESOURCE_SERVER'],
-                                site: ENV['OIDC_PROVIDER_HOST'])
+                                site: ENV['OIDC_PROVIDER_HOST'],
+                                # oauth2 2.x の既定値は Basic 認証。client_id と secret は本文で送る
+                                auth_scheme: :request_body)
     oauth2_response = client.client_credentials.get_token(scope: 'introspection')
 
     # Faradayを使って、Introspectionエンドポイントで access_token を検証
