@@ -1,8 +1,9 @@
 require "test_helper"
 
 class ApplesControllerTest < ActionDispatch::IntegrationTest
-  test "should get show" do
+  test "Authorization ヘッダーがないと 401 を返す" do
     get apples_show_url
-    assert_response :success
+
+    assert_response :unauthorized
   end
 end
