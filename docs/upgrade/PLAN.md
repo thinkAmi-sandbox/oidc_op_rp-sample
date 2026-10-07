@@ -222,6 +222,26 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 - [ ] 上書きしているビューを、上げた版の雛形と比べる
 - [ ] 上げた gem の advisory（doorkeeper・json-jwt）を `.bundler-audit.yml` から消す
 
+0-f-1 の作業計画のときに調べたこと（サブエージェントの調査。rubygems の API で確かめたのは、doorkeeper 5.5.4・5.6.9・5.7.1・5.9.9 と doorkeeper-openid_connect 1.8.9・1.8.11・1.10.1 の依存と Ruby の要件だけ。ほかは着手時に確かめ直す）:
+
+| 対象 | 分かったこと | テスト・E2E で守られているか |
+|---|---|---|
+| 版の組み合わせ | doorkeeper-openid_connect は 1.8.0・1.8.1 が `doorkeeper < 5.6`（json-jwt）、1.8.2・1.8.3 が `< 5.7`（1.8.3 は json-jwt 1.15.0 以上）、1.8.4〜1.8.8 が `< 5.7`（jwt 2.5 以上）、1.8.9 が `< 5.8`、1.8.10・1.8.11 が `< 5.9`（Ruby 3.1 以上。1.8.11 は ostruct も）、1.9.0〜1.10.1 が `< 6.0`。doorkeeper は 5.6.3 から Ruby 2.7 以上 | — |
+| マイグレーション | doorkeeper 5.5.2 → 5.7.1 で必須のものはない（雛形の差分は列の並びだけ）。doorkeeper-openid_connect も 2.0 まで新しいものはない | `db:drop db:setup` で E2E 用の DB を作り直している |
+| doorkeeper の新しい設定 | `force_pkce`、`revoke_previous_client_credentials_token`、`revoke_previous_authorization_code_token`、`custom_access_token_attributes` などはすべて opt-in。`pkce_code_challenge_methods`（plain・S256）と `client_credentials_methods`（Basic・本文）の既定値は今と同じ | — |
+| 同意画面を省く条件 | 5.6.0〜5.6.2 は有効なトークンしか見ない不具合があり（doorkeeper#1542）、5.6.3 で期限切れも含める挙動に戻った。5.6.6 で「confidential のアプリ」という条件が加わった（doorkeeper#1646）。seeds と fixtures のアプリは 3 つとも confidential | なし（先にテストを足す） |
+| 期限切れの判定・introspect | `expirable.rb` は変わらない（`現在時刻 > created_at + expires_in`）。introspect の項目も同じ（並びだけが変わる） | OP のテスト（10 分ちょうど・10 分 1 秒）と E2E のスナップショット（キーを並べ替えて保存） |
+| トークン応答のヘッダー | `Cache-Control` が `no-store, no-cache` になる | スナップショットは本文だけなので、LOG.md に記録する |
+| client_credentials | 5.5.3 から、scope を付けない要求は、アプリの scopes に既定の `openid` がないと失敗する。RS とテストは `scope=introspection` を付ける | RS のテストと E2E |
+| ビューの上書き | `app/views/doorkeeper/` の 12 ファイルと `app/views/layouts/doorkeeper/` の 2 ファイルは、5.5.2 の雛形と同じ（手元で比べた）。`authorizations/new.html.erb` だけが nonce の hidden field を 2 つ足している。5.9 系では `form_post`・`error` のビューに渡す変数が変わるが、5.7.1 までで変わるかは確かめていない | 同意画面は OP のテストと E2E。form_post・エラー画面・拒否の経路はテストなし |
+| ID トークン・JWKS | 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった。kid は 1.8.4・1.8.5 だけ鍵の SHA256 になり、1.8.6 で RFC 7638 の thumbprint に戻った（json-jwt 1.14.0 と ruby-jwt の thumbprint が同じ値になることを手元で確かめたという報告）。ヘッダーの `typ` は 1.8.4〜1.8.7 で消え、1.8.8 で戻った。独自の claim を先に混ぜる順番に変わった（doorkeeper-openid_connect#273）。`auth_time` は出ないまま、`exp - iat` は 120 のまま。JWKS の項目（kty・n・e・kid・use・alg）は同じ | 構造と `alg` は E2E のスナップショット、RP の検証は E2E のログイン。kid の一致と値の変化はなし（先にテストを足し、値は手元で前後を比べる） |
+| discovery | 1.8.3 から、PKCE の列があると `code_challenge_methods_supported: ["plain", "S256"]` を出す。ほかの項目は同じ | E2E のスナップショット（意図的な仕様変更として更新） |
+| 使っていない経路の変化 | `prompt=select_account`（doorkeeper-openid_connect#279）、`prompt=none` と `max_age`（#275）、ログアウトしているユーザーに同意画面を出さない（1.8.4、#183） | なし。RP はこれらを使わない |
+| OP のテスト | `test/integration/authorization_code_flow_test.rb` が `JSON::JWT.decode` で ID トークンを検証している。json-jwt は 1.8.4 で lock から外れるので、ruby-jwt に書き直す（json-jwt 1.16.6 以上を test グループに足すと、faraday 2 と faraday-net_http 3.4 が入り、default gem の net-http を置き換える） | — |
+| 後の Step に関わること | doorkeeper-openid_connect 1.9.0 以上は doorkeeper 5.8 以上にある `pkce_code_challenge_methods` を呼ぶ。1.9.0 には Dynamic Client Registration の advisory（CVE-2026-44476。OP では無効）がある。doorkeeper 5.9.5〜5.9.7 は、複数のクライアント認証方式やトークンの渡し方を同時に使う要求を拒む | — |
+
+ダウンロード（0-f-1 の作業計画で承認済み。版が変わったら示し直す）: doorkeeper 5.5.4（100 KB）・5.6.9（104 KB）・5.7.1（104 KB）、doorkeeper-openid_connect 1.8.9（24 KB）、jwt 2.10.3（54 KB。OP の `vendor/bundle` に入る）
+
 ### Step 1〜9
 
 「8. 各 Step 共通の手順」に従う。Step 固有の作業はロードマップの表のとおり。補足:
