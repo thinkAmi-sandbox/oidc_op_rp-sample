@@ -15,11 +15,6 @@ class IntrospectionsController < ApplicationController
     incorrect_access_token = "#{access_token}_bad"
     fetch_resource_server(incorrect_access_token)
 
-    # 有効期限切れの access_token を使って、Resource Serverへリクエスト
-    # puts '================> EXPIRED access_token'
-    # sleep 70
-    # fetch_resource_server(access_token)
-
     # Clientで access_token を revoke 後に、Resource Serverへリクエスト
     puts '================> REVOKE access_token'
     revoke_tokens(access_token)

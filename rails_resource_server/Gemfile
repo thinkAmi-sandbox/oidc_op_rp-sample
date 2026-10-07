@@ -43,6 +43,12 @@ group :development do
   gem 'spring'
 end
 
+group :test do
+  # カバレッジの計測と、外部への HTTP 通信の遮断・差し替え
+  gem 'simplecov', require: false
+  gem 'webmock', require: false
+end
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
 

@@ -1,0 +1,27 @@
+# rails_open_id_provider/db/seeds.rb と同じ 3 つのアプリ。secret はテストを流すたびに作る
+_fixture:
+  model_class: Doorkeeper::Application
+
+my_op:
+  name: RP (my_op)
+  uid: test-dummy-rp-my-op-client-id
+  secret: <%= SecureRandom.hex(16) %>
+  redirect_uri: http://localhost:3781/auth/my_op/callback
+  scopes: openid
+  confidential: true
+
+introspection:
+  name: RP (introspection)
+  uid: test-dummy-rp-introspection-client-id
+  secret: <%= SecureRandom.hex(16) %>
+  redirect_uri: http://localhost:3781/auth/introspection/callback
+  scopes: openid introspection
+  confidential: true
+
+resource_server:
+  name: Resource Server
+  uid: test-dummy-rs-client-id
+  secret: <%= SecureRandom.hex(16) %>
+  redirect_uri: urn:ietf:wg:oauth:2.0:oob
+  scopes: introspection
+  confidential: true

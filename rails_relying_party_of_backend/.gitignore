@@ -93,3 +93,5 @@ yarn-debug.log*
 
 # 追加
 .env
+# テスト用の環境変数はコミットする（client_id と secret は test-dummy- で始まるダミー）
+!.env.test

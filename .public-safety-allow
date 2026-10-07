@@ -7,3 +7,6 @@ private-key rails_open_id_provider/config/initializers/doorkeeper_openid_connect
 
 # E2E 用のダミーの client_secret（rails_open_id_provider/db/seeds.rb と同じ値で、本物の secret ではない）
 oauth-param rails_{relying_party_of_backend,resource_server}/.env_e2e =e2e-dummy-
+
+# テスト用のダミーの client_secret（minitest が .env.test から読む。本物の secret ではない）
+oauth-param rails_{relying_party_of_backend,resource_server}/.env.test =test-dummy-

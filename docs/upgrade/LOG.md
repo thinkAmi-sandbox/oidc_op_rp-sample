@@ -324,7 +324,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-d-1: 静的解析と脆弱性チェックの導入（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0d-lint-audit-tests` / PR は未作成
+- ブランチ / PR: `upgrade/step0d-lint-audit-tests` / [#13](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/13)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 作業計画からの変更点
@@ -424,3 +424,121 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 | 「依存として lock に新しく入った gem は 20 個」は誤り。増えた spec は 18 個で、直接足した 5 個を除くと 13 個 | 13 個に直した |
 | 0-d-1 の最初のコミットで書き換えた RS のテストの違反が、`.rubocop_todo.yml` に既存の違反として凍結されていた | テストを違反なしの書き方にし、todo を作り直した。`test/test_helper.rb` は生成物から行を消しただけなので、凍結に残した |
 | PLAN.md の 0-d-2 に、まだない `.env.test` などを現在形で書いていた | 「予定:」と書き、`.public-safety-allow` への追記は承認を得てから行うこと、承認されない場合の代案も書いた |
+
+## Step 0-d-2: minitest（2026-10-07）
+
+- ブランチ / PR: `upgrade/step0d2-minitest` / PR は未作成
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 作業計画からの変更点
+
+計画は前のセッションで承認済み。作業中に分かった事実をもとに、次のように変えた。
+
+| 項目 | 計画 | 実際 | 理由 |
+|---|---|---|---|
+| RP の ID トークンの検証に失敗したとき | 例外になる（クラスをテストで確かめる） | `/auth/failure?message=...&strategy=my_op` へリダイレクトし、例外は `env['omniauth.error']` に残る。テストはリダイレクト・例外のクラス・セッションにユーザーがないことを確かめる | 下の「記録した挙動」1 |
+| OP の「他クライアントのトークン」の 2 本 | RS のトークン（introspection scope あり）の場合と、introspection scope のない別アプリの資格情報の場合 | RS のトークンの場合は、有効なトークンのテストを兼ねた | RS と同じく、introspect のテストはすべて RS のトークンで問い合わせるため、同じリクエストのテストが 2 本になる |
+| RP のテスト | 計画の項目 | 「認可要求のパラメーター（scope `openid`・nonce・PKCE S256）」と「トークン要求の `code_verifier` が `code_challenge` に対応すること」を追加 | 0-f の omniauth-oauth2 / oauth2 の更新で変わりやすい |
+| RS のテスト | トークン要求と、introspect に `token` が渡ること | トークン要求の本文に client_id・client_secret が入ること（oauth2 1.4.7 の既定の `auth_scheme` は `:request_body`）も確かめる | 0-f の oauth2 の更新で既定値が変わる（PLAN.md 7 章） |
+| OP の ID トークンの署名の検証 | 指定なし | json-jwt 1.14.0 の `JSON::JWT.decode` に、OP の JWKS から作った `JSON::JWK::Set` を渡す | OP には jwt gem がなく、json-jwt は doorkeeper-openid_connect の依存で入っている。CVE-2023-51774 は残るが、テストで OP 自身の JWKS を使うだけなので影響しない |
+| RS の `test/test_helper.rb` | `fixtures :all` を書かない | 生成物の `fixtures :all`（fixture のファイルはない）を消し、違反なしに書き直して `.rubocop_todo.yml` から外した | 0-d-1 で凍結した 3 ルールの件数も合わせて減らした |
+
+### 導入したもの
+
+| gem | バージョン | 備考 |
+|---|---|---|
+| simplecov | 0.22.0 | 3 アプリとも test グループに `require: false`。1.x は Ruby 3.2 以上が必要 |
+| webmock | 3.26.4 | 同上。外部への HTTP 通信はすべて遮断する |
+
+- 依存として lock に新しく入った gem は 9 個（simplecov-html 0.13.2、simplecov_json_formatter 0.1.4、docile 1.4.1、addressable 2.9.0、public_suffix 6.0.2、crack 1.0.1、hashdiff 1.2.1、rexml 3.4.4、bigdecimal 3.1.1）。3 アプリとも Gemfile.lock の既存の行は変わっていない
+- crack は bigdecimal に依存する。そのままでは bigdecimal 4.1.3 が lock に入り、Ruby 3.1.7 の default gem の 3.1.1 が置き換わる。0-a・0-d-1 と同じ一時固定で 3.1.1 にして、固定は外した
+- rexml は Ruby 3.1.7 では default gem ではなく bundled gem（3.3.9）なので、3.4.4 が lock に入っても default gem の置き換えにはならない
+
+### テストの土台
+
+- 各アプリの `test/test_helper.rb` は、先頭で `SimpleCov.start 'rails'`、`config/environment` と `rails/test_help` の後に `webmock/minitest`。`parallelize` は書かない（Step 0-d-1「遭遇した問題」2）
+- テストは `DISABLE_SPRING=1 bin/rails test` で流す。spring 経由ではアプリが SimpleCov より先に読み込まれ、起動時に読まれる `lib/omniauth/strategies/my_op.rb` などのカバレッジが取れない
+- RP と OP には `test/` ディレクトリがなかったので、新しく作った。共通の手順は各アプリの `test/support/` のモジュールにまとめ、`test_helper.rb` で読み込む
+- RP / RS のテスト用の環境変数は、ダミーの値の `.env.test` をコミットして渡す。RP の独自ストラテジーはクラス本体で `OIDC_PROVIDER_HOST` を、initializer で client_id / secret を、どちらも起動時に読むので、`test_helper.rb` で ENV を設定しても間に合わない
+  - dotenv-rails 2.7.6 は test 環境で `.env.test` を `.env` より先に読み、先に読んだ値が勝つ。足りない変数は手元の `.env` から入ってしまうので、RP は 6 つ、RS は 3 つの変数をすべて書いた。test 環境で `.env.test` の値が読まれることを `bin/rails runner` で確かめた
+  - 各アプリの `.gitignore` は `.env.*` を無視するので、末尾に `!.env.test` を足した
+  - `CLIENT_SECRET_*=test-dummy-...` は安全チェックの `oauth-param` ルールで検出されるので、`.public-safety-allow` に RP / RS の `.env.test` の `=test-dummy-` を含む行の除外を追加した（人間が承認）。同じファイルに本物らしい値を書くと検出されることを確かめた
+- OP だけ fixtures を使う。ユーザー 1 人と、`db/seeds.rb` と同じ 3 つの Doorkeeper アプリケーション。secret は `SecureRandom` で毎回作り、パスワードは `test_helper.rb` のダミーの定数から `Devise::Encryptor.digest` で作る
+- OP は起動時に `jwtRS256.key` を読むので、手動確認用の鍵をそのまま使う。テストは鍵の中身に依存せず、JWKS を OP 自身から取って ID トークンを検証する。鍵がない環境（CI）での扱いは「仕上げ」で決める（PLAN.md）
+- テスト環境の `config.active_support.deprecation` を `:raise` にした。切り替える前に、3 アプリのテストの出力に ActiveSupport の非推奨警告がないことを確かめた。thor 1.1.0 の `DidYouMean::SPELL_CHECKERS` の警告（Step 0-a）は Ruby が出すもので、`:raise` の対象にならない
+
+### テストの構成
+
+| アプリ | 件数 | 内容 |
+|---|---|---|
+| RS | 7 | `apples/show`: Authorization ヘッダーなし・`Bearer ` だけは 401。introspect が `active: true` なら 200 でりんごの情報、`active: false` や introspect 自体が 401 なら 401。トークン要求（`grant_type=client_credentials`、`scope=introspection`、本文の client_id・secret）と、introspect に渡すもの（`token` と RS のトークン） |
+| RP | 16 | 独自ストラテジーの実際の流れ（`POST /auth/my_op` → リダイレクト先の `state` でコールバック）。OP の token・userinfo・JWKS を WebMock で差し替え、ID トークンはテスト内で作った RSA 鍵で署名し、JWKS も同じ鍵から作る。認可要求、PKCE、ログイン、`OpUser` の作成、ID トークンの検証失敗 6 本、トップ・ログアウト、introspection 用 RP のコールバック |
+| OP | 17 | discovery、JWKS（`n` が設定した鍵と一致）、Devise のログイン、認可コードフロー（同意画面、認可コード、トークン応答、ID トークン）、userinfo、introspect（有効、10 分ちょうど、10 分 1 秒、revoke 済み、別アプリの資格情報）、revoke |
+
+- テスト名は E2E と同じく日本語。1 テストのアサーションは 3 つまで（rubocop-minitest の `Minitest/MultipleAssertions`）なので、複数の値は 1 つの `assert_equal` にハッシュでまとめた
+- テストの中のトークンや secret はリテラルで書かず、doorkeeper が発行した値か `SecureRandom` の値を変数で渡す（安全チェックの `oauth-param` ルール）
+- 新しいテストは違反なしで書き、`.rubocop_todo.yml` は作り直していない
+
+### 記録した挙動
+
+計画の段階の見込みと違ったものを含む。どれも現在の挙動として記録し、コードは変えていない。
+
+1. RP の ID トークンの検証に失敗すると、omniauth 2.0.4 が例外を rescue する（`omniauth-2.0.4/lib/omniauth/strategy.rb:196` の `rescue StandardError` → `fail!`）。`FailureEndpoint` は `RACK_ENV` が `development` のときだけ例外を外へ出し（`omniauth-2.0.4/lib/omniauth/failure_endpoint.rb:20`、既定の `failure_raise_out_environments` は `['development']`）、それ以外では `/auth/failure?message=<例外のメッセージ>&strategy=my_op` へリダイレクトする。RP は `/auth/failure` を `/` へリダイレクトする。RP の `test/test_helper.rb` で `RACK_ENV` を `test` に固定しているので、テストではリダイレクトになる（下の「コードレビュー」）
+
+   | ID トークン | 例外（`env['omniauth.error']`） |
+   |---|---|
+   | nonce が認可要求のものと違う | `JWT::VerificationError` |
+   | `kid` が JWKS にない | `JWT::VerificationError` |
+   | JWKS にない鍵で署名されている | `JWT::VerificationError` |
+   | `iss` が違う | `JWT::InvalidIssuerError` |
+   | `aud` が違う | `JWT::InvalidAudError` |
+   | 有効期限（発行から 120 秒）を過ぎた | `JWT::ExpiredSignature` |
+
+2. OP に、introspection scope のない別アプリ（my_op 用 RP）の資格情報を Basic で付けて、RS のトークンを introspect すると、エラーではなく 200 で `{"active": false}` が返る。doorkeeper 5.5.2 は、クライアントの資格情報で認可されたときは `allow_token_introspection`（OP の設定では「同じアプリなら可」）が偽なら `active: false` を返す
+3. OP の Devise のログインは、誤ったパスワードに 200 とフラッシュ（`Invalid Email or password.`）で応える（Devise 4.8.0）。正しいパスワードでは `/` へリダイレクトする（OP には `/` のルーティングはない）
+4. OP の期限切れの判定は、0-b で書いたとおり `現在時刻 > created_at + expires_in`。発行から 10 分ちょうどは `active: true`、10 分 1 秒は `active: false`。introspect に使う RS のトークンは、時刻を進めた後に取る。同じ時刻に取ると、境目で RS のトークン自体が期限切れになるため
+
+### 壊すと落ちることの確認
+
+確かめた後は元に戻し、`git diff` が空であることを確かめた。
+
+| 変更 | 落ちたテスト |
+|---|---|
+| OP の `access_token_expires_in` を 11 分にする | 10 分 1 秒で `active: false`、トークン応答の `expires_in`、introspect の有効期間 |
+| OP の `access_token_expires_in` を 10 分より 1 秒短くする | 10 分ちょうどで `active: true`、トークン応答の `expires_in`、introspect の有効期間 |
+| RP の `verify_nonce!` を素通りにする | nonce が違うときのテストだけ |
+| RS で `active: false` を通す（401 にしない） | `active: false` のときのテストだけ |
+
+### カバレッジ
+
+| アプリ | 行カバレッジ | 備考 |
+|---|---|---|
+| RS | 57.5%（23 / 40） | `app/controllers/apples_controller.rb` は全行。通っていないのは生成物の基底クラス（channel・job・mailer・`ApplicationRecord`） |
+| RP | 88.1%（104 / 118） | `lib/omniauth/strategies/my_op.rb` と各コントローラー・`OpUser` は全行。通っていないのは生成物の基底クラス |
+| OP | 30.0%（6 / 20） | OP の挙動の大部分は `config/initializers/` の doorkeeper / doorkeeper-openid_connect の設定ブロックにあり、SimpleCov の `rails` プロファイルは `config/` を対象外にする。OP の数字はテストの範囲を表さない |
+
+### 遭遇した問題
+
+1. RP の独自ストラテジーの検証失敗は、計画では「例外になる」と見込んでいたが、テストでは何も raise されなかった。omniauth のログに `Authentication failure!` が出ていたことから gem を調べ、「記録した挙動」1 の仕組みが分かった。development で起動したときに `RACK_ENV` がどうなり、例外が外へ出るかは確かめていない
+2. テストファイルが 1 つもないと、`bin/rails test` は `test_helper.rb` を読まないので、`coverage/` も作られない（RP・OP の土台のコミットの時点）
+
+### 確認結果
+
+- minitest: RS 7 runs、RP 16 runs、OP 17 runs、0 failures。`:raise` にした後も同じ
+- E2E: 各コミットの前に流して、どれも 10 passed
+- RuboCop: 3 アプリとも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）。brakeman: 3 アプリとも `Security Warnings: 0`
+- 安全チェック: 各コミットで指摘なし
+- 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する。RP と OP の `db/test.sqlite3` はテストで新しく作られた（gitignore 対象）
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| RP の ID トークンの検証失敗のテストは、`RACK_ENV` が `development` だと例外が外へ出て、記録したリダイレクトにならない | `RACK_ENV=development` を付けて流すと 6 errors になることを確かめた。RP の `test/test_helper.rb` で `RACK_ENV` を `test` に固定し、同じ条件で通ることを確かめた |
+| OP の `issue_tokens` が `application:` を受け取るのに、認可要求は既定のアプリ（my_op）で作っていて、別のアプリを渡すと認可コードとトークン要求のアプリが食い違う | 認可要求にも渡すように直した。introspection 用 RP を渡してトークンが取れることを一時的なテストで確かめた（今は渡すテストはない） |
+| RP のログアウトのテストが、ログインできていることを確かめていないので、ログインが黙って失敗しても通る | ログアウトの前にセッションのユーザーがあることを確かめるようにした |
+| RP の PKCE のテストで `code_verifier` が送られないと、比較の失敗ではなく `TypeError` になる | 送られないときは空文字列として比べ、比較の失敗になるようにした |
+| RP / RS の `.gitignore` のコメントが「`.env.test` の値はすべて `test-dummy-` で始まる」としているが、`OIDC_PROVIDER_HOST` などは違う | client_id と secret がダミーだと書き直した |
+| `.public-safety-allow` の除外は、行のどこかに `=test-dummy-` があれば効くので、本物の secret の行の後ろに書いたコメントでも素通りする | 対応しない。0-c で承認された `.env_e2e` の除外と同じ形で、除外の条件を変えるには人間の承認が必要 |
+| SimpleCov の `rails` プロファイルは `config/` を対象外にするので、OP の挙動のある initializer のカバレッジが取れない | 対応しない。この Step では計測の仕組みを入れるところまでとし、0-e でカバレッジを見るときに必要なら決める |
+| RS のテストで `stub_token_request` を 5 本で繰り返している | 対応しない。準備・実行・確認の順で、各テストの準備をテストの中に見えるようにしておく |

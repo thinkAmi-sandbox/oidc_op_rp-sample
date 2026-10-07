@@ -127,17 +127,17 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 #### 0-d-2: minitest
 
-- [ ] SimpleCov（`coverage/` は gitignore 対象）
-- [ ] WebMock
-- [ ] テスト（CLAUDE.md「テスト」の方針に従う）
-  - 予定: RP / RS のテスト用の環境変数を、ダミーの値の `.env.test` をコミットして渡す（dotenv は `.env` より先に読むので、手元の `.env` に左右されない）。secret の行は公開物の安全チェックで検出されるため、`.public-safety-allow` への追記が必要で、人間の承認を得てから行う。承認されなければ secret を空にする
-  - 予定: テストを `DISABLE_SPRING=1 bin/rails test` で流す（spring 経由ではアプリが SimpleCov より先に読み込まれ、起動時に読むファイルのカバレッジが取れない）
-  - OP: discovery、JWKS、Devise のログイン、認可コード → トークン → ID トークンの検証、userinfo、introspect（有効・期限切れ・失効済み・他クライアントのトークン）、revoke
-    - 期限切れは境目の 2 本にし、0-b で決めた 10 分をテストに残す。「発行から 10 分ちょうどは `active: true`」「10 分を 1 秒過ぎると `active: false`」（doorkeeper 5.5.2 の判定は `現在時刻 > created_at + expires_in`）
-  - RP: 独自ストラテジーの ID トークン検証（テスト内で生成した RSA 鍵 ＋ JWKS を WebMock で差し替え）、ログイン後の画面遷移、introspection 画面（OP・RS の応答を WebMock で差し替え）
+- [x] SimpleCov（`coverage/` は gitignore 対象）
+- [x] WebMock（外部への HTTP 通信はすべて遮断）
+- [x] テスト（CLAUDE.md「テスト」の方針に従う。件数と記録した挙動は LOG.md の Step 0-d-2）
+  - RP / RS のテスト用の環境変数は、ダミーの値の `.env.test` をコミットして渡す（dotenv は `.env` より先に読むので、手元の `.env` に左右されない）。secret の行は `.public-safety-allow` で除外した（人間が承認）
+  - テストは `DISABLE_SPRING=1 bin/rails test` で流す（spring 経由ではアプリが SimpleCov より先に読み込まれ、起動時に読むファイルのカバレッジが取れない）
+  - OP: discovery、JWKS、Devise のログイン、認可コード → トークン → ID トークンの検証、userinfo、introspect（有効・期限切れ・失効済み・他クライアントの資格情報）、revoke
+    - 期限切れは境目の 2 本にし、0-b で決めた 10 分をテストに残した。「発行から 10 分ちょうどは `active: true`」「10 分を 1 秒過ぎると `active: false`」（doorkeeper 5.5.2 の判定は `現在時刻 > created_at + expires_in`）
+  - RP: 独自ストラテジーの ID トークン検証（テスト内で生成した RSA 鍵 ＋ JWKS を WebMock で差し替え）、ログイン後の画面遷移、introspection 画面（OP・RS の応答を WebMock で差し替え）。検証に失敗したときは、例外ではなく `/auth/failure` へのリダイレクトになる（omniauth 2.0.4 の挙動。LOG.md）
   - RS: `apples/show` を有効・無効なトークンで呼んだとき（introspect の応答を WebMock で差し替え）
-- [ ] テスト環境の `config.active_support.deprecation = :raise`（10 章の完了条件）
-- [ ] OP の期限切れのテストを追加したら、`rails_relying_party_of_backend/app/controllers/introspections_controller.rb` のコメントアウトした期限切れの確認（`sleep 70`）を同じ PR で削除する。手動確認の名残で、期限切れの判定は OP の minitest、`active: false` の拒否は RS の minitest、3 アプリの通しは E2E の revoke で置き換わる
+- [x] テスト環境の `config.active_support.deprecation = :raise`（10 章の完了条件）
+- [x] `rails_relying_party_of_backend/app/controllers/introspections_controller.rb` のコメントアウトした期限切れの確認（`sleep 70`）を削除した。期限切れの判定は OP の minitest、`active: false` の拒否は RS の minitest、3 アプリの通しは E2E の revoke で置き換わった
 
 #### 0-d-3: 脆弱性のある gem の更新
 
@@ -188,6 +188,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 ### 仕上げ
 
 - [ ] GitHub Actions（minitest、E2E、RuboCop、oxlint、bundler-audit、brakeman、安全チェック）
+- [ ] CI で OP の署名鍵 `rails_open_id_provider/jwtRS256.key` がないときの minitest の扱いを決める（OP は起動時に鍵を読む。0-d-2 では手動確認用の鍵を使った）
 - [ ] Dependabot（bundler、npm、GitHub Actions をまとまった単位で更新）。CI ができてから有効にする
 - [ ] README の「Tested Environment」を更新。アップグレード前のコードはタグ `rails-6.1` にあること、Next.js 製 RP は新しい OP で確認していないことを書く
 - [ ] README の「How to use」に Ruby の入れ方を書く。各アプリの `mise.toml` は初回に `mise trust` が必要なこと、Ruby のバージョンは `.ruby-version` と Gemfile の `ruby` の両方にあること（mise は Gemfile を優先して読む）
@@ -225,7 +226,9 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
 | brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初 | brakeman 8 系は Ruby 3.1 では入らない |
+| simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初 | simplecov 1.x は Ruby 3.2 以上が必要（Step 2 の後に上げられる） |
 | json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
+| bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
 | concurrent-ruby（Rails 経由） | 1.1.9 | Step 3 の後 | 1.3.5 以上は Rails 6.1 でも 7.0 でも起動しない（LOG.md の Step 0-a、Step 0-d-1）。advisory は 1.3.7 で解消する |
 | rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / msgpack / mail / faraday 1.x / bcrypt | — | 未定（14 章） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる（`bundle lock --conservative` で確認。修正版は LOG.md の Step 0-d-1） |
 

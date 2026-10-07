@@ -10,3 +10,20 @@ require 'rails/test_help'
 
 # 外部への HTTP 通信はすべて遮断し、必要なものはテストごとに WebMock で差し替える
 require 'webmock/minitest'
+
+Dir[File.expand_path('support/**/*.rb', __dir__)].each { |file| require file }
+
+# fixtures の users のパスワード（テスト専用のダミー）
+TEST_USER_PASSWORD = 'test-dummy-password'
+
+module ActiveSupport
+  class TestCase
+    fixtures :all
+  end
+end
+
+module ActionDispatch
+  class IntegrationTest
+    include Devise::Test::IntegrationHelpers
+  end
+end
