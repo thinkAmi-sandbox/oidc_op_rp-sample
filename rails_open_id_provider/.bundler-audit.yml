@@ -44,9 +44,6 @@ ignore:
   # json-jwt 1.14.0: 0-f で doorkeeper-openid_connect と一緒に外す。残るなら 1.16.6 以上にする（PLAN.md 7 章）
   - CVE-2023-51774 # ~> 1.15.3, >= 1.15.3.1 / >= 1.16.6
 
-  # mail 2.8.1: 2.9.1 以上で解消する。Rails 6.1・Ruby 3.1 のまま依存関係を解決できる（Step 0-d に bundle lock で確認）。更新の時期は PLAN.md 7 章
-  - GHSA-mvxr-6m87-mv2q # >= 2.9.1
-
   # msgpack 1.4.5: 1.8.2 以上で解消する。Rails 6.1・Ruby 3.1 のまま依存関係を解決できる（Step 0-d に bundle lock で確認）。更新の時期は PLAN.md 7 章
   - CVE-2026-54522 # >= 1.8.2
 
