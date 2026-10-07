@@ -22,7 +22,8 @@ module OauthFlowTestHelper
   def issue_tokens(nonce: SecureRandom.hex(16), application: oauth_applications(:my_op))
     sign_in users(:user)
     code_verifier = SecureRandom.urlsafe_base64(48)
-    code = approve_authorization(authorization_params(nonce: nonce, code_verifier: code_verifier))
+    code = approve_authorization(authorization_params(nonce: nonce, code_verifier: code_verifier,
+                                                      application: application))
     post oauth_token_path, params: {
       grant_type: 'authorization_code', code: code, redirect_uri: application.redirect_uri,
       client_id: application.uid, client_secret: application.secret, code_verifier: code_verifier
