@@ -33,7 +33,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 - 作業ブランチは `epic/rails-8.1-upgrade` から切り、名前は `upgrade/<step>-<内容>`（例: `upgrade/step0a-boot-ruby31`）
 - **PR の向き先は `epic/rails-8.1-upgrade`**。`gh pr create --base epic/rails-8.1-upgrade` を必ず付ける
 - PR 本文は `--body-file` で渡す（Claude Code hooks が本文を検査するため）
-- epic → main の取り込みはマージコミットで行い、squash しない
+- epic への PR の取り込みも、epic → main の取り込みも、マージコミットで行う（squash・rebase はしない。`.git-blame-ignore-revs` のコミットのハッシュを残すため）
 
 ## 人間との分担
 

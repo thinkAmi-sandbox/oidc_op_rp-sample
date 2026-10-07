@@ -1,6 +1,6 @@
 # git blame で無視するコミット（見た目だけの変更）。
 # 有効にするには: git config blame.ignoreRevsFile .git-blame-ignore-revs （GitHub は自動で読む）
-# コミットのハッシュが変わらないよう、PR はマージコミットで取り込む（squash・rebase をしない）
+# コミットのハッシュが変わらないよう、CLAUDE.md の「ブランチと PR」のとおり、マージコミットで取り込む
 
 # Step 0-e: RuboCop の既存の違反の修正（文字列の引用符・シンボルの配列・空のメソッド・空白・Gemfile の並べ替え）
 f03305ca047a6295a27f52f3a5a1ddfd79a1cb14
