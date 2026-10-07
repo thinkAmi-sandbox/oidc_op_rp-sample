@@ -595,7 +595,7 @@ gem ごとに RS → RP → OP の順で `bundle lock --update <gem> --conservat
 
 | gem | 内容 | アプリへの影響 |
 |---|---|---|
-| rack 2.2.x | 2.2.14 以降、クエリのパラメーター数（既定 4096）と本文（既定 4MB）、multipart のパート数・ヘッダーなどに上限が入った。超えると `Rack::QueryParser::QueryLimitError` | Rails 6.1 はこの例外を `ActionController::BadRequest` に変換しないので、超えたときは 400 ではなく 500 になる見込み（確かめていない）。OIDC の通常の通信では届かない |
+| rack 2.2.x | 2.2.14 以降、クエリのパラメーター数（既定 4096）と本文（既定 4MB）、multipart のパート数・ヘッダーなどに上限が入った。超えると `Rack::QueryParser::QueryLimitError` | Rails 6.1 はこの例外を `ActionController::BadRequest` に変換しない（`actionpack-6.1.7.10/lib/action_dispatch/http/request.rb` が rescue するのは `ParameterTypeError` と `InvalidParameterError` だけ）ので、超えたときは 500 になる（下の「コードレビュー」）。OIDC の通常の通信では届かない |
 | puma 5.5〜5.6 | 5.5.1 から `APP_ENV` を `RACK_ENV` / `RAILS_ENV` より優先する。ヘッダーの行末の LF 単独を受け付けない | 手元のシェルに `APP_ENV` はない |
 | rails-html-sanitizer 1.6〜1.7 | HTML4 / HTML5 の名前空間ができたが、Rails 6.1 では HTML4 の sanitizer のまま。警告は出ない | OP の `rails_open_id_provider/app/views/doorkeeper/applications/index.html.erb` が `simple_format(application.redirect_uri)` を使う（下の「確認結果」） |
 | websocket-driver 0.8 | バイナリフレームの受信が Array から String に変わる。0.8.1 でリクエスト行とヘッダーの合計を 32K に制限 | ActionCable の実チャネルはない |
@@ -624,3 +624,11 @@ gem ごとに RS → RP → OP の順で `bundle lock --update <gem> --conservat
 
 1. websocket-driver の確認で RS を起動したとき、ブラウザペインが開いた `/favicon.ico` の 404 の処理中に、Step 0-b と同じ finalizer の警告（`ThreadError: can't be called from trap context`、`listen-3.7.0/lib/listen/fsm.rb:80`）が出た。0-b では OP（listen 3.6.0）で観測したもので、RS は listen 3.7.0。0-d-3 で上げた gem とは経路が違い、0-f で listen を更新するときに確認する
 2. Devise の reset password のメールを組み立てて mail の前後を比べようとしたが、OP には Devise の recoverable のルーティングがないため、テンプレートが `edit_password_url` で `NoMethodError` になった。ActionMailer で直接組み立てたメッセージで比べた
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `.bundler-audit.yml` の先頭のコメントが「Step 0-d で凍結した既存の advisory」のままで、0-d-3 で足した puma の 2 件に合わない | 「Step 0-d-1 で凍結した既存の advisory と、Step 0-d-3 の puma の更新で新しく対象に入った advisory」に直した（3 アプリ） |
+| 末尾の websocket-driver の項目を消したときに、直前の空行が残り、3 アプリの `.bundler-audit.yml` の末尾が空行 2 つになっている | 末尾の空行を消した |
+| rack の上限を超えたときに 500 になるという記述が、確かめていない見込みのまま | test 環境の OP の `/oauth/token` に `Rack::MockRequest` で POST し、パラメーター 2 個では doorkeeper が 400、4097 個では `Rack::QueryParser::QueryLimitError` で 500 になることを確かめた。セキュリティの修正による変化として受け入れ、テストは足していない |
