@@ -130,8 +130,8 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 - [ ] SimpleCov（`coverage/` は gitignore 対象）
 - [ ] WebMock
 - [ ] テスト（CLAUDE.md「テスト」の方針に従う）
-  - RP / RS のテスト用の環境変数は、ダミーの値の `.env.test` をコミットして渡す（dotenv は `.env` より先に読むので、手元の `.env` に左右されない）。secret の行は公開物の安全チェックで検出されるため、`.public-safety-allow` への追記が必要（人間の承認待ち）
-  - テストは `DISABLE_SPRING=1 bin/rails test` で流す（spring 経由ではアプリが SimpleCov より先に読み込まれ、起動時に読むファイルのカバレッジが取れない）
+  - 予定: RP / RS のテスト用の環境変数を、ダミーの値の `.env.test` をコミットして渡す（dotenv は `.env` より先に読むので、手元の `.env` に左右されない）。secret の行は公開物の安全チェックで検出されるため、`.public-safety-allow` への追記が必要で、人間の承認を得てから行う。承認されなければ secret を空にする
+  - 予定: テストを `DISABLE_SPRING=1 bin/rails test` で流す（spring 経由ではアプリが SimpleCov より先に読み込まれ、起動時に読むファイルのカバレッジが取れない）
   - OP: discovery、JWKS、Devise のログイン、認可コード → トークン → ID トークンの検証、userinfo、introspect（有効・期限切れ・失効済み・他クライアントのトークン）、revoke
     - 期限切れは境目の 2 本にし、0-b で決めた 10 分をテストに残す。「発行から 10 分ちょうどは `active: true`」「10 分を 1 秒過ぎると `active: false`」（doorkeeper 5.5.2 の判定は `現在時刻 > created_at + expires_in`）
   - RP: 独自ストラテジーの ID トークン検証（テスト内で生成した RSA 鍵 ＋ JWKS を WebMock で差し替え）、ログイン後の画面遷移、introspection 画面（OP・RS の応答を WebMock で差し替え）
@@ -213,7 +213,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
 | brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初 | brakeman 8 系は Ruby 3.1 では入らない |
 | json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | 未定 | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
-| concurrent-ruby（Rails 経由） | 1.1.9 | Step 1 の後 | 1.3.5 以上は Rails 6.1 で起動しない（LOG.md の Step 0-a）。advisory は 1.3.7 で解消する |
+| concurrent-ruby（Rails 経由） | 1.1.9 | Step 3 の後 | 1.3.5 以上は Rails 6.1 でも 7.0 でも起動しない（LOG.md の Step 0-a、Step 0-d-1）。advisory は 1.3.7 で解消する |
 | rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / msgpack / mail / faraday 1.x / bcrypt | — | 未定（14 章） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる（`bundle lock --conservative` で確認。修正版は LOG.md の Step 0-d-1） |
 
 annotate の Rails 8 対応状況と、oauth2 1.4 系の faraday 2 対応範囲は記憶ベース。Step 0-f の調査で gemspec を確認して確定させる。

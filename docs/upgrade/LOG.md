@@ -347,7 +347,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 | brakeman | 7.1.1 | 8.x は Ruby 3.1 では入らない |
 | bundler-audit | 0.9.3 | advisory DB は `~/.local/share/ruby-advisory-db` |
 
-- 依存として lock に新しく入った gem は 20 個（rubocop-ast、parser、prism など）。3 アプリとも Gemfile.lock の既存の行は変わっていない
+- 依存として lock に新しく入った gem は 13 個（rubocop-ast、parser、prism、json など）。3 アプリとも Gemfile.lock の既存の行は変わっていない
 - rubocop は json に依存する。そのままでは json 3.0.2 が lock に入り、アプリが今使っている Ruby 3.1.7 の default gem の json 2.6.1 が置き換わる。0-a と同じ一時固定で 2.6.1 にして、固定は外した（PLAN.md 7 章に追記）
 
 ### RuboCop
@@ -375,7 +375,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
   | Rails 6.1 系に修正版がない | actionpack | Step 1（7.0.8.7） |
   | | activerecord、activestorage の CVE-2025-24293 | Step 3（7.1.5.2） |
   | | actionview、activesupport、activestorage の残り | Step 5（7.2.3.1 / 7.2.3.2） |
-  | Ruby や Rails の制約がある | concurrent-ruby | 1.3.5 以上は Rails 6.1 で起動しない（Step 0-a の gem ごとの対応）。Step 1 の後 |
+  | Ruby や Rails の制約がある | concurrent-ruby | 1.3.5 以上は Rails 6.1 で起動しない（Step 0-a の gem ごとの対応）。Rails 7.0.8.7 の `active_support/logger_thread_safe_level.rb` も `logger` を require せず、require するのは 7.1.0 から。Step 3 の後 |
   | | devise（OP） | 修正版は 5.x だけで、5.x は Rails 7.0 以上が必要（railties >= 7.0）。Step 1 の後 |
   | | nokogiri | 1.19 系は Ruby 3.2 以上が必要。Step 2 |
   | | sqlite3 | 修正版は 2.x だけ。Step 5 |
@@ -408,3 +408,12 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 - E2E: gem を追加した各コミットの前に流して、どれも 10 passed
 - 3 アプリとも `bin/rails runner` で起動し、development で RuboCop を読み込まない（`defined?(RuboCop)` が nil）。json は 2.6.1 のまま
 - 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する。RS の `db/test.sqlite3` は、計画の段階で RS のテストを流したときに作られた（gitignore 対象）
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| concurrent-ruby の解消時期を「Step 1（Rails 7.0）の後」としたが、Rails 7.0.8.7 の `activesupport-7.0.8.7/lib/active_support/logger_thread_safe_level.rb` も `logger` を require しない（require するのは 7.1.0 から）。1.3.5 以上は Rails 7.0 でも起動しない | 3 アプリの無視リスト、本ファイル、PLAN.md 7 章を「Step 3 の後」に直した。rails/rails の v7.0.8.7 と v7.1.0 のタグで、該当ファイルを見比べて確かめた |
+| 「依存として lock に新しく入った gem は 20 個」は誤り。増えた spec は 18 個で、直接足した 5 個を除くと 13 個 | 13 個に直した |
+| 0-d-1 の最初のコミットで書き換えた RS のテストの違反が、`.rubocop_todo.yml` に既存の違反として凍結されていた | テストを違反なしの書き方にし、todo を作り直した。`test/test_helper.rb` は生成物から行を消しただけなので、凍結に残した |
+| PLAN.md の 0-d-2 に、まだない `.env.test` などを現在形で書いていた | 「予定:」と書き、`.public-safety-allow` への追記は承認を得てから行うこと、承認されない場合の代案も書いた |
