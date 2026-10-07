@@ -107,7 +107,7 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
   - [x] トークン失効: E2E が revoke した後、RS がそのトークンを拒否する。introspection 用 RP の画面から流した場合も、RP が revoke したトークンを RS が 401 で拒否し、introspect が `active: false` になる
   - [x] ログアウト: RP のセッションが破棄される。OP のセッションは残り、再ログインでは OP のログイン画面を経ない（現在の挙動の記録）
   - [x] 基準応答との比較: discovery、JWKS、トークン応答、ID トークン（ヘッダーとペイロード）、userinfo、introspect（有効・revoke 後）
-- [x] 基準応答の比較ルール: 時刻・トークン・nonce・ユーザー ID は伏せる。JWKS と ID トークンのヘッダーは `kid` と `n` を伏せ、`kty`・`alg`・`use`・`e` を比べる。ID トークンは項目と `alg` を比べる。有効期間は `exp - iat` として残す（ID トークン 120、introspect 600）。トークン応答の `expires_in: 600` は伏せずに比べる。基準応答は `e2e/baseline/` にあり、更新は `npx playwright test --update-snapshots`
+- [x] 基準応答の比較ルール: 時刻・トークン・nonce・ユーザー ID は伏せる（JSON の型は `<TIMESTAMP:number>` のように残す）。JWKS と ID トークンのヘッダーは `kid` と `n` を伏せ、`kty`・`alg`・`use`・`e` を比べる。ID トークンは項目と `alg` を比べる。有効期間は `exp - iat` として残す（ID トークン 120、introspect 600）。トークン応答の `expires_in: 600` は伏せずに比べる。基準応答は `e2e/baseline/` にあり、更新は `npx playwright test --update-snapshots`
 
 ### Step 0-d: 静的解析・脆弱性チェック・minitest
 
