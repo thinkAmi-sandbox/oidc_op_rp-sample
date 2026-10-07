@@ -9,10 +9,10 @@ class ApplesController < ApplicationController
   def validate_bearer_token
     # Bearer トークンを取得
     authorization_header = request.headers['Authorization']
-    return render status: 401 if authorization_header.blank?
+    return render status: :unauthorized if authorization_header.blank?
 
     access_token = authorization_header.gsub('Bearer ', '')
-    return render status: 401 if access_token.blank?
+    return render status: :unauthorized if access_token.blank?
 
     # クライアントクレデンシャルフローで、Resource Serverのアクセストークンを取得する
     client = OAuth2::Client.new(ENV['CLIENT_ID_OF_RESOURCE_SERVER'],
@@ -33,6 +33,6 @@ class ApplesController < ApplicationController
     end
 
     body = JSON.parse(response.body)
-    render status: 401 if response.status == 401 || body['active'] == false
+    render status: :unauthorized if response.status == 401 || body['active'] == false
   end
 end
