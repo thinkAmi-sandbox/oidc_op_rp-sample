@@ -220,3 +220,10 @@ modules.xml
 
 ### macOS ###
 .DS_Store
+
+### E2E (Playwright) ###
+# トレース・レポート・ログイン状態には Cookie やトークンが入る
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/.auth/

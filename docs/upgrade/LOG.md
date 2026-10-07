@@ -163,7 +163,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-b: アクセストークンの有効期限を 10 分にする（2026-10-06）
 
-- ブランチ / PR: `upgrade/step0b-access-token-expiry` / （PR 作成後に追記）
+- ブランチ / PR: `upgrade/step0b-access-token-expiry` / [#11](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/11)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 意図的な仕様変更
@@ -224,3 +224,100 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 | finalizer の警告を「0-b と無関係」「そのリクエストも正常に終わった」と書いているが、どのリクエストかは確かめていない | 確かめた範囲（発生箇所、観測 1 回、0-a の基準なし）に合わせて書き直した |
 | `doorkeeper.rb` のコメントに変更の経緯（以前は 1 分）まで書いていて、LOG.md やコミットメッセージと重複する | 今の意図（10 分にする理由）だけを残した |
 | OP の設定変更のコミットメッセージが、まだない E2E を現在形で書いている | 対応しない。直前のコミットではなく、直すには履歴の書き換えが必要なため。E2E は 0-c で導入する計画で、記述の意図は本ファイルと PLAN.md で追える |
+
+## Step 0-c: E2E と OP の応答のスナップショット（2026-10-07）
+
+- ブランチ / PR: `upgrade/step0c-e2e-baseline` / （PR 作成後に追記）
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）。E2E 用に Node 24.21.0 を mise で固定
+
+### 作業計画からの変更点
+
+計画の段階で調べた事実をもとに、PLAN.md の 0-c から次のように変えた（作業計画として承認済み）。
+
+| 項目 | PLAN.md の当初の記述 | 実際 | 理由 |
+|---|---|---|---|
+| 署名鍵 | E2E の準備で毎回生成 | `jwtRS256.key` がなければ生成し、あれば手動確認用の鍵を使う | 鍵のパスは `Rails.root.join('jwtRS256.key')` に固定（`rails_open_id_provider/config/initializers/doorkeeper_openid_connect.rb`）。毎回生成すると手動確認用の鍵を上書きし、避けるには OP のコードの変更が必要になる。`kid` と `n` は比較で伏せるので、共用しても結果は変わらない |
+| 環境変数のファイル | `.env_e2e_template` のような名前 | `.env_e2e` | コピーして使うひな形ではなく、E2E がそのまま読んで渡すため |
+| テスト用ユーザー | 1 人 | シナリオごとに 1 人（4 人） | doorkeeper は同じアプリ・ユーザー・scope の未 revoke のトークンがあると同意画面を省く（LOG.md の Step 0-b「遭遇した問題」2）。共用すると、同意画面の有無が実行順や単独実行で変わる |
+| リソース取得 | りんごの情報が表示される | E2E から RS を直接呼んで確かめる | RP の introspection 画面は RS の応答を表示せず、標準出力に `puts` するだけ（`rails_relying_party_of_backend/app/controllers/introspections_controller.rb`）。画面に出すのは RP が revoke した後のアクセストークン |
+| 起動スクリプト | アプリごとに 3 本 | `e2e/scripts/start-server.sh` の 1 本 | 中身がほぼ同じため、引数（`op` / `rp` / `rs`）で分けた |
+| 最小の起動確認の spec | スナップショットに吸収 | `e2e/tests/servers.spec.ts` として残す | 起動の失敗が分かりやすい。RS がトークンなしのリクエストを 401 で拒否することは、ほかのシナリオでは確かめていない |
+
+計画になかった作業:
+
+- RP の `.env_template` の `ISSUER_OF_MY_OP=my_op` を `http://localhost:3780` に直した。RP の独自ストラテジーは ID トークンの `iss` をこの値と比べるので、ひな形のままでは検証に失敗する（手元の `.env` は正しい値だった）
+- `.public-safety-allow` に、`.env_e2e` のダミーの secret の除外を追加した（人間が承認）。`oauth-param` ルールはキー名で判定するため、ダミー値かどうかを区別できない。除外の範囲は `oauth-param` ルール、RP / RS の `.env_e2e`、値が `e2e-dummy-` で始まる行だけ。同じファイルに本物らしい値を書くと検出されることを確認した
+
+### 判断
+
+- `rails_open_id_provider/jwtRS256.key.example` と `.pub.example` は削除した（PLAN.md 14 章の未決事項）。中身は BEGIN 行・`...`・END 行の 3 行だけのプレースホルダーで、最初のコミットから変わっておらず、どこからも参照されていなかった。「準備」の節で「コミット済みのサンプル秘密鍵」と書いたのは実態と違っていた
+- `.claude/launch.json`（手動確認用に 3 アプリを起動する Claude Code の設定）はコミットし、E2E の起動設定とはまとめなかった。E2E は E2E 用の DB と環境変数を渡し、Playwright が起動と停止を管理するので、目的が違う。同じポートを使うので同時には動かせない
+- PR は分けず 1 つにした（人間の判断）。区別はコミットの単位でつける
+
+### E2E の構成
+
+- 3 アプリは development 環境のまま起動し、`DATABASE_URL=sqlite3:db/e2e.sqlite3` で E2E 専用の DB に切り替える。起動のたびに OP / RP は `db:drop db:setup`、RS は `db:drop db:create`（RS には `schema.rb` もマイグレーションもない）
+  - Rails 6.1 は `DATABASE_URL` があると、development での `db:drop` などで test DB を対象にしない（`activerecord-6.1.7.10/lib/active_record/tasks/database_tasks.rb:500`）
+  - 起動スクリプトは、`DATABASE_URL` に `e2e` が含まれないときは `db:drop` の前に止まる
+- RP / RS の環境変数は `.env_e2e` を Playwright の設定で読み、`webServer.env` で渡す。dotenv 2.7.6 は既存の環境変数を上書きしないので、手元の `.env` より優先される。Playwright 1.63.0 は `webServer.env` を `process.env` と合わせて渡す
+- ポートは手動確認用と同じ 3780〜3782（issuer や RS の URL がコードに固定されているため）。`reuseExistingServer: false` にして、手動確認用のサーバーが動いているときに、その DB へ E2E を流さないようにした。Playwright は 200〜403 の応答を起動済みとみなすので、トークンなしでは 401 を返す RS も起動待ちに使える
+- テストは 1 つずつ流す（`workers: 1`）。3 アプリは 1 プロセスずつで、DB は sqlite のため
+- スナップショットの取得と、リソース取得・トークン失効のシナリオでは、E2E 自身が `my_op` 用 RP のクライアントとして認可コードフローを行う（RP と同じく scope `openid`、nonce、PKCE S256）。RP のコールバック URL へのリダイレクトは `page.route` で横取りするので、RP 本体には認可コードが届かない。introspect は RS と同じく、RS のクライアントのクライアントクレデンシャルのトークンを付けて呼ぶ
+- OP の応答のスナップショットは、Playwright の `toMatchSnapshot` で `e2e/baseline/` に保存する（`snapshotPathTemplate` でプラットフォーム名を付けない）。`updateSnapshots: "none"` にして、スナップショットがないときに黙って作らないようにした。項目の順番の違いを差分にしないよう、キーは並べ替えて保存する
+- 伏せた値は `<TIMESTAMP:number>` のように JSON の型を残す。gem の更新で `sub` が数値になるなど、型が変わったことを差分として検出するため。認可コードフローの 6 つの応答は `expect.soft` で比べ、最初の差分で止まらずにすべて報告する
+
+### 導入したもの
+
+| もの | バージョン | 備考 |
+|---|---|---|
+| Node.js | 24.21.0 | `e2e/mise.toml`。初回は `e2e/` で `mise trust` |
+| `@playwright/test` | 1.63.0 | ブラウザは Chromium（Chrome for Testing 153.0.8010.12）だけ |
+| `@types/node` | 24.19.1 | Node のメジャーに合わせる |
+| `oxlint` | 1.87.0 | |
+| `oxlint-tsgolint` | 7.0.2003 | 型情報を使うモード |
+| `oxfmt` | 0.72.0 | `printWidth: 100` を明示 |
+| `eslint-plugin-playwright` | 2.12.1 | oxlint の JS プラグイン（アルファ版）で読み込む |
+| `eslint` | 10.12.0 | `eslint-plugin-playwright` の必須の peer dependency なので、npm が自動で入れる。直接は使わないが、JS プラグインで問題が出たときの切り替え先になるので、`--legacy-peer-deps` で外さずに lockfile に残した |
+
+`e2e/.npmrc` に `save-exact=true` を置き、バージョンを `^` なしで固定した。
+
+### oxlint / oxfmt の確認
+
+- わざと違反を入れた spec で、次の指摘が出ることを確かめてから削除した
+  - `await` の付け忘れ: `typescript(no-floating-promises)`（型情報を使うモード）と `playwright(missing-playwright-await)`
+  - `test.only`: `playwright(no-focused-test)`
+  - `page.waitForTimeout`: `playwright(no-wait-for-timeout)`
+  - Web ファーストでないアサーション（`expect(await locator.isVisible()).toBe(true)`）: `playwright(prefer-web-first-assertions)`
+- `options.denyWarnings` を有効にしたので、警告だけでも終了コードは 1 になる。違反がなければ 0
+- JS プラグインでは、プラグインの設定（`recommended`）を継承できない。`eslint-plugin-playwright` の `flat/recommended` のルールを `.oxlintrc.json` に書き写した
+- oxlint は違反がないと何も出力しない。`--format=json` で、4 ファイルを 147 ルールで検査していることを確認した
+- oxfmt は `e2e/baseline/` を対象外にした。整形でスナップショットの書式が変わり、比較が失敗するのを防ぐため
+
+### 遭遇した問題
+
+1. Playwright はスナップショットのファイル名の `_` を `-` に置き換える（`id_token_header.json` が `id-token-header.json` になった）。コードの側の名前もファイル名に揃えた
+2. ポートが使われていて、discovery の URL が 404 などを返すとき（別のサーバーが使っているとき）は、OP の起動が `Errno::EADDRINUSE`（`Address already in use - bind(2) for "127.0.0.1" port 3780`）で失敗し、テストは流れない。discovery の URL が 200 を返すとき（手動確認用の OP が動いているとき）は、Playwright が起動スクリプトを呼ぶ前に「is already used, make sure that nothing is running on the port/url」で止まる。discovery に 200 を返すダミーのサーバーで確認した
+
+### 確認結果
+
+- E2E: 10 passed。2 回続けて流して両方通る（DB の作り直しの確認）。spec を 1 つずつ単独で流しても通る（実行順に依存しないことの確認）
+- スナップショットとの比較: `expires_in` を書き換えると差分（60 と 600）で失敗し、ファイルがないと「A snapshot doesn't exist」で失敗する
+- スナップショットの内容: discovery の issuer は `http://localhost:3780`、署名アルゴリズムは RS256。JWKS は `kty: RSA`、`alg: RS256`、`use: sig`、`e: AQAB`。ID トークンの項目は `aud`・`exp`・`iat`・`iss`・`nonce`・`sub`（`email` は userinfo だけに入る）で、`exp - iat` は 120。トークン応答の `expires_in` は 600、`refresh_token` はなし。introspect の `exp - iat` は 600、revoke 後は `{"active": false}` だけ
+- 手動確認用の環境は変わっていない: 作業の前後で、OP / RP の development DB の件数と、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する
+- 3 アプリとも `bin/rails runner` で起動する（Rails 6.1.7.10、Ruby 3.1.7）。`bin/rails s` は E2E の起動で確認
+- oxlint・oxfmt・安全チェック: 指摘なし
+- minitest・RuboCop・bundler-audit・brakeman は 0-d で導入するため未実施
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 伏せる値のプレースホルダーに型がなく、`sub` が文字列から数値になるような変化を検出できない | プレースホルダーに型を残した（`<USER_ID:string>`、`<TIMESTAMP:number>` など）。スナップショットを作り直した |
+| 伏せるキーの判定に `in` 演算子を使っていて、`constructor` などの `Object.prototype` のキーにも一致する | `Object.hasOwn` に変えた |
+| 認可コードフローのスナップショットの比較が 1 つのテストにまとまっていて、最初の差分で止まる。CLAUDE.md の「1 テスト 1 振る舞い」にも反する | 6 つの比較を `expect.soft` にして、差分をすべて報告するようにした。スナップショットを 2 つ書き換えて、両方が報告されることを確認した。応答は 1 回の認可から得るものなので、「認可コードフローの応答がスナップショットと一致する」を 1 つの振る舞いとし、テストは分けなかった |
+| ログアウトのシナリオの `toHaveURL`（RP のトップページ）が、遷移の前から満たされていて何も確かめていない | 削除した。遷移の後にしか出ない flash の表示で確かめている |
+| seeds のパスワードがトップレベルの定数で、同じプロセスで 2 回読むと警告が出る | ローカル変数にした。同じプロセスで 2 回読み込んで、警告が出ず、重複も作られないことを確認した |
+| OP がエラーで戻したとき、認可コードがないという失敗しか出ず、原因が分からない | 対応しない。不正な scope で試すと、doorkeeper 5.5.2 はコールバックへリダイレクトせずにエラー画面を出し、その画面は失敗時に Playwright が保存するページの内容（`error-context.md`）に残った。コールバックにエラーが付いて戻るのは同意画面で Deny を押したときで、E2E では押さない |
+| ダミーの client_id / secret・ユーザー・パスワードが seeds、`.env_e2e`、`e2e/support/users.ts` に重複している | 対応しない。seeds が E2E のファイルを読むと、OP が `e2e/` に依存する。食い違えばログインやトークンの取得で E2E が失敗するので、気づける |
+| `e2e/tests/servers.spec.ts` の discovery の確認が、スナップショットの比較と重複している | 対応しない。起動の失敗が分かりやすい確認として残すと決めた（「作業計画からの変更点」） |
+| introspect のたびに RS のクライアントでトークンを取り直している | 対応しない。RS と同じ呼び方を再現するためで、E2E 用の DB は毎回作り直す |

@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "alg": "RS256",
+      "e": "AQAB",
+      "kid": "<KID:string>",
+      "kty": "RSA",
+      "n": "<MODULUS:string>",
+      "use": "sig"
+    }
+  ]
+}

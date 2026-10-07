@@ -26,7 +26,7 @@
 2. アップグレード中は挙動を変えない。例外は「意図的な仕様変更」として本計画に明記したものだけ
 3. 脆弱性が公表されている gem の修正は即時に行う。設定の改善（PKCE 必須化、secret のハッシュ化など）は epic を main に取り込んだ後に別作業で行う
 4. `app:update` が提案する新しい構成（Propshaft、Solid Queue/Cache/Cable、Kamal、Thruster など）は採用しない
-5. 伊藤さん式の「ステージング確認・本番デプロイ」は、「3 アプリ通しの E2E ＋基準応答の比較＋ PR レビュー」に置き換える
+5. 伊藤さん式の「ステージング確認・本番デプロイ」は、「3 アプリ通しの E2E ＋ OP の応答のスナップショットとの比較＋ PR レビュー」に置き換える
 
 ## 4. ブランチと PR
 
@@ -47,7 +47,7 @@
 | 準備 | 3.0.1 | 6.1.4 | 本計画・LOG・CLAUDE.md、公開物の安全チェック、直下の Gemfile 削除 |
 | 0-a | **3.1.x** | **6.1.7.10** | 起動できる状態に戻す（必要最小限の gem のみ） |
 | 0-b | 3.1 | 6.1 | **意図的な仕様変更**: アクセストークンの有効期限を 1 分 → 10 分 |
-| 0-c | 3.1 | 6.1 | E2E（Playwright / oxlint / oxfmt）、seeds、基準応答の保存 |
+| 0-c | 3.1 | 6.1 | E2E（Playwright / oxlint / oxfmt）、seeds、OP の応答のスナップショットの保存 |
 | 0-d | 3.1 | 6.1 | RuboCop・bundler-audit・brakeman・SimpleCov の導入（既存違反は凍結）、minitest |
 | 0-e | 3.1 | 6.1 | 既存コードの RuboCop 違反の修正 |
 | 0-f | 3.1 | 6.1 | 周辺 gem の更新 |
@@ -93,21 +93,21 @@ Ruby 3.0 系は OpenSSL 1.1 を必要とし、現在の macOS (arm64) では動�
 - 理由: 一般的な長さに合わせる。1 分だと E2E のデバッグ中（Playwright の一時停止など）に期限切れになり、結果が不安定になる
 - ID トークンの有効期限（doorkeeper-openid_connect の `expiration`、未設定で gem の既定値）は変更しない
 
-### Step 0-c: E2E と基準応答
+### Step 0-c: E2E と OP の応答のスナップショット
 
-- [ ] OP の `db/seeds.rb`: テスト用ユーザーと Doorkeeper アプリケーション 3 つ（`my_op` 用 RP、introspection 用 RP、RS）を、一目でダミーと分かる固定の client_id / secret で作成
-- [ ] RP / RS の E2E 用環境変数のひな形（`.env.*` は gitignore 対象なので `.env_e2e_template` のような名前にする）
-- [ ] OP の署名鍵は E2E の準備スクリプトで毎回生成し、gitignore 対象にする（秘密鍵はコミットしない）
-- [ ] `e2e/` に Playwright を導入。`webServer` で 3 アプリを起動
-- [ ] `.gitignore` に `e2e/test-results/`、`e2e/playwright-report/`、`e2e/blob-report/`、`e2e/.auth/`、生成した鍵を追加（トレースやログイン状態には Cookie・トークンが入る）
-- [ ] oxlint ＋ oxfmt を導入（詳細は「9. Linter / Formatter」）
-- [ ] シナリオ
-  - [ ] ログイン: RP → OP でログイン → 同意 → RP に戻りユーザー情報が表示される（RP 側の ID トークン検証も通る）
-  - [ ] リソース取得: introspection 用 RP でログイン → RS の API → OP の introspect → りんごの情報が表示される
-  - [ ] トークン失効: revoke 後、RS がそのトークンを拒否する（期限切れと同じ「introspect が `active: false`」の経路を確認する）
-  - [ ] ログアウト: セッションが破棄される
-  - [ ] 基準応答との比較: discovery、JWKS、userinfo、introspect、トークン応答
-- [ ] 基準応答の比較ルール: 時刻・トークンなど毎回変わる値は伏せる。JWKS は鍵が毎回変わるので `kid` と `n` を伏せ、`kty`・`alg`・`use` などの構造を比べる。ID トークンは項目と `alg` を必ず比べる。トークン応答の `expires_in: 600` は伏せずに比べる
+- [x] OP の `db/seeds.rb`: Doorkeeper アプリケーション 3 つ（`my_op` 用 RP、introspection 用 RP、RS）を、一目でダミーと分かる固定の client_id / secret で作成。ユーザーはシナリオごとに 1 人（同意画面の有無が実行順で変わらないようにするため）
+- [x] RP / RS の E2E 用の環境変数 `.env_e2e`（ひな形ではなく E2E がそのまま読むファイルなので、`.env_e2e_template` から名前を変えた）。ダミーの secret は `.public-safety-allow` で除外（人間が承認）
+- [x] OP の署名鍵は、E2E の起動時に `jwtRS256.key` がなければ生成し、あれば手動確認用の鍵を使う（毎回生成するには OP のコードの変更が必要なため、計画から変更）。秘密鍵はコミットしない
+- [x] `e2e/` に Playwright を導入。`webServer` で 3 アプリを development 環境のまま起動し、`DATABASE_URL` で E2E 専用の DB（`db/e2e.sqlite3`）を毎回作り直す。手動確認用のサーバーが動いていれば起動に失敗する
+- [x] `.gitignore` に `e2e/test-results/`、`e2e/playwright-report/`、`e2e/blob-report/`、`e2e/.auth/` を追加（生成した鍵は OP の `.gitignore` で無視済み）
+- [x] oxlint ＋ oxfmt を導入（詳細は「9. Linter / Formatter」）
+- [x] シナリオ
+  - [x] ログイン: RP → OP でログイン → 同意 → RP に戻りユーザー情報が表示される（RP 側の ID トークン検証も通る）
+  - [x] リソース取得: RP の introspection 画面は RS の応答を表示しない（標準出力に出すだけ）ため、E2E から RS を直接呼んで確かめる。E2E 自身が `my_op` 用 RP のクライアントとして取ったトークンで RS が 200 でりんごの情報を返す
+  - [x] トークン失効: E2E が revoke した後、RS がそのトークンを拒否する。introspection 用 RP の画面から流した場合も、RP が revoke したトークンを RS が 401 で拒否し、introspect が `active: false` になる
+  - [x] ログアウト: RP のセッションが破棄される。OP のセッションは残り、再ログインでは OP のログイン画面を経ない（現在の挙動の記録）
+  - [x] スナップショットとの比較: discovery、JWKS、トークン応答、ID トークン（ヘッダーとペイロード）、userinfo、introspect（有効・revoke 後）
+- [x] スナップショットの比較ルール: 時刻・トークン・nonce・ユーザー ID は伏せる（JSON の型は `<TIMESTAMP:number>` のように残す）。JWKS と ID トークンのヘッダーは `kid` と `n` を伏せ、`kty`・`alg`・`use`・`e` を比べる。ID トークンは項目と `alg` を比べる。有効期間は `exp - iat` として残す（ID トークン 120、introspect 600）。トークン応答の `expires_in: 600` は伏せずに比べる。スナップショットは `e2e/baseline/` にあり、更新は `npx playwright test --update-snapshots`
 
 ### Step 0-d: 静的解析・脆弱性チェック・minitest
 
@@ -235,11 +235,11 @@ oxlint / oxfmt の導入条件:
 
 - [ ] 3 アプリで `bin/rails c` と `bin/rails s` が起動する
 - [ ] minitest が全件通る（非推奨警告は `:raise`）
-- [ ] E2E が全件通り、基準応答との比較に差分がない
+- [ ] E2E が全件通り、スナップショットとの比較に差分がない
 - [ ] RuboCop で新しい違反がない
 - [ ] bundler-audit と brakeman で新しい警告がない
 - [ ] `bin/rails zeitwerk:check` が通る（Step 1 以降）
-- [ ] `db:drop db:setup` で空から作り直して E2E が通る
+- [ ] `db:drop db:setup` で空から作り直して E2E が通る（E2E の起動時に E2E 用の DB で毎回行われる。RS は `schema.rb` がないので `db:drop db:create`）
 - [ ] 公開物の安全チェック（`scripts/check-public-safety --staged`）が通る
 - [ ] LOG.md と本計画のチェックリストを更新した
 
@@ -257,7 +257,7 @@ oxlint / oxfmt の導入条件:
 | リスク | 対策 |
 |---|---|
 | oauth2 2.x / faraday 2 / doorkeeper 系の更新で、アプリ間の通信が壊れる | 1 gem ずつ上げ、毎回 E2E を流す |
-| doorkeeper-openid_connect の JWT ライブラリ変更で ID トークンや JWKS が変わる（Next.js 製 RP にも影響しうる） | 基準応答の比較で ID トークンの項目と `alg`、JWKS の構造を比べる |
+| doorkeeper-openid_connect の JWT ライブラリ変更で ID トークンや JWKS が変わる（Next.js 製 RP にも影響しうる） | スナップショットの比較で ID トークンの項目と `alg`、JWKS の構造を比べる |
 | Rails 7.0 の `load_defaults` で Cookie の鍵生成方式が SHA256 に変わり、既存セッションが無効になる | サンプルなので許容。E2E は毎回新しいセッションで流す |
 | Rails 7.1 で RP の独自ストラテジーが Zeitwerk の読み込みに失敗する | Step 3 の案 B で対応。失敗したら案 A |
 | gem 更新でマイグレーションの追加が必要になる | gem 更新の手順で確認し、`db:drop db:setup` の完了条件で検出する |
@@ -283,7 +283,7 @@ Step 1 を一度手作業で通した後に、`/rails-upgrade` を入口とす�
 ## 14. 未決事項
 
 - [ ] 最終的に Ruby 4.0 まで上げるか（Step 8 完了時に判断）
-- [ ] `rails_open_id_provider/jwtRS256.key.example`（コミット済みのサンプル秘密鍵）の扱い（Step 0-c で判断）
+- [x] `rails_open_id_provider/jwtRS256.key.example` の扱い（Step 0-c で判断）: 鍵の中身のないプレースホルダーで、どこからも参照されていなかったため、`.pub.example` と一緒に削除した
 
 ## 15. 決定済みの事項
 
