@@ -6,6 +6,10 @@ const E2E_DATABASE_URL = "sqlite3:db/e2e.sqlite3";
 
 export default defineConfig({
   testDir: "./tests",
+  // 基準応答（toMatchSnapshot）の保存先。プラットフォーム名を付けず、OS によらず同じファイルと比べる
+  snapshotPathTemplate: "{testDir}/../baseline/{arg}{ext}",
+  // 基準応答がないときに黙って作らない。作り直すときは --update-snapshots を付ける
+  updateSnapshots: "none",
   // 3 アプリは 1 プロセスずつで、DB は sqlite のため、テストは 1 つずつ流す
   fullyParallel: false,
   workers: 1,

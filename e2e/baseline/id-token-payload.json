@@ -1,0 +1,9 @@
+{
+  "aud": "e2e-dummy-rp-my-op-client-id",
+  "exp": "<TIMESTAMP>",
+  "exp - iat": 120,
+  "iat": "<TIMESTAMP>",
+  "iss": "http://localhost:3780",
+  "nonce": "<NONCE>",
+  "sub": "<USER_ID>"
+}

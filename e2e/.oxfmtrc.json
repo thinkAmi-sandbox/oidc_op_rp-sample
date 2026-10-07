@@ -5,6 +5,7 @@
     "package-lock.json",
     "playwright-report/**",
     "test-results/**",
-    "blob-report/**"
+    "blob-report/**",
+    "baseline/**"
   ]
 }

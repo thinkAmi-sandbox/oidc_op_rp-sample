@@ -1,0 +1,9 @@
+{
+  "active": true,
+  "client_id": "e2e-dummy-rp-my-op-client-id",
+  "exp": "<TIMESTAMP>",
+  "exp - iat": 600,
+  "iat": "<TIMESTAMP>",
+  "scope": "openid",
+  "token_type": "Bearer"
+}
