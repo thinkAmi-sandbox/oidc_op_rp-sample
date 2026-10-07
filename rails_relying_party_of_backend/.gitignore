@@ -93,3 +93,5 @@ yarn-debug.log*
 
 # 追加
 .env
+# テスト用のダミーの環境変数はコミットする（値はすべて test-dummy- で始まる）
+!.env.test
