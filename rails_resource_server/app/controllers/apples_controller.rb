@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ApplesController < ApplicationController
   before_action :validate_bearer_token
   def show
@@ -6,13 +8,14 @@ class ApplesController < ApplicationController
 
   private
 
-  def validate_bearer_token
+  # トークンの取得から introspect の結果の判定までを 1 か所で読めるよう、メソッドを分けていない
+  def validate_bearer_token # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     # Bearer トークンを取得
     authorization_header = request.headers['Authorization']
-    return render status: 401 if authorization_header.blank?
+    return render status: :unauthorized if authorization_header.blank?
 
     access_token = authorization_header.gsub('Bearer ', '')
-    return render status: 401 if access_token.blank?
+    return render status: :unauthorized if access_token.blank?
 
     # クライアントクレデンシャルフローで、Resource Serverのアクセストークンを取得する
     client = OAuth2::Client.new(ENV['CLIENT_ID_OF_RESOURCE_SERVER'],
@@ -25,14 +28,17 @@ class ApplesController < ApplicationController
     params = { token: access_token }
     response = Faraday.post("#{ENV['OIDC_PROVIDER_HOST']}/oauth/introspect", params, headers)
 
+    # introspect の応答を標準出力で確かめるための出力。logger にすると出力先が変わるので puts のまま残す
+    # rubocop:disable Rails/Output
     response.tap do |r|
       puts '======> introspection'
       puts "STATUS: #{r.status}"
       puts "BODY  : #{r.body}"
       puts '<====== introspection'
     end
+    # rubocop:enable Rails/Output
 
     body = JSON.parse(response.body)
-    render status: 401 if response.status == 401 || body['active'] == false
+    render status: :unauthorized if response.status == 401 || body['active'] == false
   end
 end

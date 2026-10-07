@@ -545,7 +545,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-d-3: 脆弱性のある gem の更新（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0d3-security-updates` / PR は未作成
+- ブランチ / PR: `upgrade/step0d3-security-updates` / [#15](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/15)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 作業計画で決めたこと
@@ -633,3 +633,88 @@ gem ごとに RS → RP → OP の順で `bundle lock --update <gem> --conservat
 | 末尾の websocket-driver の項目を消したときに、直前の空行が残り、3 アプリの `.bundler-audit.yml` の末尾が空行 2 つになっている | 末尾の空行を消した |
 | rack の上限を超えたときに 500 になるという記述が、確かめていない見込みのまま | test 環境の OP の `/oauth/token` に `Rack::MockRequest` で POST し、パラメーター 2 個では doorkeeper が 400、4097 個では `Rack::QueryParser::QueryLimitError` で 500 になることを確かめた。セキュリティの修正による変化として受け入れ、テストは足していない |
 | logger・base64（と 0-d-1 の json、0-d-2 の bigdecimal）を Ruby 3.1.7 の default gem の版に固定したが、Ruby を上げたときに合わせ直す手順がない。そのままでは、Step 2 以降も lock の古い版が読まれ、新しい Ruby の default gem と食い違う | 人間の判断で、PLAN.md 8 章の 4（Ruby を上げる場合）に「新しい Ruby の default gem の版に一時固定で合わせ直す。default gem でなくなったものは 7 章の表に従う」を足した。7 章の表の 4 つの行の時期も「未定」から「Ruby を上げる各 Step で合わせ直す」に変えた。Ruby 3.4 で bundled gem になる base64・bigdecimal は、既存の「base64 / bigdecimal / mutex_m など」の行に従う |
+
+## Step 0-e: 既存コードの RuboCop 違反の修正（2026-10-07）
+
+- ブランチ / PR: `upgrade/step0e-rubocop-violations` / PR は未作成
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 着手時の件数
+
+todo を外し、直下の `.rubocop.yml` だけで数え直した件数は、凍結時と同じ RS 31・RP 58・OP 68 だった。
+
+### 作業計画で決めたこと
+
+PLAN.md の 0-e で「着手時の調査で決める」とした論点は、次のとおり作業計画に入れて承認を得た。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| todo にある `app/`・`lib/`・`test/` の外のファイル | `Gemfile`・`Rakefile` は直す。`config.ru` は直下の `.rubocop.yml` で対象外にする | `config.ru` は `rails app:update` で上書きされる（`railties-6.1.7.10/lib/rails/generators/rails/app/app_generator.rb` の `config_when_updating` が `configru` を呼ぶ）。`Rakefile` と `Gemfile` は上書きされない |
+| Rails/Output（RS 4・RP 14） | `puts` のまま残し、`rubocop:disable` / `enable` で囲んで理由を書く | 下の「Rails/Output」 |
+| テストが通っていない生成物の基底クラス | 先に eager load のテストを足し、その後でマジックコメントを足す | PLAN.md の「先にテストを足すか Layout 系だけ」に従う |
+| Style/FrozenStringLiteralComment | 安全でない自動修正（`-A`）で全ファイルに足す | 下の「マジックコメント」 |
+| Rails/HttpStatus（RS） | 自動修正で `401` → `:unauthorized` | Rack が `:unauthorized` を 401 に変換する。RS のテストが 3 つの分岐をすべて確かめている |
+| Rails/RakeEnvironment・Metrics/BlockLength（OP の annotate の rake） | `task` の行に `rubocop:disable` を付ける | 下の「annotate の rake」 |
+| Bundler/OrderedGems・Bundler/DuplicatedGroup | 並べ替え、RP/OP の 2 つ目の `group :development` の annotate を 1 つ目に移す | 下の「Gemfile」 |
+| Metrics（RS 2・RP 3） | メソッドを分けず、`def` の行に `rubocop:disable` を付けて理由を書く | 分割の正しさはテストに頼ることになる。該当箇所は 0-f の oauth2・omniauth-oauth2・jwt の更新で書き換わりうる。OIDC の流れを 1 か所で読めるサンプルの形を残す。既定の上限は新しいコードに効いたまま |
+| Style/Documentation（18） | 直下の `.rubocop.yml` で無効にする | 11 件は生成物の基底クラス・空のヘルパー。残りもクラス名と中のコメントで足りる |
+| RP の `my_op.rb` の空の `client_id_of_my_op(provider_name)` | 消さずに 1 行にする（Style/EmptyMethod） | どこからも呼ばれていない private メソッドだが、消すのは違反の修正の範囲を超える |
+| PR とコミット | PR は 1 つ。コミットは「ルール（分類）× アプリ」で RS → RP → OP | PLAN.md 2 章・4 章 |
+| `.git-blame-ignore-revs` | 見た目だけのコミット（文字列の引用符・シンボルの配列・空のメソッド・空白・Gemfile の並べ替え）だけを登録する | マジックコメント・ステータスの記法・クラスの入れ子・`rubocop:disable` の追加は、意味が変わりうるか、判断の記録なので登録しない |
+
+### 進め方
+
+- 各コミットで、直した違反の分だけ `.rubocop_todo.yml` から消した。`--auto-gen-config` は継承の順番を書き換えるので使わず（Step 0-d-1「遭遇した問題」3）、直下の設定だけで数え直した結果から、直し終えたファイル・ルールを消して件数を書き直す使い捨てのスクリプトで行った
+- todo が空になったアプリから、ファイルを消して `.rubocop.yml` の `inherit_from` を `../.rubocop.yml` だけにした
+- 各コミットの前に、そのアプリの RuboCop・minitest と E2E を流した。Gemfile を変えたコミットでは、lock と依存の一覧も確かめた（下の「Gemfile」）
+
+### テストの追加
+
+- 3 アプリに `test/eager_load_test.rb`（`Rails.application.eager_load!` が例外を出さない）を足した。テストの環境は `eager_load = false` なので、どのテストからも使われない生成物の基底クラス（`application_cable/channel.rb`・`connection.rb`、`application_job.rb`、`application_mailer.rb`、RS の `application_record.rb`）は読み込まれず、カバレッジも 0 だった
+- 足した後の行カバレッジは 3 アプリとも 100%（RS 33 行、RP 112 行、OP 14 行）。分母が 0-d-2 の記録（RS 40・RP 118・OP 20）より小さいのは、読み込まれなかったファイルの行を SimpleCov が自前で数えていたため
+- 100% のうち、クラス本体・`def` の行・`devise` や `before_action` のようなマクロの行は、読み込むだけで通ったことになる。以降の Step で「テストが通っていない箇所」を SimpleCov で探すときは、メソッドの中の行で判断する
+- ActiveSupport の `assert_nothing_raised` はアサーションの件数を増やさないので、テストの件数（runs）だけが 1 ずつ増えた
+
+### マジックコメント
+
+- 対象のファイルに、リテラルの文字列を破壊的に変更するコード（`<<`・`gsub!`・`concat`・`force_encoding` など）はなかった。式展開した文字列は Ruby 3.0 から凍結されないので、RP の不正なトークン（`"#{access_token}_bad"`）なども影響しない
+- `--only` を付けて自動修正したので、マジックコメントの直後の空行が入らず、Layout/EmptyLineAfterMagicComment が新しく出た。同じコミットで直した
+- OP の `app/models/user.rb` は、annotate がスキーマのコメントを先頭に書くファイル。annotate 3.1.1 は書き直すときにマジックコメントを先頭に残し、空行を挟んでスキーマのコメントを書く（`annotate-3.1.1/lib/annotate/annotate_models.rb:536`）ので、今回の配置と食い違わない
+
+### Rails/Output
+
+- RP の introspection 画面は RS の応答を表示せず、`puts` で標準出力に出すだけ（Step 0-c）。RP の独自ストラテジーも、JWKS と nonce の比較を `puts` で出している。RS も introspect の応答を `puts` で出している
+- 自動修正（`-A`）は `Rails.logger.debug` に変える。`rails s` は development のとき logger の出力を標準出力にも出す（`railties-6.1.7.10/lib/rails/commands/server/server_command.rb` の `log_to_stdout?`）ので端末には同じ文字列が出るが、`log/development.log` にも残り（nonce や JWKS を含む）、`rails test` の出力には出なくなる
+- 出力先が変わるので、アップグレード中は `puts` のまま残した。logger への変更は、epic を main に取り込んだ後の改善として扱う
+
+### Gemfile
+
+- RS は `dotenv-rails` を `faraday` の前に移した。RP・OP は、自動修正が `listen` を rack-mini-profiler の説明コメントの下に入れ、コメントと gem の対応が崩れた。RuboCop はコメントを区切りとして扱う（`TreatCommentsAsGroupSeparators`）ので、コメントのない `listen` と、2 つ目の `group :development` から移した `annotate` を、1 つ目の `group :development` の先頭に置いた
+- 3 アプリとも、`bundle lock --local` で Gemfile.lock の差分がなく、依存の一覧（名前・グループ・プラットフォーム・要求・`require:`）が作業の前と同じことを確かめた
+- 変わるのは `Bundler.require` が gem を読む順番だけ。dotenv-rails が `.env` を読むのは `before_configuration`（`dotenv-rails-2.7.6/lib/dotenv/rails.rb:75`）で、`config/application.rb` の `Bundler.require` の後なので、読む順番は環境変数に影響しない。development で annotate・listen・rack-mini-profiler が読み込まれることも確かめた
+
+### annotate の rake（OP）
+
+- `lib/tasks/auto_annotate_models.rake` は annotate の生成物で、development のときだけ読まれる。テストの対象外なので、作業の前後で `set_annotation_options` を実行した後の annotate の設定値（ENV）を比べ、同じであることを確かめた
+- Rails/RakeEnvironment に従って `:environment` を足すと、`annotate_models`（annotate 3.1.1 では `:set_annotation_options` と `:environment` に依存する）を実行したときに、設定値を入れる前にアプリが読み込まれる順に変わる。Step 5 で annotaterb に置き換えるときにこのファイルを見直すので（PLAN.md の Step 5）、`rubocop:disable` を付けて残した
+- Layout/HashAlignment（45 件）は空白だけの変更（`git diff -w` で差分なし）
+
+### 確認結果
+
+- RuboCop: 3 アプリとも `.rubocop_todo.yml` なしで `no offenses detected`。`--list-target-files` に `config.ru` が出ない。12 行のメソッドを `--stdin` で渡すと Metrics/MethodLength と Rails/Output が出る（新しいコードは既定の上限で検査される）
+- minitest: RS 8 runs、RP 17 runs、OP 18 runs、0 failures（eager load のテストを 1 本ずつ足した）
+- E2E: 各コミットの前に流して、どれも 10 passed
+- bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）。brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 2`
+- 3 アプリとも `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動で確認
+- `.git-blame-ignore-revs` を有効にして `git blame` すると、引用符を直した `Rakefile` の行や、移した `annotate` の行が元のコミットに戻る
+- 手動確認用の環境は変わっていない: 作業の前後で、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが一致する
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `.git-blame-ignore-revs` が効くのは、この PR を epic にマージコミットで取り込んだときだけ。その決まりはファイルのコメントにしかない。git 2.49 の `git blame` は ignore のファイルにある未知のハッシュを黙って無視するので、squash や rebase で取り込んでもエラーにならず、ignore だけが効かなくなる | 人間の判断で、CLAUDE.md の「ブランチと PR」の行を「epic への PR の取り込みも、epic → main の取り込みも、マージコミットで行う」に直した。これまでの PR もマージコミットで取り込んでいて、運用は変わらない。ファイルのコメントは CLAUDE.md を指すようにした |
+| eager load のテストの `assert_nothing_raised` は、アサーションの件数に入らない | 対応しない。Rails 7.0 の Testing ガイド（Testing Eager Loading）の例と同じ書き方 |
+| 同じプロセスで eager load すると、後に流れるテストでは定数がすべて読み込み済みになり、autoload の漏れが隠れうる | 対応しない。ガイドの例も同じプロセスで動かす。ファイル名と定数名の食い違いは、このテスト自体と `bin/rails zeitwerk:check` で見つかる |
+| 行カバレッジ 100% は、読み込むだけで通る行を含む | 「テストの追加」に、以降の Step ではメソッドの中の行で判断することを書き足した |
+| RS の `gsub('Bearer ', '')` は `Bearer ` の接頭辞を確かめないので、`Basic` などのヘッダーの値もそのまま introspect に渡る | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う |

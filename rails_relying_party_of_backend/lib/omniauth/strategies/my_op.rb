@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'omniauth-oauth2'
 
 module OmniAuth
@@ -66,7 +68,8 @@ module OmniAuth
         session.delete('omniauth.nonce')
       end
 
-      def id_token_payload(id_token, subject_from_userinfo)
+      # ID トークンの検証の項目を 1 か所に並べて読めるよう、メソッドを分けていない
+      def id_token_payload(id_token, subject_from_userinfo) # rubocop:disable Metrics/MethodLength
         # decodeできない場合はエラーを送出する
         payload, _header = JWT.decode(
           id_token, # JWT
@@ -109,6 +112,8 @@ module OmniAuth
         payload
       end
 
+      # 公開鍵と nonce を標準出力で確かめるための出力。logger にすると出力先が変わるので puts のまま残す
+      # rubocop:disable Rails/Output
       def fetch_public_keys
         # Faradayはすでにインストールされている
         response = Faraday.get("#{ENV['OIDC_PROVIDER_HOST']}/oauth/discovery/keys")
@@ -128,10 +133,9 @@ module OmniAuth
 
         raise JWT::VerificationError
       end
+      # rubocop:enable Rails/Output
 
-      def client_id_of_my_op(provider_name)
-
-      end
+      def client_id_of_my_op(provider_name); end
     end
   end
 end

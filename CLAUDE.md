@@ -13,7 +13,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 
 1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する
 2. 現在のブランチを確認する。作業ブランチは `epic/rails-8.1-upgrade` から切る
-3. クローン直後は `git config core.hooksPath .githooks` を実行して git hooks を有効にする
+3. クローン直後は `git config core.hooksPath .githooks` を実行して git hooks を有効にする。あわせて `git config blame.ignoreRevsFile .git-blame-ignore-revs` で、見た目だけのコミットを git blame から外す
 4. Ruby は mise で管理する。各アプリの `mise.toml`（`.ruby-version` を読ませる設定）は、初回に各アプリのディレクトリで `mise trust` を実行しないと読まれない
 
 ## アップグレードのルール
@@ -33,7 +33,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 - 作業ブランチは `epic/rails-8.1-upgrade` から切り、名前は `upgrade/<step>-<内容>`（例: `upgrade/step0a-boot-ruby31`）
 - **PR の向き先は `epic/rails-8.1-upgrade`**。`gh pr create --base epic/rails-8.1-upgrade` を必ず付ける
 - PR 本文は `--body-file` で渡す（Claude Code hooks が本文を検査するため）
-- epic → main の取り込みはマージコミットで行い、squash しない
+- epic への PR の取り込みも、epic → main の取り込みも、マージコミットで行う（squash・rebase はしない。`.git-blame-ignore-revs` のコミットのハッシュを残すため）
 
 ## 人間との分担
 

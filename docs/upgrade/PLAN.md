@@ -117,7 +117,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 - [x] RuboCop（rubocop / rubocop-minitest / rubocop-rails）
   - リポジトリ直下に共通の `.rubocop.yml`、各アプリは `inherit_from: [../.rubocop.yml, .rubocop_todo.yml]`（この順）。gem は各アプリの development / test グループ
-  - `config/`、`bin/`、`db/` は対象外（`app:update` で上書きされる雛形のため）
+  - `config/`、`bin/`、`db/` は対象外（`app:update` で上書きされる雛形のため）。同じ理由で、0-e で `config.ru` も対象外にした
   - 既存違反は `rubocop --auto-gen-config --no-exclude-limit` で `.rubocop_todo.yml` に凍結
   - バージョンを固定し、`NewCops: disable`
 - [x] bundler-audit と brakeman。既存の advisory と警告は無視リスト（各アプリの `.bundler-audit.yml`、`config/brakeman.ignore`）に凍結し、新しいものがないことを完了条件にする
@@ -154,12 +154,21 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 ### Step 0-e: 既存コードの RuboCop 違反の修正
 
-- [ ] SimpleCov でテストが通っていない箇所を確認。そこを直す場合は、先にテストを足すか Layout 系の修正だけにする
-- [ ] 安全な自動修正（`-a`）はルールの分類ごとにまとめて適用
-- [ ] 安全でない自動修正（`-A`）は 1 ルールずつ、変更内容を確認しながら適用
-- [ ] ルール（または分類）ごとにコミット。見た目だけのコミットは `.git-blame-ignore-revs` に登録
-- [ ] 完了条件: `.rubocop_todo.yml` が空になり削除できること
-- 対象は `app/`、`lib/`、`test/`。`config/`、`bin/`、`db/` は対象外のまま
+- [x] SimpleCov でテストが通っていない箇所を確認。そこを直す場合は、先にテストを足すか Layout 系の修正だけにする
+  - 通っていなかったのは生成物の基底クラス（channel・connection・job・mailer など）だけ。3 アプリに「アプリのコードをすべて読み込める」テスト（`Rails.application.eager_load!`）を足し、行カバレッジは 3 アプリとも 100% になった
+- [x] 安全な自動修正（`-a`）はルールの分類ごとにまとめて適用
+- [x] 安全でない自動修正（`-A`）は 1 ルールずつ、変更内容を確認しながら適用
+- [x] ルール（または分類）ごとにコミット。見た目だけのコミットは `.git-blame-ignore-revs` に登録
+- [x] 完了条件: `.rubocop_todo.yml` が空になり削除できること
+- 対象は `app/`、`lib/`、`test/`。`config/`、`bin/`、`db/` は対象外のまま。todo にあった `Gemfile`・`Rakefile` も直し、`config.ru` は `app:update` で上書きされるので対象外にした
+- 着手時の調査で決めたこと（人間が承認。理由は LOG.md の Step 0-e）
+  - Rails/Output: `puts` のまま残し、`rubocop:disable` で囲む。logger にすると出力先が変わるため。logger への変更は epic を main に取り込んだ後の改善として扱う
+  - Metrics（RS・RP のメソッド、OP の annotate の rake）: メソッドを分けず、`rubocop:disable` を付ける。既定の上限は新しいコードに効いたまま
+  - Rails/RakeEnvironment（OP の annotate の rake）: `:environment` は足さず、`rubocop:disable` を付ける。Step 5 で見直す
+  - Style/Documentation: 直下の `.rubocop.yml` で無効にする
+  - Rails/HttpStatus・Style/FrozenStringLiteralComment・Style/ClassAndModuleChildren: 自動修正で直す
+  - Bundler/OrderedGems・Bundler/DuplicatedGroup: 並べ替え、annotate を 1 つ目の `group :development` に移す。lock と依存の一覧が変わらないことを確かめた
+  - PR は 1 つ
 
 ### Step 0-f: 周辺 gem の更新
 
@@ -182,6 +191,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
   - 完了条件: `bin/rails zeitwerk:check`、RP の minitest、E2E のログインシナリオ
   - うまくいかない場合は案 A（`autoload_lib(ignore: %w[assets tasks omniauth])` ＋ `require`）に切り替え、LOG.md に理由を残す
 - **Step 5（Rails 7.2）**: Rails 7.2 にした後で sqlite3 を 2.x へ（Rails 8.0 は 2.1 以上が必須のため前倒し）。annotate を annotaterb に置き換え（annotate は Rails 8 未対応）
+  - OP の `lib/tasks/auto_annotate_models.rake` の `rubocop:disable`（Metrics/BlockLength・Rails/RakeEnvironment。0-e で付けた）を、annotaterb が生成するファイルに合わせて見直す
   - Rails 7.2 から「Redirected to」行のクエリにも `filter_parameters` が適用される。OP のログでリダイレクト先の `code=` が `[FILTERED]` になることを確認する（0-a では Rails 6.1 の制約で残ることを許容した）
 - **Step 6（Rails 8.0）**: `app:update` が生成する Solid 系・Kamal 系・Thruster 関連のファイルは採用しない
 
