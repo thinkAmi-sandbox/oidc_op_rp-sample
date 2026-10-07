@@ -545,7 +545,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 
 ## Step 0-d-3: 脆弱性のある gem の更新（2026-10-07）
 
-- ブランチ / PR: `upgrade/step0d3-security-updates` / PR は未作成
+- ブランチ / PR: `upgrade/step0d3-security-updates` / [#15](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/15)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 作業計画で決めたこと
