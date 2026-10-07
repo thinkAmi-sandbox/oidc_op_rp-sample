@@ -26,6 +26,8 @@ class SessionsTest < ActionDispatch::IntegrationTest
   test 'ログアウトするとセッションのユーザーが消え、トップが未ログインの表示に戻る' do
     log_in_via_op
 
+    assert_predicate session[:user_id], :present?
+
     get logout_path
     follow_redirect!
 

@@ -25,7 +25,7 @@ class MyOpLoginTest < ActionDispatch::IntegrationTest
     receive_callback('my_op', authorization)
 
     assert_requested(:post, op_url('/oauth/token')) do |request|
-      verifier = URI.decode_www_form(request.body).to_h['code_verifier']
+      verifier = URI.decode_www_form(request.body).to_h['code_verifier'].to_s
       Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false) == authorization['code_challenge']
     end
   end

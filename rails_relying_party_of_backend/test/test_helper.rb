@@ -5,6 +5,9 @@ require 'simplecov'
 SimpleCov.start 'rails'
 
 ENV['RAILS_ENV'] ||= 'test'
+# omniauth は RACK_ENV が development のときだけ認証の失敗を例外にして外へ出す。
+# 手元の RACK_ENV によって /auth/failure へのリダイレクトの記録が変わらないよう、test に固定する
+ENV['RACK_ENV'] = 'test'
 require_relative '../config/environment'
 require 'rails/test_help'
 
