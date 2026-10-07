@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SessionsController < ApplicationController
   # ログイン情報しかセッションに入れていないため、セッション情報の移し替えは不要
   before_action :reset_session

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class OpUser < ApplicationRecord
   def self.find_or_create_from_auth_hash!(auth_hash)
     # auth_hash の中身
