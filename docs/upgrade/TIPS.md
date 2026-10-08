@@ -33,6 +33,7 @@
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
 - 一時固定が要るかは、epic の lock と Gemfile を scratchpad にコピーし、`BUNDLE_GEMFILE` をそのコピーに向けて `bundle lock --update <gem> --conservative` を実行すると分かる（gem は入れず、依存の解決だけを行う）
   - コピーの前後を `diff` で比べるときは、行頭の記号が `< ` / `> ` の 2 文字になるので、`grep -E '^[<>]     [a-z]'`（空白 5 つ）で gem の行を拾う。`git diff` 用の `^[-+]    [a-z]`（空白 4 つ）では何も拾えず、変化がないように見える
+- lock にない gem を足すときは `bundle lock --update <gem>` が使えない（`Could not find gem`）。Gemfile に足して `bundle lock`（入れるときは `bundle install`）を実行する。版の制約がないと最新のメジャー版が入るので、一時固定する（Step 0-f-3 の jwt）
 - advisory が今の版でも対象かは、`ignore: []` だけの YAML を作り、`bundle-audit check --config <ファイル>` に渡すと分かる
 - gem の依存と Ruby の要件は、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json` で確かめられる。`.gem` のサイズは `https://rubygems.org/downloads/<gem>-<版>.gem` への HEAD リクエストの `content-length`
 - Gemfile に gem を足す・動かすときは Bundler/OrderedGems に気をつける。RuboCop はコメントを区切りとして扱い（`TreatCommentsAsGroupSeparators`）、自動修正はコメントと gem の対応を崩すことがある（LOG.md の Step 0-e「Gemfile」）

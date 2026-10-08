@@ -961,3 +961,137 @@ oauth2 の CHANGELOG（2.0.0）と、GitHub の PR・issue で確かめた。
 | テスト (a) はブロックの引数を `request` にして、統合テストの `request` を隠している。(b) は `token_request` | 対応しない。(a) は同じファイルの既存のテスト（code_verifier）と同じ書き方。(b) はブロックの外の `request`（コールバックの要求）を使うので名前を変えた |
 | RS は `token_url` を明記せず、相対パスの既定値に頼っている。`OIDC_PROVIDER_HOST` をパス付きにすると 1.4.7 と違う URL に送る | 対応しない（人間が判断）。上の「URL の既定値が相対パスになった経緯」 |
 | RS はリクエストのたびに `OAuth2::Client` を作り、クライアントクレデンシャルでトークンを取り直す | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う（docs/IMPROVEMENTS.md の IMP-007） |
+
+## Step 0-f-3: OP の doorkeeper 系の gem の更新（2026-10-08）
+
+- ブランチ / PR: `upgrade/step0f3-doorkeeper` / （PR 作成後に記入）
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 着手時に確かめ直したこと
+
+PLAN.md の 0-f-3 にある版と事実を、作業計画の前に確かめ直した。gem のソースは、0-f-1 で承認済みの `.gem`（doorkeeper 5.5.4・5.6.9・5.7.1、doorkeeper-openid_connect 1.8.9、jwt 2.10.3。版・サイズとも PLAN.md と同じ）を展開して読んだ。GitHub には `v1.8.9`・`v5.6.8`・`v5.6.9` のタグがない。
+
+| 項目 | 結果 |
+|---|---|
+| 版（rubygems の API） | doorkeeper の 5.5・5.6・5.7 系の最新は 5.5.4・5.6.9・5.7.1、doorkeeper-openid_connect は Rails 6 を外していない 1.8.9 で、0-f-1 の調査と同じ。0-f-1 の後に doorkeeper 5.9.9・6.0.0.rc2、doorkeeper-openid_connect 1.10.2〜1.10.5・2.0.0 が出たが、どれも Ruby 3.2 以上か、Rails 6 を外した系列 |
+| 依存（API v2） | doorkeeper-openid_connect 1.8.0〜1.8.10 の doorkeeper・json-jwt・jwt の要求と、doorkeeper 5.5.4・5.6.9・5.7.1 の `railties >= 5` は PLAN.md の表と同じ |
+| advisory | GitHub Advisory Database で、doorkeeper・doorkeeper-openid_connect・jwt・json-jwt に、上げる先の版を対象とする新しい advisory はない。ローカルの ruby-advisory-db は 0-f-2 と同じ（2026-10-06） |
+| lock の解決 | epic の lock のコピーに `BUNDLE_GEMFILE` を向けて `bundle lock` だけを実行した。何も固定しないと、`--conservative` を付けても doorkeeper-openid_connect は 1.10.1 になり、jwt 3.3.0 と ostruct 0.6.3 が入る。1.10.5 の CHANGELOG（#329）によると、1.9.0〜1.10.4 は doorkeeper 5.5 で起動時に NameError、5.6・5.7 で discovery が壊れる |
+
+### PLAN の表から直したこと
+
+0-f-1 の作業計画のときの調査（サブエージェント）のうち、ソースと CHANGELOG で確かめて違っていたもの。PLAN.md の 0-f-3 の表を直した。
+
+| PLAN の記述 | 確かめた結果 |
+|---|---|
+| client_credentials の scope の確認が 5.5.3 から変わった | 5.6.0.rc2（#1558）。`doorkeeper-5.6.9/lib/doorkeeper/oauth/client_credentials/validator.rb` で `return true if @request.scopes.blank? && application_scopes.blank?` になった。RS は `scope=introspection` を送るので影響しない |
+| トークン応答の `Cache-Control` が `no-store, no-cache` になる | gem は `no-store, no-cache` を返すが、Rails 6.1 が `no-store` にまとめる（`actionpack-6.1.7.10/lib/action_dispatch/http/cache.rb` の `merge_and_normalize_cache_control!`）ので、応答の値は変わらない。変わるのは `Pragma: no-cache` が消えること（5.6.6 #1644。5.8.0 #1712 で戻る）。下の「応答ヘッダーの前後比較」 |
+| 独自の claim を先に混ぜる順番に変わった（#273）。使っていない経路の変化に `prompt=select_account`（#279）、`prompt=none` と `max_age`（#275） | どれも doorkeeper-openid_connect 1.10.0 の変更で、1.8.9 には入らない。1.8.0 と 1.8.9 の `id_token.rb` の差分は `as_jws_token`（json-jwt の `sign` → `::JWT.encode`。ヘッダーに `typ`・`kid` を明示）だけ |
+| `pkce_code_challenge_methods` の既定値は今と同じ | 設定は 5.8.0（#1735）で入るもので、5.7.1 にはない。5.7.1 の `pre_authorization.rb` も、今と同じく `plain` か `S256` を受け付ける |
+
+確かめて PLAN.md どおりだったもの: 同意画面を省く条件（5.6.6 #1646 で confidential のアプリだけになる。5.6.9・5.7.1 の `matching_token_for` は `include_expired: true` が既定）、`expirable.rb` は 5.5.2 と 5.7.1 で同じ、マイグレーションは新しいものがない（doorkeeper の雛形は列の並びだけというサブエージェントの報告。doorkeeper-openid_connect の generators が 1.8.0 と 1.8.9 で同じことは自分で確かめた）、kid は json-jwt 1.14.0 も ruby-jwt の `JWT::JWK::Thumbprint` も RFC 7638 の thumbprint、ヘッダーの `typ` は 1.8.8 で戻った。doorkeeper 5.5.4 → 5.7.1 のソースの差分はサブエージェントで読み、要点（エラー画面のステータス、ヘッダー、client_credentials、同意画面を省く条件、form_post）は自分でソースで確かめた。
+
+### 作業計画で決めたこと
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版 | PLAN.md の版のまま（doorkeeper 5.5.4 → 5.6.9 → 5.7.1、doorkeeper-openid_connect 1.8.9、jwt 2.10.3） | 上の「着手時に確かめ直したこと」 |
+| 先に足すテスト | kid 2 本（JWKS の kid が署名鍵の RFC 7638 の thumbprint、ID トークンのヘッダーの kid が JWKS と同じ）、同意画面を省く条件 2 本（期限切れでも revoke されていないトークンがあれば省く、revoke 済みしかないと出す）、テストのない経路 3 本（form_post、エラー画面、同意の拒否）。gem を上げる前に 1 つのコミットにする | kid のテストは JWT のライブラリを使わずに書き、ライブラリが変わっても同じテストで前後を比べられるようにした。有効なトークンで省くことは E2E の logout が確かめている。confidential の条件（5.6.6）は、public のアプリがないので足さない |
+| `JSON::JWT` の書き直し | gem を上げる前に ruby-jwt に書き直す。jwt を OP の Gemfile の test グループに明記する | json-jwt が署名した ID トークンで、書き直したテストが通ることを確かめられる。テストの変更と gem の変更が別のコミットになる。テストが直接使う gem なので明記した（RP と同じく版の制約は書かない） |
+| 一時固定 | jwt 2.10.3、doorkeeper-openid_connect 1.8.9、doorkeeper 5.6.9 を一時固定で入れ、Gemfile に版の制約は残さない | 過去の Step と同じやり方。固定しないと jwt は 3.3.0、doorkeeper-openid_connect は 1.10.1、doorkeeper は 5.6.9 を飛ばして 5.7.1 になる |
+| 意図的な仕様変更 | discovery の `code_challenge_methods_supported` に加えて、`/.well-known/oauth-authorization-server` とエラー画面のステータスも「意図的な仕様変更」にする。`Pragma` が消えることは記録だけにする | 下の「意図的な仕様変更」。`Pragma` は 0-f-1 で `Cache-Control` を記録だけにしたのと同じ扱い |
+| E2E のスナップショットの更新 | doorkeeper-openid_connect 1.8.9 のコミットに含める | 分けると、どちらかのコミットで E2E が落ちる |
+| 上書きしているビュー | 変えない。上げるたびに雛形と比べる | 今の HTML と挙動を保つ。新しい雛形に合わせるのは epic を main に取り込んだ後（docs/IMPROVEMENTS.md の IMP-008） |
+| ブラウザでの手動確認 | gem をすべて上げた後に 1 回 | 各コミットで E2E を流している。手動確認用の DB に残るトークンで、同意画面を省く経路と出る経路の両方を確かめられる |
+
+### gem ごとの対応
+
+OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP は変えていない。
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| jwt | なし → 2.10.3 | test グループに明記し、一時固定で入れた。依存の base64 は 0.1.1 のまま |
+| doorkeeper | 5.5.2 → 5.5.4 | 固定不要（doorkeeper-openid_connect 1.8.0 が `< 5.6`）。5.5.3 の redirect_uri のクエリの拒否（#1528）は 5.5.4 で戻った（#1535） |
+| doorkeeper-openid_connect | 1.8.0 → 1.8.9 | 一時固定。json-jwt・aes_key_wrap・bindata が外れた。`e2e/baseline/discovery.json` を更新し、json-jwt の CVE-2023-51774 を `.bundler-audit.yml` から消した |
+| doorkeeper | 5.5.4 → 5.6.9 | 一時固定。エラー画面のテストの期待値を 400 に直した。CVE-2023-34246（5.6.6 で修正）を `.bundler-audit.yml` から消した |
+| doorkeeper | 5.6.9 → 5.7.1 | 固定不要（doorkeeper-openid_connect 1.8.9 が `< 5.8`） |
+
+- 一時固定は、過去の Step と同じく Gemfile に版を足して `bundle update`（jwt は `bundle install`）→ 外して `bundle lock --local` → Gemfile が戻り、lock に固定した版が残ることを確かめた。`bundle lock --update` は lock にない gem には使えない（`Could not find gem 'jwt'`）
+- 作業の後の OP の lock を epic と比べ、変わったのは上の gem と、外れた 3 つだけ。default gem（json 2.6.1・bigdecimal 3.1.1・logger 1.5.0・base64 0.1.1 など）と concurrent-ruby 1.1.9 は動いていない
+- doorkeeper の新しい設定（`force_pkce`、`revoke_previous_client_credentials_token`、`custom_access_token_attributes` など）はすべて既定で無効のまま
+
+### 意図的な仕様変更
+
+どれも gem の更新に伴うもので、設定では元に戻せない。RP・RS は使わない。
+
+| 変化 | 前 | 後 | 版 | 確かめ方 |
+|---|---|---|---|---|
+| discovery に `code_challenge_methods_supported` が増える | なし | `["plain", "S256"]` | doorkeeper-openid_connect 1.8.3（#180）。`oauth_access_grants` に PKCE の列があると出す | E2E のスナップショット（`e2e/baseline/discovery.json` を更新）。差分はこの項目だけ |
+| `/.well-known/oauth-authorization-server` が増える | 404（ルートなし） | discovery と同じ応答を 200 で返す | doorkeeper-openid_connect 1.8.1（#152）。ルートは discovery と一緒に足され、これだけを外す設定はない | `bin/rails routes`、下の「応答ヘッダーの前後比較」 |
+| 認可エンドポイントのエラー画面（登録されていない redirect_uri など）のステータス | 200 | エラーに応じて 400（`invalid_client`・`unauthorized_client` は 401） | doorkeeper 5.6.7（#1676）。`render :error, locals: {...}, status: pre_auth.error_response.status`。本文は同じ | OP のテスト「登録されていない redirect_uri では、エラーの説明を 400 で表示する」 |
+
+### テストの追加
+
+- OP に 7 本を足した（上の「作業計画で決めたこと」）。OP は 18 runs → 25 runs。JWKS の kid のテストは `discovery_test.rb`、ID トークンの kid と同意画面を省く条件は `authorization_code_flow_test.rb`、form_post・エラー画面・拒否は新しい `authorization_endpoint_test.rb`
+- 壊すと落ちることの確認（doorkeeper 5.5.2 のうちに、`test/support/` に一時的なパッチを置いて流し、消した）
+  - JWKS の kid を別の値にすると、kid の 2 本と、JWKS で ID トークンを検証するテストが落ちる
+  - 期限切れのトークンを同意画面を省く判定から外す（5.6.0〜5.6.2 の挙動）と、期限切れのテストだけが落ちる
+  - revoke 済みのトークンも判定に使うと、revoke 済みのテストだけが落ちる
+  - `form_post.html.erb` を 5.7.1 の雛形と同じ `auth.body` にすると、form_post のテストだけが落ちる
+- ruby-jwt に書き直したテスト: JWKS に別の公開鍵を同じ kid で出すと、`JWT::VerificationError` で落ちる。`JWT.decode` に JWKS を渡すので、kid で鍵を探すところも通る
+
+### 応答ヘッダーの前後比較
+
+更新の前（doorkeeper 5.5.2 / doorkeeper-openid_connect 1.8.0）と後（5.7.1 / 1.8.9）で、使い捨ての統合テストから OP の応答のステータスとヘッダーを書き出して比べた。対象は discovery・`oauth-authorization-server`・JWKS・同意画面・エラー画面・拒否・form_post・同意・トークン（成功・エラー）・userinfo（成功・エラー）・introspect（成功・エラー）・revoke。
+
+| 応答 | 変化 |
+|---|---|
+| discovery | `Content-Length` が増えた（`code_challenge_methods_supported` の分）。ほかのヘッダーと Cookie は同じ |
+| `oauth-authorization-server` | ルートなし → 200（discovery と同じヘッダー） |
+| エラー画面 | 200 → 400。ステータスが 200 でなくなったので、`ETag` が付かず、`Cache-Control` が `max-age=0, private, must-revalidate` → `no-cache` |
+| トークン（成功・エラー）、userinfo のエラー、introspect のエラー | `Pragma: no-cache` が消えた。`Cache-Control` は `no-store` のまま |
+
+- discovery と userinfo のコントローラーの基底が `Doorkeeper::ApplicationController` から `ApplicationMetalController` に変わった（doorkeeper-openid_connect 1.8.2 #170）が、ヘッダーと Cookie に違いはない
+- `Pragma` が消えた後も、RP・RS を通す E2E と手動確認は通る
+
+### ビュー・ロケールの比較
+
+上げるたびに、`app/views/doorkeeper/**`・`app/views/layouts/doorkeeper/*` と `config/locales/doorkeeper*.en.yml` を、lock の gem の雛形と 1 ファイルずつ比べた。上書きしているビューとロケールは変えていない。
+
+| 版 | 雛形と違うファイル |
+|---|---|
+| 5.5.4 / 1.8.0 | `authorizations/new.html.erb`（nonce の hidden field を 2 つ足した分。5.5.2 と同じ）、`doorkeeper.en.yml` |
+| 5.6.9 / 1.8.9 | 上に加えて `authorizations/error.html.erb`（雛形は `local_assigns[:error_response]` を読む。5.6.6） |
+| 5.7.1 / 1.8.9 | 上に加えて `authorizations/form_post.html.erb`（雛形はローカル変数 `auth` を読む。5.7.0 #1702） |
+
+- 上書きしているビューはインスタンス変数（`@pre_auth`・`@authorize_response`）を読む。5.7.1 のコントローラーも両方をインスタンス変数に入れるので、表示は変わらない（足したテスト）。同意画面の hidden field の重複 ID は 5.6.0.rc1（#1552）で雛形からなくなったが、上書きしているビューには残る
+- 上書きされていない雛形は、どの版にもない
+- `doorkeeper.en.yml` は 5.5.2 の gem と同じ。5.5.4〜5.7.1 の gem の `en.yml` は互いに同じで、違いは 5.5.3 で増えた `forbidden_token.missing_scope` だけ（gem のロケールも読まれるので訳は欠けない）。`doorkeeper_openid_connect.en.yml` は 1.8.0・1.8.9 と同じ
+- nonce の hidden field は 1.8.9 でも要る（`AuthorizationsExtension` が `pre_auth_param_fields` に `nonce` を足す。1.8.9 では `config.to_prepare` で prepend する）
+
+### kid の値
+
+- 手動確認用と同じ `jwtRS256.key` で、`Doorkeeper::OpenidConnect.signing_key_normalized[:kid]` を更新の前・doorkeeper-openid_connect 1.8.9 の後・全部上げた後に書き出し、3 つが一致することを確かめた（値は記録していない）
+- E2E の ID トークンのヘッダーと JWKS のスナップショット（`typ`・`alg`・`kid` の型）にも差分はない
+
+### 手動確認
+
+全部の gem を上げた後に、`.claude/launch.json` で 3 アプリを起動して確かめた（同意は人間が操作）。
+
+- ログイン（RP の my_op）: RP の「Re Login」から、OP のログイン画面も同意画面も出ずに RP に戻り、「ログインしました」とユーザーのメールアドレスが表示された。OP のログで `AuthorizationsController#new` が 302 を返した。手動確認用の DB には 0-f-2 のときの、期限切れで revoke されていないトークンがあり、それで同意画面が省かれた。RP の ID トークンの検証（JWKS の取得、nonce の比較）も通った
+- introspection 用 RP: 前回のトークンが revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke は 200、revoke の後は 401。RS の introspect は `active: true`（`exp - iat = 600`）→ `active: false` が 2 回。0-f-2 と同じ
+- サーバーの出力: `preview_logs` でエラーの行、`warning`、`DEPRECATION` を探した。RP・RS には何もなく、OP には既知の listen の finalizer の警告（Step 0-b・0-f-1。`listen-3.10.1/lib/listen/fsm.rb:78`）が 1 件だけ出た
+- 手動確認用の環境: 作業の開始時に、件数が Step 0-f-2「手動確認」の後と同じこと（RP `sessions` 8・`op_users` 1、OP `oauth_access_grants` 7・`oauth_access_tokens` 20）を確かめてハッシュを控え、手動確認の直前に一致を確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 7 → 9 件、`oauth_access_tokens` が 20 → 25 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）に増えた。RP の development DB は `sessions` が 8 件のまま 1 行が更新された。どちらもハッシュが変わった。RS の DB・鍵・`.env` のハッシュは変わっていない。以降の Step の基準は手動確認の後のハッシュにする
+
+### 遭遇した問題
+
+1. lock のコピーで事前に確かめたとき、Gemfile のコピーを書き換える Ruby のワンライナーが日本語のコメントで `invalid byte sequence in US-ASCII` になり、コピーの Gemfile が壊れた。コピーを作り直し、`LC_ALL=ja_JP.UTF-8` を付けた perl で書き換えた（TIPS.md にある注意）
+2. 応答ヘッダーを書き出すテストで、更新の前は `/.well-known/oauth-authorization-server` が `ActionController::RoutingError` になった（test 環境は例外を投げる）。ルートなしとして記録した
+
+### 確認結果
+
+- minitest: OP 25 runs、0 failures（非推奨警告は `:raise` のまま）。最初のコミットでテストを 7 本足した後は、どのコミットの前も 25 runs。RS・RP は変えていない
+- E2E: 各コミットの前に流して、どれも 10 passed（doorkeeper-openid_connect 1.8.9 のコミットは、スナップショットを更新した後）
+- RuboCop: OP `no offenses detected`。bundler-audit: OP `No vulnerabilities found`（無視リスト込み）。無視リストを空にした bundler-audit で、doorkeeper・doorkeeper-openid_connect・jwt は報告されない。brakeman: OP `Security Warnings: 0`、`Ignored Warnings: 2`
+- OP の `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動と launch.json で確認し、Puma 6.6.1 で起動する
+- テストとサーバーの出力に、jwt の非推奨の警告（`[DEPRECATION WARNING]`）は出ない

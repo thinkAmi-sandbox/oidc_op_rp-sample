@@ -23,6 +23,7 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 | IMP-005 | トークン要求の `redirect_uri` からコールバックのクエリを外す | RP | 挙動の変更 | 未着手 |
 | IMP-006 | 独自ストラテジーの `site` を OP のベース URL に直す | RP | コードの整理 | 未着手 |
 | IMP-007 | introspect 用のトークンを使い回す | RS | 性能 | 未着手 |
+| IMP-008 | 上書きしている doorkeeper のビューを新しい雛形に合わせる | OP | コードの整理 | 未着手 |
 
 ## IMP-001: PKCE を必須にし、S256 だけを受け付ける
 
@@ -93,3 +94,16 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: アップグレード中は挙動を変えない
 - 確かめ方: RS のテストは、リクエストごとにトークンを要求することを前提にしている。使い回しと取り直しのテストは、先に足す
 - 記録した Step: 0-f-2
+
+## IMP-008: 上書きしている doorkeeper のビューを新しい雛形に合わせる
+
+- 対象: `rails_open_id_provider/app/views/doorkeeper/authorizations/` の `new.html.erb`・`error.html.erb`・`form_post.html.erb`
+- 現状: doorkeeper 5.5.2 の雛形をコピーしたもの（`new.html.erb` は nonce の hidden field を 2 つ足している）。doorkeeper 5.7.1 の雛形とは次の点が違う
+  - `new.html.erb`: 同意と拒否の 2 つのフォームの hidden field に同じ `id` が付く（雛形は 5.6.0.rc1 の #1552 で `id: nil` にした）
+  - `error.html.erb`: `@pre_auth.error_response` を読む（雛形は 5.6.6 から、コントローラーが渡すローカル変数 `error_response` を先に読む）
+  - `form_post.html.erb`: `@authorize_response` を読む（雛形は 5.7.0 の #1702 から、ローカル変数 `auth` を読む）
+- 改善案: nonce の hidden field を残して、使っている doorkeeper の版の雛形に合わせる。以降も doorkeeper を上げるたびに雛形と比べる
+- 経緯: LOG.md の Step 0-f-3「ビュー・ロケールの比較」。5.7.1 のコントローラーもインスタンス変数（`@pre_auth`・`@authorize_response`）を入れるので、今のビューのまま表示は変わらない
+- 見送った理由: 同意画面などの HTML が変わる。アップグレード中は挙動を変えない
+- 確かめ方: OP のテスト（同意画面、form_post、エラー画面、同意の拒否）と E2E のログイン
+- 記録した Step: 0-f-3
