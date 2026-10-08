@@ -179,7 +179,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
   - 上げる先は、Ruby 3.1・Rails 6.1 で使える最新の版。ただし doorkeeper は 5.7.1、doorkeeper-openid_connect は 1.8.9 で止める（Rails 6 を外していない最後の組み合わせ）。上げない gem と、上げる時期は 7 章
   - 間接依存の gem は、上の更新で必要になったものしか動かさない（`--conservative`）
   - gem の既定値が変わって挙動が変わるもの（oauth2 2.x の `auth_scheme` など）は、設定で元の挙動に固定する。テストや E2E で守られていない挙動は、gem を上げる前にテストを足す
-  - 例外として、doorkeeper-openid_connect が discovery に足す `code_challenge_methods_supported` は設定で消せないので、「意図的な仕様変更」として受け入れる（0-f-3）
+  - 例外として、doorkeeper-openid_connect が discovery に足す `code_challenge_methods_supported` は設定で消せないので、「意図的な仕様変更」として受け入れる（0-f-3）。0-f-3 の着手時に、同じく設定で戻せない `/.well-known/oauth-authorization-server` の追加と、認可エンドポイントのエラー画面のステータスの変化も加えた（人間が承認）
   - spring を消すときは、`bin/spring`・`config/spring.rb` も消し、`bin/rails`・`bin/rake` を Rails 7.0 の雛形の形にする
 
 #### 0-f-1: spring の削除と、開発・テスト用などの gem
@@ -215,33 +215,38 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 #### 0-f-3: doorkeeper 系（OP）
 
-予定:
+決めた経緯と作業の記録は LOG.md の Step 0-f-3。
 
-- [ ] テストを足す（ID トークンの `kid` が JWKS の `kid` と同じこと、同意画面を省く条件 2 本）
-- [ ] doorkeeper 5.5.4 → doorkeeper-openid_connect 1.8.9（json-jwt が外れる。OP のテストの `JSON::JWT` を ruby-jwt に書き直す）→ doorkeeper 5.6.9 → 5.7.1。doorkeeper-openid_connect 1.8.0 は doorkeeper 5.6 未満を要求するので、交互に上げる
-- [ ] **意図的な仕様変更**: discovery に `code_challenge_methods_supported: ["plain", "S256"]` が増える（doorkeeper-openid_connect 1.8.3 以上は PKCE の列があると出し、設定では消せない）。`e2e/baseline/discovery.json` を更新し、LOG.md に記録する
-- [ ] 上書きしているビューを、上げた版の雛形と比べる
-- [ ] 上げた gem の advisory（doorkeeper・json-jwt）を `.bundler-audit.yml` から消す
+- [x] テストを足す（kid 2 本、同意画面を省く条件 2 本、form_post・エラー画面・同意の拒否 3 本）
+- [x] jwt を OP の Gemfile の test グループに明記して 2.10.3（一時固定）にし、OP のテストの `JSON::JWT` を ruby-jwt に書き直す（gem を上げる前）
+- [x] doorkeeper 5.5.4 → doorkeeper-openid_connect 1.8.9（一時固定。json-jwt が外れる）→ doorkeeper 5.6.9（一時固定）→ 5.7.1。doorkeeper-openid_connect 1.8.0 は doorkeeper 5.6 未満を要求するので、交互に上げた
+- [x] **意図的な仕様変更**（設定では戻せない。LOG.md の Step 0-f-3「意図的な仕様変更」）
+  - discovery に `code_challenge_methods_supported: ["plain", "S256"]` が増える（doorkeeper-openid_connect 1.8.3 以上は PKCE の列があると出す）。`e2e/baseline/discovery.json` を更新した
+  - `/.well-known/oauth-authorization-server` が増え、discovery と同じ応答を返す（1.8.1 以上）
+  - 認可エンドポイントのエラー画面の HTTP ステータスが 200 → 400（`invalid_client`・`unauthorized_client` は 401）になる（doorkeeper 5.6.7 以上）
+- [x] 上書きしているビューを、上げた版の雛形と比べる（ビューは変えない。新しい雛形に合わせるのは docs/IMPROVEMENTS.md の IMP-008）
+- [x] 上げた gem の advisory（doorkeeper・json-jwt）を `.bundler-audit.yml` から消す
 
-0-f-1 の作業計画のときに調べたこと（サブエージェントの調査。rubygems の API で確かめたのは、doorkeeper 5.5.4・5.6.9・5.7.1・5.9.9 と doorkeeper-openid_connect 1.8.9・1.8.11・1.10.1 の依存と Ruby の要件だけ。ほかは着手時に確かめ直す）:
+0-f-1 の作業計画のときに調べたこと（サブエージェントの調査）。0-f-3 の着手時（2026-10-08）に gem のソース・CHANGELOG で確かめ直し、違っていたところを直した（直した箇所は LOG.md の Step 0-f-3「PLAN の表から直したこと」）:
 
 | 対象 | 分かったこと | テスト・E2E で守られているか |
 |---|---|---|
 | 版の組み合わせ | doorkeeper-openid_connect は 1.8.0・1.8.1 が `doorkeeper < 5.6`（json-jwt）、1.8.2・1.8.3 が `< 5.7`（1.8.3 は json-jwt 1.15.0 以上）、1.8.4〜1.8.8 が `< 5.7`（jwt 2.5 以上）、1.8.9 が `< 5.8`、1.8.10・1.8.11 が `< 5.9`（Ruby 3.1 以上。1.8.11 は ostruct も）、1.9.0〜1.10.1 が `< 6.0`。doorkeeper は 5.6.3 から Ruby 2.7 以上 | — |
-| マイグレーション | doorkeeper 5.5.2 → 5.7.1 で必須のものはない（雛形の差分は列の並びだけ）。doorkeeper-openid_connect も 2.0 まで新しいものはない | `db:drop db:setup` で E2E 用の DB を作り直している |
-| doorkeeper の新しい設定 | `force_pkce`、`revoke_previous_client_credentials_token`、`revoke_previous_authorization_code_token`、`custom_access_token_attributes` などはすべて opt-in。`pkce_code_challenge_methods`（plain・S256）と `client_credentials_methods`（Basic・本文）の既定値は今と同じ | — |
-| 同意画面を省く条件 | 5.6.0〜5.6.2 は有効なトークンしか見ない不具合があり（doorkeeper#1542）、5.6.3 で期限切れも含める挙動に戻った。5.6.6 で「confidential のアプリ」という条件が加わった（doorkeeper#1646）。seeds と fixtures のアプリは 3 つとも confidential | なし（先にテストを足す） |
+| マイグレーション | doorkeeper 5.5.2 → 5.7.1 で必須のものはない（雛形の差分は列の並びだけ）。doorkeeper-openid_connect は 1.8.9 まで新しいものはない（generators は 1.8.0 と 1.8.9 で同じ）。2.0.0 は `post_logout_redirect_uris` の列を足すマイグレーションが必要（2.0.0.beta1 の #243） | `db:drop db:setup` で E2E 用の DB を作り直している |
+| doorkeeper の新しい設定 | `force_pkce`、`revoke_previous_client_credentials_token`、`revoke_previous_authorization_code_token`、`custom_access_token_attributes` などはすべて opt-in。`pkce_code_challenge_methods` は 5.8.0 で入る設定で、5.7.1 は今と同じく plain・S256 を受け付ける。`client_credentials_methods`（Basic・本文）の既定値は今と同じ | — |
+| 同意画面を省く条件 | 5.6.0〜5.6.2 は有効なトークンしか見ない不具合があり（doorkeeper#1542）、5.6.3 で期限切れも含める挙動に戻った。5.6.6 で「confidential のアプリ」という条件が加わった（doorkeeper#1646、CVE-2023-34246 の修正）。seeds と fixtures のアプリは 3 つとも confidential | OP のテスト（期限切れでも省く、revoke 済みなら出す）と E2E の logout（有効なトークンで省く） |
 | 期限切れの判定・introspect | `expirable.rb` は変わらない（`現在時刻 > created_at + expires_in`）。introspect の項目も同じ（並びだけが変わる） | OP のテスト（10 分ちょうど・10 分 1 秒）と E2E のスナップショット（キーを並べ替えて保存） |
-| トークン応答のヘッダー | `Cache-Control` が `no-store, no-cache` になる | スナップショットは本文だけなので、LOG.md に記録する |
-| client_credentials | 5.5.3 から、scope を付けない要求は、アプリの scopes に既定の `openid` がないと失敗する。RS とテストは `scope=introspection` を付ける | RS のテストと E2E |
-| ビューの上書き | `app/views/doorkeeper/` の 12 ファイルと `app/views/layouts/doorkeeper/` の 2 ファイルは、5.5.2 の雛形と同じ（手元で比べた）。`authorizations/new.html.erb` だけが nonce の hidden field を 2 つ足している。5.9 系では `form_post`・`error` のビューに渡す変数が変わるが、5.7.1 までで変わるかは確かめていない | 同意画面は OP のテストと E2E。form_post・エラー画面・拒否の経路はテストなし |
-| ID トークン・JWKS | 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった。kid は 1.8.4・1.8.5 だけ鍵の SHA256 になり、1.8.6 で RFC 7638 の thumbprint に戻った（json-jwt 1.14.0 と ruby-jwt の thumbprint が同じ値になることを手元で確かめたという報告）。ヘッダーの `typ` は 1.8.4〜1.8.7 で消え、1.8.8 で戻った。独自の claim を先に混ぜる順番に変わった（doorkeeper-openid_connect#273）。`auth_time` は出ないまま、`exp - iat` は 120 のまま。JWKS の項目（kty・n・e・kid・use・alg）は同じ | 構造と `alg` は E2E のスナップショット、RP の検証は E2E のログイン。kid の一致と値の変化はなし（先にテストを足し、値は手元で前後を比べる） |
-| discovery | 1.8.3 から、PKCE の列があると `code_challenge_methods_supported: ["plain", "S256"]` を出す。ほかの項目は同じ | E2E のスナップショット（意図的な仕様変更として更新） |
-| 使っていない経路の変化 | `prompt=select_account`（doorkeeper-openid_connect#279）、`prompt=none` と `max_age`（#275）、ログアウトしているユーザーに同意画面を出さない（1.8.4、#183） | なし。RP はこれらを使わない |
-| OP のテスト | `test/integration/authorization_code_flow_test.rb` が `JSON::JWT.decode` で ID トークンを検証している。json-jwt は 1.8.4 で lock から外れるので、ruby-jwt に書き直す（json-jwt 1.16.6 以上を test グループに足すと、faraday 2 と faraday-net_http 3.4 が入り、default gem の net-http を置き換える） | — |
-| 後の Step に関わること | doorkeeper-openid_connect 1.9.0 以上は doorkeeper 5.8 以上にある `pkce_code_challenge_methods` を呼ぶ。1.9.0 には Dynamic Client Registration の advisory（CVE-2026-44476。OP では無効）がある。doorkeeper 5.9.5〜5.9.7 は、複数のクライアント認証方式やトークンの渡し方を同時に使う要求を拒む | — |
+| 応答ヘッダー | トークン応答と OAuth のエラー応答から `Pragma: no-cache` が消える（5.6.6 #1644。5.8.0 #1712 で戻る）。gem は `Cache-Control: no-store, no-cache` を返すが、Rails 6.1 が `no-store` にまとめるので値は変わらない | スナップショットは本文だけなので、前後の応答ヘッダーを比べて LOG.md に記録した |
+| client_credentials | 5.6.0.rc2（#1558）から、scope を付けない要求は、アプリの scopes に既定の `openid` がないと失敗する。RS とテストは `scope=introspection` を付ける | RS のテストと E2E |
+| 認可エンドポイントのエラー画面 | 5.6.7（#1676）から、エラーに応じたステータス（400・401）で返す（意図的な仕様変更） | OP のテスト |
+| ビューの上書き | `app/views/doorkeeper/` の 12 ファイルと `app/views/layouts/doorkeeper/` の 2 ファイルは、5.5.2 の雛形と同じ。`authorizations/new.html.erb` だけが nonce の hidden field を 2 つ足している。雛形は 5.6.6 で `error`（ローカル変数 `error_response`）、5.7.0（#1702）で `form_post`（ローカル変数 `auth`）が変わったが、上書きしているビューが読むインスタンス変数は 5.7.1 でも入る。5.6.0.rc1（#1552）で雛形の hidden field の重複 ID がなくなった | OP のテスト（同意画面・form_post・エラー画面・拒否）と E2E |
+| ID トークン・JWKS | 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった。kid は 1.8.4・1.8.5 だけ鍵の SHA256 になり、1.8.6 で RFC 7638 の thumbprint に戻った。ヘッダーの `typ` は 1.8.4〜1.8.7 で消え、1.8.8 で戻った。`auth_time` は出ないまま、`exp - iat` は 120 のまま。JWKS の項目（kty・n・e・kid・use・alg）は同じ。手動確認用の鍵の kid は前後で同じ | OP のテスト（kid が RFC 7638 の thumbprint、ID トークンの kid が JWKS と同じ）、構造と `alg` は E2E のスナップショット、RP の検証は E2E のログイン |
+| discovery | 1.8.3 から、PKCE の列があると `code_challenge_methods_supported: ["plain", "S256"]` を出す。1.8.1 から `/.well-known/oauth-authorization-server` でも同じ応答を返す。1.8.2（#170）から discovery と userinfo の基底が `ApplicationMetalController` になったが、応答ヘッダーと Cookie は変わらない。ほかの項目は同じ | E2E のスナップショット（意図的な仕様変更として更新） |
+| 使っていない経路の変化 | 1.8.4（#183）で、`prompt=consent` でもログインしていないユーザーには同意画面を出さない。RP は `prompt` を使わない | なし |
+| OP のテスト | `test/integration/authorization_code_flow_test.rb` の `JSON::JWT.decode` を、gem を上げる前に ruby-jwt の `JWT.decode`（JWKS を渡す）に書き直した。jwt は test グループに明記した | — |
+| 後の Step に関わること | 1.10.0 で、独自の claim を先に混ぜる順番（#273）、`prompt=select_account`（#279）、`prompt=none` と `max_age`（#275）が変わる。doorkeeper-openid_connect 1.9.0 以上は doorkeeper 5.8 以上にある `pkce_code_challenge_methods` を呼び、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（5.5 では起動時に NameError。1.10.5 の #329 で直った）。1.9.0 には Dynamic Client Registration の advisory（CVE-2026-44476。OP では無効）がある。doorkeeper 5.9.5〜5.9.7 は、複数のクライアント認証方式やトークンの渡し方を同時に使う要求を拒む | — |
 
-ダウンロード（0-f-1 の作業計画で承認済み。版が変わったら示し直す）: doorkeeper 5.5.4（100 KB）・5.6.9（104 KB）・5.7.1（104 KB）、doorkeeper-openid_connect 1.8.9（24 KB）、jwt 2.10.3（54 KB。OP の `vendor/bundle` に入る）
+ダウンロード（0-f-1 の作業計画で承認済み。0-f-3 の着手時に版とサイズが同じことを確かめた）: doorkeeper 5.5.4（100 KB）・5.6.9（104 KB）・5.7.1（104 KB）、doorkeeper-openid_connect 1.8.9（24 KB）、jwt 2.10.3（54 KB。OP の `vendor/bundle` に入れた）
 
 ### Step 1〜9
 
@@ -286,14 +291,14 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 |---|---|---|---|
 | mail | 2.7.1 | 0-a で 2.8.1（済）→ 0-d-3 で 2.9.1（済） | 0-a は Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした。0-d-3 は advisory の修正 |
 | nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19 系最新 | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
-| jwt（RP は直接使う。RS は oauth2 経由の間接依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる |
-| json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f-3 で外れる | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だが、OP は署名だけで decode しないため影響なし。doorkeeper-openid_connect 1.8.4 で jwt に置き換わった。OP の minitest が json-jwt で ID トークンを検証しているので、0-f-3 で ruby-jwt に書き直す |
+| jwt（RP は直接使う。RS は oauth2 経由の間接依存。OP はテストが直接使い、doorkeeper-openid_connect 1.8.4 以上の依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま）→ 0-f-3 で OP に 2.10.3（済。test グループに明記。一時固定で入れた） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる |
+| json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f-3 で外れた（済） | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だったが、OP は署名だけで decode しないため影響なし。doorkeeper-openid_connect 1.8.4 で jwt に置き換わった。OP の minitest は、0-f-3 で gem を上げる前に ruby-jwt に書き直した |
 | nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済）。msgpack は 0-d-3 で 1.8.5（済） | 0-a は clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新。0-d-3 は advisory の修正 |
 | thor（railties 経由） | 1.1.0 | 0-f-1 で 1.5.0（済） | 1.1.0 は Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし）。1.2.0 で出なくなった。railties 6.1 は `~> 1.0` |
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（済。同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
 | faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（済。oauth2 の後。RP は Gemfile に明記） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
 | faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Ruby を上げる各 Step で見直す | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない |
-| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（交互に上げる）→ 5.8 以上・1.8.10 以上は Step 1 の後 → doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正されるが、openid_connect 1.8.0 は doorkeeper 5.6 未満を要求する。必須のマイグレーションはない（0-f の調査で確認） |
+| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 5.8 以上・1.8.10 以上は Step 1 の後 → doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 と jwt 3.3.0 になり、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
 | devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ Step 1 の後に 5.x | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認） |
 | dotenv-rails | 2.7.6 | 0-f-1 で 3.2.0（済） | 読むファイルの順番と、既にある環境変数を上書きしないことは 2.x と同じ。3.x はテストのたびに ENV を戻し、Rails のログに変数名を出す |
 | puma | 5.4 | 0-d-3 で 5.6.9（済）→ 0-f-1 で 6.6.1（済）→ 7.2.1 以上 | 7 系に上げる時期は後の Step で判断。5.5.0 以降（6.6.1 も）は PROXY protocol v1 の advisory 2 件（CVE-2026-47736 / 47737）の対象で、修正版は 7.2.1 / 8.0.2 だけ。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない（無視リストに入れた） |

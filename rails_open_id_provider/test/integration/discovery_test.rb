@@ -33,4 +33,17 @@ class DiscoveryTest < ActionDispatch::IntegrationTest
 
     assert_equal expected_n, response.parsed_body['keys'].first['n']
   end
+
+  # JWT のライブラリが json-jwt から ruby-jwt に変わっても kid の値が変わらないよう、作り方をライブラリなしで書く
+  test 'JWKS の kid は、署名鍵の公開鍵の RFC 7638 の thumbprint' do
+    get oauth_discovery_keys_path
+
+    signing_key = OpenSSL::PKey::RSA.new(Doorkeeper::OpenidConnect.configuration.signing_key)
+    # RFC 7638 は、必須のメンバーだけを辞書順に並べ、空白なしの JSON にしたものの SHA-256 を求める
+    members = { e: Base64.urlsafe_encode64(signing_key.e.to_s(2), padding: false), kty: 'RSA',
+                n: Base64.urlsafe_encode64(signing_key.n.to_s(2), padding: false) }
+    expected_kid = Base64.urlsafe_encode64(Digest::SHA256.digest(members.to_json), padding: false)
+
+    assert_equal expected_kid, response.parsed_body['keys'].first['kid']
+  end
 end

@@ -35,12 +35,6 @@ ignore:
   - CVE-2026-32700 # >= 5.0.3
   - CVE-2026-40295 # >= 5.0.4
 
-  # doorkeeper 5.5.2: 修正版は 5.6.6 以上。doorkeeper-openid_connect 1.8.0 が 5.6 未満を要求するので、0-f で doorkeeper-openid_connect と合わせて上げる（PLAN.md 7 章）
-  - CVE-2023-34246 # >= 5.6.6
-
-  # json-jwt 1.14.0: 0-f で doorkeeper-openid_connect と一緒に外す。残るなら 1.16.6 以上にする（PLAN.md 7 章）
-  - CVE-2023-51774 # ~> 1.15.3, >= 1.15.3.1 / >= 1.16.6
-
   # nokogiri 1.18.10: 修正版の 1.19 系は Ruby 3.2 以上が必要。Step 2 で解消する
   - GHSA-5prr-v3j2-97mh # >= 1.19.4
   - GHSA-5v8h-3h3q-446p # >= 1.19.4

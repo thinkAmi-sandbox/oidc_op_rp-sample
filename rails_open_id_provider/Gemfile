@@ -47,6 +47,8 @@ group :development do
 end
 
 group :test do
+  # ID トークンを JWKS の鍵で検証する
+  gem 'jwt'
   # カバレッジの計測と、外部への HTTP 通信の遮断・差し替え
   gem 'simplecov', require: false
   gem 'webmock', require: false
