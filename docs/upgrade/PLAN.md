@@ -24,7 +24,7 @@
 
 1. 一度に上げるのは 1 つだけ。Ruby・Rails・周辺 gem を同時に上げず、マイナーバージョンも飛ばさない
 2. アップグレード中は挙動を変えない。例外は「意図的な仕様変更」として本計画に明記したものだけ
-3. 脆弱性が公表されている gem の修正は即時に行う。設定の改善（PKCE 必須化、secret のハッシュ化など）は epic を main に取り込んだ後に別作業で行う
+3. 脆弱性が公表されている gem の修正は即時に行う。設定の改善（PKCE 必須化、secret のハッシュ化など）は epic を main に取り込んだ後に別作業で行う。見送った改善は [docs/IMPROVEMENTS.md](../IMPROVEMENTS.md) に記録する
 4. `app:update` が提案する新しい構成（Propshaft、Solid Queue/Cache/Cable、Kamal、Thruster など）は採用しない
 5. 伊藤さん式の「ステージング確認・本番デプロイ」は、「3 アプリ通しの E2E ＋ OP の応答のスナップショットとの比較＋ PR レビュー」に置き換える
 
@@ -162,7 +162,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 - [x] 完了条件: `.rubocop_todo.yml` が空になり削除できること
 - 対象は `app/`、`lib/`、`test/`。`config/`、`bin/`、`db/` は対象外のまま。todo にあった `Gemfile`・`Rakefile` も直し、`config.ru` は `app:update` で上書きされるので対象外にした
 - 着手時の調査で決めたこと（人間が承認。理由は LOG.md の Step 0-e）
-  - Rails/Output: `puts` のまま残し、`rubocop:disable` で囲む。logger にすると出力先が変わるため。logger への変更は epic を main に取り込んだ後の改善として扱う
+  - Rails/Output: `puts` のまま残し、`rubocop:disable` で囲む。logger にすると出力先が変わるため。logger への変更は epic を main に取り込んだ後の改善として扱う（IMPROVEMENTS.md の IMP-003）
   - Metrics（RS・RP のメソッド、OP の annotate の rake）: メソッドを分けず、`rubocop:disable` を付ける。既定の上限は新しいコードに効いたまま
   - Rails/RakeEnvironment（OP の annotate の rake）: `:environment` は足さず、`rubocop:disable` を付ける。Step 5 で見直す
   - Style/Documentation: 直下の `.rubocop.yml` で無効にする

@@ -21,6 +21,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 - 一度に上げるのは 1 つだけ（Ruby / Rails / 周辺 gem を同時に上げない）。マイナーバージョンは飛ばさない
 - アップグレード中は挙動を変えない。例外は PLAN.md に「意図的な仕様変更」として明記したものだけで、LOG.md に記録する
 - 脆弱性が公表されている gem の修正だけは即時に行ってよい。設定の改善（PKCE 必須化、secret のハッシュ化など）は epic を main に取り込んだ後に別作業で行う
+- アップグレード中に見送った改善（設定の改善や、元からの挙動の改善）は `docs/IMPROVEMENTS.md` に ID を振って記録する。足すときは人間の承認を得る
 - `rails app:update` が提案する新しい構成（Propshaft、Solid Queue/Cache/Cable、Kamal、Thruster など）は採用しない
 - テスト・E2E・RuboCop・安全チェックが通らない状態でコミットしない
 - 動作保証は development / test 環境のみ。`config/environments/production.rb` は `app:update` の雛形に追従するだけにする

@@ -136,7 +136,7 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 - 3 アプリの `filter_parameters` に `:code` を追加した。`access_token`・`id_token`・`refresh_token`・`client_secret` は既存の `:token`・`:secret` の部分一致で対象済み。`code_verifier`・`code_challenge` も `:code` の部分一致で伏せられる
 - 手動確認の後、3 アプリの `log/development.log` を安全チェックのルールで検査した。RP と RS は伏せられていない値なし。OP には次の 2 種類が残る。どちらもローカル専用のため許容し、公開物には安全チェックで混入を防ぐ
   - 「Redirected to」の行のクエリ（`code=<AUTH_CODE>`）。Rails 6.1〜7.1 はリダイレクト先に `filter_parameters` を適用しない（`actionpack-6.1.7.10/lib/action_dispatch/http/filter_redirect.rb`）。Rails 7.2 で適用されるようになるので、Step 5 で確認する
-  - トークン要求の Parameters の `redirect_uri` の値。RP（omniauth-oauth2 1.7.1）がコールバック URL を `?code=<AUTH_CODE>&state=...` 付きのまま `redirect_uri` に入れて送るため、キー名で判定する `filter_parameters` では伏せられない。元からの挙動なので、アップグレード中は変えない
+  - トークン要求の Parameters の `redirect_uri` の値。RP（omniauth-oauth2 1.7.1）がコールバック URL を `?code=<AUTH_CODE>&state=...` 付きのまま `redirect_uri` に入れて送るため、キー名で判定する `filter_parameters` では伏せられない。元からの挙動なので、アップグレード中は変えない（docs/IMPROVEMENTS.md の IMP-005）
 
 ### 確認結果
 
@@ -685,7 +685,7 @@ PLAN.md の 0-e で「着手時の調査で決める」とした論点は、次�
 
 - RP の introspection 画面は RS の応答を表示せず、`puts` で標準出力に出すだけ（Step 0-c）。RP の独自ストラテジーも、JWKS と nonce の比較を `puts` で出している。RS も introspect の応答を `puts` で出している
 - 自動修正（`-A`）は `Rails.logger.debug` に変える。`rails s` は development のとき logger の出力を標準出力にも出す（`railties-6.1.7.10/lib/rails/commands/server/server_command.rb` の `log_to_stdout?`）ので端末には同じ文字列が出るが、`log/development.log` にも残り（nonce や JWKS を含む）、`rails test` の出力には出なくなる
-- 出力先が変わるので、アップグレード中は `puts` のまま残した。logger への変更は、epic を main に取り込んだ後の改善として扱う
+- 出力先が変わるので、アップグレード中は `puts` のまま残した。logger への変更は、epic を main に取り込んだ後の改善として扱う（docs/IMPROVEMENTS.md の IMP-003）
 
 ### Gemfile
 
@@ -717,7 +717,7 @@ PLAN.md の 0-e で「着手時の調査で決める」とした論点は、次�
 | eager load のテストの `assert_nothing_raised` は、アサーションの件数に入らない | 対応しない。Rails 7.0 の Testing ガイド（Testing Eager Loading）の例と同じ書き方 |
 | 同じプロセスで eager load すると、後に流れるテストでは定数がすべて読み込み済みになり、autoload の漏れが隠れうる | 対応しない。ガイドの例も同じプロセスで動かす。ファイル名と定数名の食い違いは、このテスト自体と `bin/rails zeitwerk:check` で見つかる |
 | 行カバレッジ 100% は、読み込むだけで通る行を含む | 「テストの追加」に、以降の Step ではメソッドの中の行で判断することを書き足した |
-| RS の `gsub('Bearer ', '')` は `Bearer ` の接頭辞を確かめないので、`Basic` などのヘッダーの値もそのまま introspect に渡る | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う |
+| RS の `gsub('Bearer ', '')` は `Bearer ` の接頭辞を確かめないので、`Basic` などのヘッダーの値もそのまま introspect に渡る | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う（docs/IMPROVEMENTS.md の IMP-004） |
 
 ## Step 0-f-1: spring の削除と、開発・テスト用などの gem の更新（2026-10-07）
 
@@ -895,7 +895,7 @@ oauth2 の CHANGELOG（2.0.0）と、GitHub の PR・issue で確かめた。
 | 2019 年 7 月 | PR #461: 先頭の `/` を外して `oauth/token` と設定すれば、`site` のパスの下につながること（Faraday の時点でできていた）をテストで示した |
 | 2019 年 8 月（2.0.0 で公開） | PR #469: 設定を変えなくても動くよう、既定値を `oauth/authorize`・`oauth/token` にした。CHANGELOG では BREAKING の扱い |
 
-- RP の `site`（`http://localhost:3780/oauth/authorize`）は、1.4.7 が `site` のパスを捨てていたので、本来は不要なパスが付いていても動いていた。明記した `authorize_url`・`token_url` は、この挙動を保つためのもの。`site` を `http://localhost:3780` に直すのは、epic を main に取り込んだ後の改善として扱う
+- RP の `site`（`http://localhost:3780/oauth/authorize`）は、1.4.7 が `site` のパスを捨てていたので、本来は不要なパスが付いていても動いていた。明記した `authorize_url`・`token_url` は、この挙動を保つためのもの。`site` を `http://localhost:3780` に直すのは、epic を main に取り込んだ後の改善として扱う（docs/IMPROVEMENTS.md の IMP-006。`site` の値の経緯もそこに書いた）
 - RS は `token_url` を明記しない（人間が判断）。RS の 4 つの環境ファイル（`.env`・`.env.test`・`.env_e2e`・`.env_template`）の `OIDC_PROVIDER_HOST` はどれも `http://localhost:3780` で、1.4.7 と 2.0.25 の既定値で同じ URL（`http://localhost:3780/oauth/token`）になる。違いが出るのはパス付きの `site` のときだけで、その場合は 1.4.7 の挙動が issue #245 の不具合にあたる（下の表。oauth2 1.4.7 と 2.0.25 の `OAuth2::Client#token_url` で確かめた）
 
   | `site` | 1.4.7 | 2.0.25 の既定値 | 2.0.25 で `token_url: '/oauth/token'` を明記 |
@@ -960,4 +960,4 @@ oauth2 の CHANGELOG（2.0.0）と、GitHub の PR・issue で確かめた。
 | `jwt` と `faraday` を Gemfile に版の制約なしで足したので、`--conservative` を付けない `bundle update` で jwt 3.x に上がる。faraday-net_http 3.0.2 の固定も lock にしかない | 対応しない。Gemfile のほかの gem も版の制約を書いていない。faraday-net_http は cgi などと同じ一時固定のやり方で、0-f-1 のコードレビューで同じ判断をした。gem を上げるたびに lock の差分を確かめている |
 | テスト (a) はブロックの引数を `request` にして、統合テストの `request` を隠している。(b) は `token_request` | 対応しない。(a) は同じファイルの既存のテスト（code_verifier）と同じ書き方。(b) はブロックの外の `request`（コールバックの要求）を使うので名前を変えた |
 | RS は `token_url` を明記せず、相対パスの既定値に頼っている。`OIDC_PROVIDER_HOST` をパス付きにすると 1.4.7 と違う URL に送る | 対応しない（人間が判断）。上の「URL の既定値が相対パスになった経緯」 |
-| RS はリクエストのたびに `OAuth2::Client` を作り、クライアントクレデンシャルでトークンを取り直す | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う |
+| RS はリクエストのたびに `OAuth2::Client` を作り、クライアントクレデンシャルでトークンを取り直す | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う（docs/IMPROVEMENTS.md の IMP-007） |
