@@ -11,7 +11,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 
 ## 作業を始めるとき
 
-1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する
+1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する。コマンドの実行や確認の手順は `docs/upgrade/TIPS.md`（作業のコツ）を参照する
 2. 現在のブランチを確認する。作業ブランチは `epic/rails-8.1-upgrade` から切る
 3. クローン直後は `git config core.hooksPath .githooks` を実行して git hooks を有効にする。あわせて `git config blame.ignoreRevsFile .git-blame-ignore-revs` で、見た目だけのコミットを git blame から外す
 4. Ruby は mise で管理する。各アプリの `mise.toml`（`.ruby-version` を読ませる設定）は、初回に各アプリのディレクトリで `mise trust` を実行しないと読まれない
@@ -21,6 +21,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 - 一度に上げるのは 1 つだけ（Ruby / Rails / 周辺 gem を同時に上げない）。マイナーバージョンは飛ばさない
 - アップグレード中は挙動を変えない。例外は PLAN.md に「意図的な仕様変更」として明記したものだけで、LOG.md に記録する
 - 脆弱性が公表されている gem の修正だけは即時に行ってよい。設定の改善（PKCE 必須化、secret のハッシュ化など）は epic を main に取り込んだ後に別作業で行う
+- アップグレード中に見送った改善（設定の改善や、元からの挙動の改善）は `docs/IMPROVEMENTS.md` に ID を振って記録する。足すときは人間の承認を得る
 - `rails app:update` が提案する新しい構成（Propshaft、Solid Queue/Cache/Cable、Kamal、Thruster など）は採用しない
 - テスト・E2E・RuboCop・安全チェックが通らない状態でコミットしない
 - 動作保証は development / test 環境のみ。`config/environments/production.rb` は `app:update` の雛形に追従するだけにする

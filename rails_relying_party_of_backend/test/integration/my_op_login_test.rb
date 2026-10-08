@@ -30,6 +30,33 @@ class MyOpLoginTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test 'トークン要求では、client_id と client_secret を本文で送り、Authorization ヘッダーを付けない' do
+    authorization = request_authorization('my_op')
+    stub_op(id_token: id_token_for(authorization))
+
+    receive_callback('my_op', authorization)
+
+    assert_requested(:post, op_url('/oauth/token')) do |request|
+      body = URI.decode_www_form(request.body).to_h
+      body['client_id'] == ENV.fetch('CLIENT_ID_OF_MY_OP') &&
+        body['client_secret'] == ENV.fetch('CLIENT_SECRET_OF_MY_OP') &&
+        request.headers['Authorization'].nil?
+    end
+  end
+
+  test 'トークン要求の redirect_uri は、認可要求の redirect_uri にコールバックのクエリ（code・state）が付いたもの' do
+    authorization = request_authorization('my_op')
+    stub_op(id_token: id_token_for(authorization))
+
+    receive_callback('my_op', authorization)
+
+    expected = "#{authorization['redirect_uri']}?#{request.query_string}"
+
+    assert_requested(:post, op_url('/oauth/token')) do |token_request|
+      URI.decode_www_form(token_request.body).to_h['redirect_uri'] == expected
+    end
+  end
+
   test 'ID トークンが正しいとログインでき、トップにメッセージとメールアドレスが出る' do
     log_in_via_op
 
