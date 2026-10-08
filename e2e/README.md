@@ -36,4 +36,4 @@ npm test
 - Ruby は `ruby/setup-ruby`（各アプリの `.ruby-version`）、Node.js は `actions/setup-node`（`.node-version`）で入れる。mise は使わない
 - ブラウザは手元と同じ headless shell だけを、毎回 `npx playwright install --with-deps --only-shell chromium` で入れる
 - OP の署名鍵は、起動スクリプトが毎回新しく作る
-- 失敗したときは、`test-results/`・`playwright-report/` と 3 アプリの `log/development.log` を artifact `e2e-failure` に 7 日残す。リポジトリは public なので、サインインした誰でも取得できる。中のトークン・Cookie・署名鍵は CI の使い捨ての環境のもので、ユーザーの資格情報は元からリポジトリにあるダミー
+- 失敗したときは、`test-results/`・`playwright-report/` と 3 アプリの `log/development.log` を artifact `e2e-failure` に 7 日残す。リポジトリは public で、GitHub の文書は取得に要るのをリポジトリの読み取り権限としているので、誰でも取得できるものとして扱う。中のトークンと Cookie は、CI の使い捨ての署名鍵と DB で作られたもので（鍵そのものは artifact に入れない）、ユーザーの資格情報は元からリポジトリにあるダミー

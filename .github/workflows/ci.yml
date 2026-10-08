@@ -188,7 +188,7 @@ jobs:
           echo "検査したコミット: $(git rev-list --count "$range")"
           exit "$status"
 
-  # ブランチ保護で必須にするのはこのジョブだけ。ジョブの増減や matrix の名前が変わっても、ブランチ保護を直さなくて済む
+  # ほかのジョブの結果をまとめる。ブランチ保護で必須にする候補はこのジョブだけにして、ジョブの増減や matrix の名前が変わっても、ブランチ保護を直さなくて済むようにする
   ci-result:
     if: ${{ always() }}
     needs: [rails, e2e, public-safety]

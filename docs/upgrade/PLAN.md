@@ -280,7 +280,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | OP の署名鍵 | `rails_open_id_provider/config/initializers/doorkeeper_openid_connect.rb` が起動時に `jwtRS256.key` を読む。minitest と `zeitwerk:check` も起動するので鍵が要る。テストは鍵の中身に依存しない |
 | RP・RS の環境変数 | 起動時は `ENV[...]` を読むだけで、`.env` がなくても起動する。テストはコミット済みの `.env.test`、E2E は `.env_e2e` を読む |
 | 安全チェック | 追跡中の全ファイルを `--files` に渡すと通る。`main` から epic までの 204 コミット（マージコミット 11 を含む）のメッセージも、`--message` で全部通る |
-| Playwright のブラウザ | 設定は headless の既定のままなので、手元も headless shell で流れている。Playwright の CI の文書は、ブラウザのキャッシュを勧めていない |
+| Playwright のブラウザ | 設定は headless の既定のままなので、手元も headless shell で流れている。Playwright の CI の文書（playwright.dev の Continuous Integration）は、復元にかかる時間がダウンロードと同じくらいなので、ブラウザのバイナリのキャッシュを勧めていない |
 | action の版 | `actions/checkout` v7.0.1、`ruby/setup-ruby` v1.325.0、`actions/setup-node` v6.5.0、`actions/upload-artifact` v7.0.1（どれも公開から 2 週間以上たった版） |
 
 ### Step 1〜9

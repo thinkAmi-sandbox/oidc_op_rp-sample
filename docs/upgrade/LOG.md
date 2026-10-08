@@ -1133,8 +1133,8 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 | E2E の起動スクリプト | mise がなければ PATH の Ruby で動かす | CI には mise がない。手元の挙動は変わらない |
 | lock のプラットフォーム | 3 アプリの lock に `x86_64-linux` を足す | setup-ruby は frozen で入れるので、lock にないプラットフォームでは入らない見込み。frozen を外すと CI が毎回 lock を解決し直し、手元と同じ版である保証がなくなる |
 | OP の署名鍵 | CI の `rails` ジョブで、OP のときだけ、E2E の起動スクリプトと同じ方法で作る | アプリのコードを変えずに済む。テストは鍵の中身に依存しない（Step 0-d-2）。鍵をコミットするのは安全チェックの対象で、initializer でテスト時に作るのはアプリの変更になる |
-| E2E のブラウザ | `--with-deps --only-shell chromium` で毎回入れる | 手元も headless shell で流れている。Playwright の CI の文書は、ブラウザのキャッシュを勧めていない |
-| E2E が失敗したとき | レポート・トレースと 3 アプリの `log/development.log` を artifact に 7 日残す | リポジトリは public で、サインインした誰でも artifact を取れる。中のトークン・Cookie・署名鍵は CI の使い捨ての環境のもので、ユーザーの資格情報は元からリポジトリにあるダミー |
+| E2E のブラウザ | `--with-deps --only-shell chromium` で毎回入れる | 手元も headless shell で流れている。Playwright の CI の文書（playwright.dev の Continuous Integration）は、復元にかかる時間がダウンロードと同じくらいなので、ブラウザのバイナリのキャッシュを勧めていない |
+| E2E が失敗したとき | レポート・トレースと 3 アプリの `log/development.log` を artifact に 7 日残す | リポジトリは public で、GitHub の文書は artifact の取得に要るのをリポジトリの読み取り権限としているので、誰でも取れるものとして扱う。中のトークンと Cookie は、CI の使い捨ての署名鍵と DB で作られたもので（鍵そのものは artifact に入れない）、ユーザーの資格情報は元からリポジトリにあるダミー |
 | 安全チェック | 追跡中の全ファイルを `--files` で、PR（push は前後の範囲）のコミットメッセージを `--message` で検査する。PR のタイトル・本文は検査しない | 全ファイルが今は通るので、差分でなく全体を不変条件にできる。PR の本文を編集したときにも動かすには、全ジョブが流れ直さないよう別のワークフローが要る。本文は CLAUDE.md の手順で `--message` を通してから出している |
 | action | コミットの SHA で固定し、版を行末のコメントに書く。公開から 2 週間以上たった版。`permissions` は `contents: read` だけ、checkout は `persist-credentials: false` | タグは付け替えられる。仕上げの Dependabot はこの形のまま更新できる |
 | ブランチ保護 | epic と main で `ci-result` の通過を必須にする（設定は人間）。「ブランチを最新にすること」は必須にしない | epic に入る PR は 1 本ずつ |
@@ -1184,3 +1184,17 @@ PR #20 の最初の実行（head は `docs: record step 0-g and update the upgra
 - E2E: Node 24.21.0（`e2e/.node-version` から）、Chrome Headless Shell 153.0.8010.12 だけを入れて 10 passed。OP の署名鍵は起動スクリプトが作った
 - 安全チェック: 追跡中の全ファイルと、PR の 9 コミットのメッセージ
 - bundle のキャッシュは、最初の実行で保存された。`e2e` ジョブの RP・RS は、先に終わった `rails` ジョブが保存したキャッシュを復元した。npm のキャッシュも `actions/setup-node` が保存した
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 「Playwright の CI の文書はブラウザのキャッシュを勧めていない」「artifact はサインインした誰でも取れる」を、この Step で出典を確かめずに書いている | 確かめて直した。Playwright の文書（Continuous Integration）は、復元にかかる時間がダウンロードと同じくらいなので、ブラウザのバイナリのキャッシュを勧めていない。GitHub の文書（ワークフローの artifact のダウンロード）は、取得に要るのをリポジトリの読み取り権限としており、サインインには触れていない。「誰でも取得できるものとして扱う」に直した |
+| ワークフローのコメント「ブランチ保護で必須にするのはこのジョブだけ」が、まだ設定されていないブランチ保護を現在形で書いている（CLAUDE.md「まだ存在しないものを現在形で書かない」） | 「必須にする候補はこのジョブだけにして」に直した |
+| TIPS.md の mise なしの E2E のコマンドに、確かめたときに付けた `LANG=ja_JP.UTF-8` がない | 足した |
+| `e2e/README.md` の「中のトークン・Cookie・署名鍵は CI の使い捨て」が、artifact に署名鍵が入っているように読める | 「トークンと Cookie は CI の使い捨ての署名鍵と DB で作られたもの（鍵そのものは artifact に入れない）」に直した（LOG.md も同じ） |
+| bundler-audit の `--update` で、新しい advisory が出ると、変更と関係のない PR でも CI が落ちる | 構成は変えない（作業計画で決めたこと）。落ちたときの手順を TIPS.md の「CI の結果を読む」に書いた |
+| 署名鍵を作る 1 行が、ワークフローと `e2e/scripts/start-server.sh` で重なっている | 対応しない。1 行だけで、ワークフローのコメントで起動スクリプトと同じ方法だと書いている。共通にすると、E2E の起動スクリプトに鍵だけを作るモードを足すことになる |
+| E2E がジョブの `timeout-minutes`（30 分）で打ち切られると、artifact が残らない | 対応しない。Playwright の起動待ちは 1 アプリ 120 秒、テストは 1 本 30 秒（既定）で、10 本が約 20 秒で終わるので、30 分に届く前に Playwright が失敗として終わる |
+| `public-safety` が、ランナーのイメージに入っている Ruby（ubuntu-24.04 は 3.2.3）に依存している | 対応しない。スクリプトは Ruby 2.6 の構文の範囲で書いてあり、macOS 標準の Ruby でも動かしている。イメージから Ruby が外れたら setup-ruby に替える |
+| advisory のデータベースを matrix の 3 ジョブで別々に取得している | 対応しない。1 回数秒で、取得した版はジョブのログ（`last updated`・`commit`）で分かる |

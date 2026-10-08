@@ -34,8 +34,9 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す。違いは、O
 - push と PR の作成は人間が行う。AI は `gh` で結果を読む
 - 実行の一覧: `gh run list --branch <ブランチ> --workflow CI`
 - ジョブとステップの結果: `gh run view <run-id>`。失敗したステップのログだけを見るときは `gh run view <run-id> --log-failed`
+- bundler-audit だけが落ちたときは、CI が取った advisory のデータベースに新しい advisory が入った可能性が高い（CI は `--update` を付けて最新を使う。手元は `bundle-audit update` を流すまで古いまま）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」に従い、上げるか、無視リストに入れるかを人間に確かめる。変更と関係のない PR でも落ちる
 - E2E が失敗したときは、artifact `e2e-failure` にレポート・トレースと 3 アプリのログがある（`gh run download <run-id> -n e2e-failure -D <scratchpad のディレクトリ>`）。中のトークンは CI の使い捨てのものだが、LOG.md に貼るときは公開物の記載ルールに従う
-- 手元で mise なしの経路（CI と同じ）を試すときは、`env -i HOME="$HOME" PATH="$(mise where ruby@3.1.7)/bin:$(mise where node@24.21.0)/bin:/usr/bin:/bin"` の下で `npm test` を流す（Step 0-g）
+- 手元で mise なしの経路（CI と同じ）を試すときは、`env -i HOME="$HOME" LANG=ja_JP.UTF-8 PATH="$(mise where ruby@3.1.7)/bin:$(mise where node@24.21.0)/bin:/usr/bin:/bin"` の下で `npm test` を流す（Step 0-g）
 
 ## gem の更新
 
