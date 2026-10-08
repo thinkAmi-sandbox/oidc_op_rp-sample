@@ -986,10 +986,10 @@ PLAN.md の 0-f-3 にある版と事実を、作業計画の前に確かめ直�
 |---|---|
 | client_credentials の scope の確認が 5.5.3 から変わった | 5.6.0.rc2（#1558）。`doorkeeper-5.6.9/lib/doorkeeper/oauth/client_credentials/validator.rb` で `return true if @request.scopes.blank? && application_scopes.blank?` になった。RS は `scope=introspection` を送るので影響しない |
 | トークン応答の `Cache-Control` が `no-store, no-cache` になる | gem は `no-store, no-cache` を返すが、Rails 6.1 が `no-store` にまとめる（`actionpack-6.1.7.10/lib/action_dispatch/http/cache.rb` の `merge_and_normalize_cache_control!`）ので、応答の値は変わらない。変わるのは `Pragma: no-cache` が消えること（5.6.6 #1644。5.8.0 #1712 で戻る）。下の「応答ヘッダーの前後比較」 |
-| 独自の claim を先に混ぜる順番に変わった（#273）。使っていない経路の変化に `prompt=select_account`（#279）、`prompt=none` と `max_age`（#275） | どれも doorkeeper-openid_connect 1.10.0 の変更で、1.8.9 には入らない。1.8.0 と 1.8.9 の `id_token.rb` の差分は `as_jws_token`（json-jwt の `sign` → `::JWT.encode`。ヘッダーに `typ`・`kid` を明示）だけ |
-| `pkce_code_challenge_methods` の既定値は今と同じ | 設定は 5.8.0（#1735）で入るもので、5.7.1 にはない。5.7.1 の `pre_authorization.rb` も、今と同じく `plain` か `S256` を受け付ける |
+| 独自の claim を先に混ぜる順番に変わった（#273）。使っていない経路の変化に `prompt=select_account`（#279）、`prompt=none` と `max_age`（#275） | どれも doorkeeper-openid_connect 1.10.0 の変更で、1.8.9 には入らない。`doorkeeper-openid_connect-1.8.0/lib/doorkeeper/openid_connect/id_token.rb` と 1.8.9 の差分は `as_jws_token`（json-jwt の `sign` → `::JWT.encode`。ヘッダーに `typ`・`kid` を明示）だけ |
+| `pkce_code_challenge_methods` の既定値は今と同じ | 設定は 5.8.0（#1735）で入るもので、5.7.1 にはない。`doorkeeper-5.7.1/lib/doorkeeper/oauth/pre_authorization.rb` も、今と同じく `plain` か `S256` を受け付ける |
 
-確かめて PLAN.md どおりだったもの: 同意画面を省く条件（5.6.6 #1646 で confidential のアプリだけになる。5.6.9・5.7.1 の `matching_token_for` は `include_expired: true` が既定）、`expirable.rb` は 5.5.2 と 5.7.1 で同じ、マイグレーションは新しいものがない（doorkeeper の雛形は列の並びだけというサブエージェントの報告。doorkeeper-openid_connect の generators が 1.8.0 と 1.8.9 で同じことは自分で確かめた）、kid は json-jwt 1.14.0 も ruby-jwt の `JWT::JWK::Thumbprint` も RFC 7638 の thumbprint、ヘッダーの `typ` は 1.8.8 で戻った。doorkeeper 5.5.4 → 5.7.1 のソースの差分はサブエージェントで読み、要点（エラー画面のステータス、ヘッダー、client_credentials、同意画面を省く条件、form_post）は自分でソースで確かめた。
+確かめて PLAN.md どおりだったもの: 同意画面を省く条件（5.6.6 #1646 で confidential のアプリだけになる。5.6.9・5.7.1 の `matching_token_for` は `include_expired: true` が既定）、`doorkeeper-5.7.1/lib/doorkeeper/models/concerns/expirable.rb` は 5.5.2 と同じ、マイグレーションは新しいものがない（doorkeeper の雛形は列の並びだけというサブエージェントの報告。doorkeeper-openid_connect の generators が 1.8.0 と 1.8.9 で同じことは自分で確かめた）、kid は json-jwt 1.14.0 も ruby-jwt の `JWT::JWK::Thumbprint` も RFC 7638 の thumbprint、ヘッダーの `typ` は 1.8.8 で戻った。doorkeeper 5.5.4 → 5.7.1 のソースの差分はサブエージェントで読み、要点（エラー画面のステータス、ヘッダー、client_credentials、同意画面を省く条件、form_post）は自分でソースで確かめた。
 
 ### 作業計画で決めたこと
 
@@ -1027,7 +1027,7 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 | 変化 | 前 | 後 | 版 | 確かめ方 |
 |---|---|---|---|---|
 | discovery に `code_challenge_methods_supported` が増える | なし | `["plain", "S256"]` | doorkeeper-openid_connect 1.8.3（#180）。`oauth_access_grants` に PKCE の列があると出す | E2E のスナップショット（`e2e/baseline/discovery.json` を更新）。差分はこの項目だけ |
-| `/.well-known/oauth-authorization-server` が増える | 404（ルートなし） | discovery と同じ応答を 200 で返す | doorkeeper-openid_connect 1.8.1（#152）。ルートは discovery と一緒に足され、これだけを外す設定はない | `bin/rails routes`、下の「応答ヘッダーの前後比較」 |
+| `/.well-known/oauth-authorization-server` が増える | ルートなし（test 環境では `ActionController::RoutingError`） | discovery と同じ応答を 200 で返す | doorkeeper-openid_connect 1.8.1（#152）。ルートは discovery と一緒に足され、これだけを外す設定はない | `bin/rails routes`、下の「応答ヘッダーの前後比較」 |
 | 認可エンドポイントのエラー画面（登録されていない redirect_uri など）のステータス | 200 | エラーに応じて 400（`invalid_client`・`unauthorized_client` は 401） | doorkeeper 5.6.7（#1676）。`render :error, locals: {...}, status: pre_auth.error_response.status`。本文は同じ | OP のテスト「登録されていない redirect_uri では、エラーの説明を 400 で表示する」 |
 
 ### テストの追加
@@ -1090,8 +1090,22 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 
 ### 確認結果
 
-- minitest: OP 25 runs、0 failures（非推奨警告は `:raise` のまま）。最初のコミットでテストを 7 本足した後は、どのコミットの前も 25 runs。RS・RP は変えていない
-- E2E: 各コミットの前に流して、どれも 10 passed（doorkeeper-openid_connect 1.8.9 のコミットは、スナップショットを更新した後）
+- minitest: OP 25 runs、0 failures（非推奨警告は `:raise` のまま）。テストを 7 本足したコミット（この Step の 2 つ目）の後は、どのコミットの前も 25 runs。RS・RP は変えていない
+- E2E: テストと gem のコミットの前に流して、どれも 10 passed（doorkeeper-openid_connect 1.8.9 のコミットは、スナップショットを更新した後）
 - RuboCop: OP `no offenses detected`。bundler-audit: OP `No vulnerabilities found`（無視リスト込み）。無視リストを空にした bundler-audit で、doorkeeper・doorkeeper-openid_connect・jwt は報告されない。brakeman: OP `Security Warnings: 0`、`Ignored Warnings: 2`
 - OP の `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動と launch.json で確認し、Puma 6.6.1 で起動する
 - テストとサーバーの出力に、jwt の非推奨の警告（`[DEPRECATION WARNING]`）は出ない
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| PLAN.md の「doorkeeper-openid_connect も 2.0 まで新しいマイグレーションはない」は、2.0.0 でマイグレーションが不要だとも読める。2.0.0.beta1 の CHANGELOG（#243）は `post_logout_redirect_uris` の列を必須にしている | 「1.8.9 まではない。2.0.0 は `post_logout_redirect_uris` の列を足すマイグレーションが必要」に直した |
+| 上書きしている `form_post.html.erb`・`error.html.erb` が、doorkeeper の内部のインスタンス変数（`@authorize_response`・`@pre_auth`）を読み続けている。`local_assigns[:auth] \|\| @authorize_response` のように書けば、HTML を変えずにどの版でも動く | 対応しない。作業計画のとおり、この Step ではビューを変えない。足したテスト（form_post・エラー画面）が、doorkeeper を上げるたびにこの依存を確かめる。ビューを雛形に合わせるときに一緒に直す（docs/IMPROVEMENTS.md の IMP-008） |
+| 確認結果の「最初のコミットでテストを 7 本足した」が事実と違う（最初のコミットは PR #18 のリンクの修正） | 「テストを 7 本足したコミット（この Step の 2 つ目）」に直した |
+| 意図的な仕様変更の表の「前は 404」は確かめていない（確かめたのは test 環境の `ActionController::RoutingError` だけ） | 「ルートなし（test 環境では `ActionController::RoutingError`）」に直した |
+| 新しく書いた LOG の行で、gem 内のファイルを `gem名-バージョン/` から書いていない（`id_token.rb`・`pre_authorization.rb`・`expirable.rb`） | `gem名-バージョン/` からのパスに直した |
+| 確認結果の「E2E を各コミットの前に流した」は、docs だけのコミットにはあてはまらない | 「テストと gem のコミットの前に流した」に直した |
+| `gem 'jwt'` に版の制約がないので、`bundle update jwt` で jwt 3.3.0 になり、doorkeeper-openid_connect 1.8.9 との組み合わせを確かめていない状態になる | 対応しない（作業計画で人間が判断）。RP と同じく、Gemfile のほかの gem にも版の制約は書いていない。PLAN.md 7 章の jwt と doorkeeper の行に、一時固定で入れたことを書いた |
+| kid のテストで、`n` の base64url の計算が、同じファイルの既存のテストと重なっている | 対応しない。2 か所だけで、それぞれのテストを単独で読めるようにした |
+| 足したテストの多くが `authorization_params(nonce: SecureRandom.hex(16), code_verifier: SecureRandom.urlsafe_base64(48))` を繰り返している | 対応しない。既存のテストと同じ書き方。ヘルパーに既定値を持たせると、既存のテストもすべて書き換わる |

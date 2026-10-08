@@ -232,7 +232,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | 対象 | 分かったこと | テスト・E2E で守られているか |
 |---|---|---|
 | 版の組み合わせ | doorkeeper-openid_connect は 1.8.0・1.8.1 が `doorkeeper < 5.6`（json-jwt）、1.8.2・1.8.3 が `< 5.7`（1.8.3 は json-jwt 1.15.0 以上）、1.8.4〜1.8.8 が `< 5.7`（jwt 2.5 以上）、1.8.9 が `< 5.8`、1.8.10・1.8.11 が `< 5.9`（Ruby 3.1 以上。1.8.11 は ostruct も）、1.9.0〜1.10.1 が `< 6.0`。doorkeeper は 5.6.3 から Ruby 2.7 以上 | — |
-| マイグレーション | doorkeeper 5.5.2 → 5.7.1 で必須のものはない（雛形の差分は列の並びだけ）。doorkeeper-openid_connect も 2.0 まで新しいものはない（generators は 1.8.0 と 1.8.9 で同じ） | `db:drop db:setup` で E2E 用の DB を作り直している |
+| マイグレーション | doorkeeper 5.5.2 → 5.7.1 で必須のものはない（雛形の差分は列の並びだけ）。doorkeeper-openid_connect は 1.8.9 まで新しいものはない（generators は 1.8.0 と 1.8.9 で同じ）。2.0.0 は `post_logout_redirect_uris` の列を足すマイグレーションが必要（2.0.0.beta1 の #243） | `db:drop db:setup` で E2E 用の DB を作り直している |
 | doorkeeper の新しい設定 | `force_pkce`、`revoke_previous_client_credentials_token`、`revoke_previous_authorization_code_token`、`custom_access_token_attributes` などはすべて opt-in。`pkce_code_challenge_methods` は 5.8.0 で入る設定で、5.7.1 は今と同じく plain・S256 を受け付ける。`client_credentials_methods`（Basic・本文）の既定値は今と同じ | — |
 | 同意画面を省く条件 | 5.6.0〜5.6.2 は有効なトークンしか見ない不具合があり（doorkeeper#1542）、5.6.3 で期限切れも含める挙動に戻った。5.6.6 で「confidential のアプリ」という条件が加わった（doorkeeper#1646、CVE-2023-34246 の修正）。seeds と fixtures のアプリは 3 つとも confidential | OP のテスト（期限切れでも省く、revoke 済みなら出す）と E2E の logout（有効なトークンで省く） |
 | 期限切れの判定・introspect | `expirable.rb` は変わらない（`現在時刻 > created_at + expires_in`）。introspect の項目も同じ（並びだけが変わる） | OP のテスト（10 分ちょうど・10 分 1 秒）と E2E のスナップショット（キーを並べ替えて保存） |
