@@ -11,6 +11,7 @@
 - Claude Code の Bash の作業ディレクトリは、呼び出しの間で変わっていることがある。ファイルを作る・書き換えるコマンドは、絶対パスで書くか、同じ呼び出しの中で `cd` してから実行する
 - 一時ファイルはセッションの scratchpad に置き、`/tmp` は使わない（`/tmp` は `/private/tmp` へのシンボリックリンク）
 - 日本語を含む `ruby -e` や `sed` には `LC_ALL=ja_JP.UTF-8` を付ける。日本語を含むファイルを Ruby で読み書きするときは `encoding: 'UTF-8'` を指定する
+- perl で日本語を含むパターンを置換するときは `perl -Mutf8 -CSD` にする。`-CSD` だけではスクリプトの中の日本語が UTF-8 として読まれず、置換が何も当たらないまま正常に終わる（Step 0-g）
 
 ## 確認のコマンド
 
@@ -25,6 +26,17 @@
 | bundler-audit | `mise exec -- bundle exec bundle-audit check` | `No vulnerabilities found`（無視リスト込み） |
 | brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`、`Ignored Warnings: 2` |
 | E2E | `e2e/` で `mise exec -- npm test` | 約 10 秒で 10 passed。手動確認用のサーバーが動いていると起動に失敗する |
+
+CI（`.github/workflows/ci.yml`）も同じコマンドを流す。違いは、OP の署名鍵をジョブの中で作ること、bundler-audit に `--update` を付けて advisory のデータベースの最新を使うこと、E2E を mise なしで流すこと。
+
+## CI の結果を読む
+
+- push と PR の作成は人間が行う。AI は `gh` で結果を読む
+- 実行の一覧: `gh run list --branch <ブランチ> --workflow CI`
+- ジョブとステップの結果: `gh run view <run-id>`。失敗したステップのログだけを見るときは `gh run view <run-id> --log-failed`
+- bundler-audit だけが落ちたときは、CI が取った advisory のデータベースに新しい advisory が入った可能性が高い（CI は `--update` を付けて最新を使う。手元は `bundle-audit update` を流すまで古いまま）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」に従い、上げるか、無視リストに入れるかを人間に確かめる。変更と関係のない PR でも落ちる
+- E2E が失敗したときは、artifact `e2e-failure` にレポート・トレースと 3 アプリのログがある（`gh run download <run-id> -n e2e-failure -D <scratchpad のディレクトリ>`）。中のトークンは CI の使い捨てのものだが、LOG.md に貼るときは公開物の記載ルールに従う
+- 手元で mise なしの経路（CI と同じ）を試すときは、`env -i HOME="$HOME" LANG=ja_JP.UTF-8 PATH="$(mise where ruby@3.1.7)/bin:$(mise where node@24.21.0)/bin:/usr/bin:/bin"` の下で `npm test` を流す（Step 0-g）
 
 ## gem の更新
 

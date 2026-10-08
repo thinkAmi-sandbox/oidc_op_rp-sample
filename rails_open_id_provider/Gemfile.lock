@@ -145,6 +145,8 @@ GEM
       racc (~> 1.4)
     nokogiri (1.18.10-x86_64-darwin)
       racc (~> 1.4)
+    nokogiri (1.18.10-x86_64-linux-gnu)
+      racc (~> 1.4)
     orm_adapter (0.5.0)
     parallel (1.28.0)
     parser (3.3.12.0)
@@ -237,6 +239,7 @@ GEM
       sprockets (>= 3.0.0)
     sqlite3 (1.7.3-arm64-darwin)
     sqlite3 (1.7.3-x86_64-darwin)
+    sqlite3 (1.7.3-x86_64-linux)
     thor (1.5.0)
     timeout (0.6.1)
     tzinfo (2.0.4)
@@ -264,6 +267,7 @@ GEM
 PLATFORMS
   arm64-darwin
   x86_64-darwin-19
+  x86_64-linux
 
 DEPENDENCIES
   annotate

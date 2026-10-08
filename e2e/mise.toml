@@ -1,3 +1,5 @@
-# E2E（Playwright）で使う Node.js のバージョン。初回は e2e/ で `mise trust` を実行する
-[tools]
-node = "24.21.0"
+# mise が Node.js のバージョンファイル（.node-version）を読むようにする。
+# GitHub Actions の actions/setup-node も同じファイルを読むので、版はここに書かず .node-version だけに置く。
+# 初回は e2e/ で `mise trust` を実行する
+[settings]
+idiomatic_version_file_enable_tools = ["node"]

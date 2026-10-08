@@ -1,0 +1,205 @@
+# Ruby / Rails のアップグレード中の検査。docs/upgrade/PLAN.md の 10 章の完了条件のうち、CI で確かめられるものを流す。
+# 構成を決めた経緯は docs/upgrade/LOG.md の Step 0-g
+name: CI
+
+on:
+  pull_request:
+    branches: [epic/rails-8.1-upgrade, main]
+  push:
+    branches: [epic/rails-8.1-upgrade, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  rails:
+    name: rails (${{ matrix.app }})
+    # Ruby 3.1.7 のビルド済みのものは ubuntu-26.04 にないので、ubuntu-latest は使わない
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [rails_open_id_provider, rails_relying_party_of_backend, rails_resource_server]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # .ruby-version の Ruby を入れ、各アプリの vendor/bundle に bundle install してキャッシュする
+      - id: ruby
+        uses: ruby/setup-ruby@e8944e80fb94b20106697132f8c20c665fab29e9 # v1.325.0
+        with:
+          working-directory: ${{ matrix.app }}
+          bundler-cache: true
+
+      # OP は起動時に ID トークンの署名鍵を読む（config/initializers/doorkeeper_openid_connect.rb）。
+      # 鍵はコミットしないので、E2E の起動スクリプト（e2e/scripts/start-server.sh）と同じ方法で作る
+      - name: OP の署名鍵を作る
+        if: matrix.app == 'rails_open_id_provider'
+        run: |
+          ruby -ropenssl -e 'File.write("jwtRS256.key", OpenSSL::PKey::RSA.new(4096).to_pem, perm: 0o600)'
+
+      # 以降の検査は、前の検査が失敗しても流す
+      - name: RuboCop
+        if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
+        run: bundle exec rubocop
+
+      - name: zeitwerk:check
+        if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
+        run: bin/rails zeitwerk:check
+
+      - name: minitest
+        if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
+        run: bin/rails test
+
+      # advisory のデータベースは最新を取る。新しい advisory が出ると、コードを変えていなくても落ちる
+      - name: bundler-audit
+        if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
+        run: bundle exec bundle-audit check --update
+
+      - name: brakeman
+        if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
+        run: bundle exec brakeman --no-pager -q
+
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # E2E は 3 アプリを起動する（playwright.config.ts の webServer）。アプリごとに bundle install する
+      - uses: ruby/setup-ruby@e8944e80fb94b20106697132f8c20c665fab29e9 # v1.325.0
+        with:
+          working-directory: rails_open_id_provider
+          bundler-cache: true
+      - uses: ruby/setup-ruby@e8944e80fb94b20106697132f8c20c665fab29e9 # v1.325.0
+        with:
+          working-directory: rails_relying_party_of_backend
+          bundler-cache: true
+      - uses: ruby/setup-ruby@e8944e80fb94b20106697132f8c20c665fab29e9 # v1.325.0
+        with:
+          working-directory: rails_resource_server
+          bundler-cache: true
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: e2e/.node-version
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - id: npm
+        run: npm ci
+
+      # 以降の検査は、前の検査が失敗しても流す
+      - name: oxlint
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        run: npm run lint
+
+      - name: oxfmt
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        run: npm run fmt:check
+
+      # 手元と同じく headless shell だけを入れる。ブラウザはキャッシュしない（Playwright の CI の文書が勧めていない）
+      - id: browser
+        name: Playwright のブラウザを入れる
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        run: npx playwright install --with-deps --only-shell chromium
+
+      # OP の署名鍵は、起動スクリプトがなければ作る
+      - id: e2e
+        name: E2E
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
+        run: npm test
+
+      # トレースやログに入るトークン・Cookie・署名鍵は、この CI の使い捨ての環境のもの
+      - name: 失敗したときのレポートとログを残す
+        if: ${{ failure() && steps.e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-failure
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+            rails_open_id_provider/log/development.log
+            rails_relying_party_of_backend/log/development.log
+            rails_resource_server/log/development.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  public-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # コミットメッセージを読むため、履歴をすべて取る
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # 検査は Ruby 2.6 の構文の範囲で書いてあるので、ランナーにある Ruby で動かす
+      - name: 追跡中の全ファイル
+        run: git ls-files -z | xargs -0 scripts/check-public-safety --files
+
+      - name: コミットメッセージ
+        if: ${{ !cancelled() }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          case "$EVENT_NAME" in
+            pull_request)
+              range="$PR_BASE_SHA..$PR_HEAD_SHA"
+              ;;
+            push)
+              # ブランチを新しく作った push（before が 0）や、force push で before が履歴にないときは飛ばす
+              if ! git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+                echo "push の前のコミットがないので、コミットメッセージの検査を飛ばす"
+                exit 0
+              fi
+              range="$PUSH_BEFORE..$PUSH_AFTER"
+              ;;
+            *)
+              echo "$EVENT_NAME ではコミットメッセージを検査しない"
+              exit 0
+              ;;
+          esac
+          status=0
+          for commit in $(git rev-list "$range"); do
+            git log -1 --format=%B "$commit" > "$RUNNER_TEMP/commit-message"
+            scripts/check-public-safety --message "$RUNNER_TEMP/commit-message" --label "コミット $commit" || status=1
+          done
+          echo "検査したコミット: $(git rev-list --count "$range")"
+          exit "$status"
+
+  # ほかのジョブの結果をまとめる。ブランチ保護で必須にする候補はこのジョブだけにして、ジョブの増減や matrix の名前が変わっても、ブランチ保護を直さなくて済むようにする
+  ci-result:
+    if: ${{ always() }}
+    needs: [rails, e2e, public-safety]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: すべてのジョブが成功したか
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "結果: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = success ] || exit 1
+          done

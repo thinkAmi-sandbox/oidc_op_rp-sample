@@ -964,7 +964,7 @@ oauth2 の CHANGELOG（2.0.0）と、GitHub の PR・issue で確かめた。
 
 ## Step 0-f-3: OP の doorkeeper 系の gem の更新（2026-10-08）
 
-- ブランチ / PR: `upgrade/step0f3-doorkeeper` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step0f3-doorkeeper` / [#19](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/19)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 着手時に確かめ直したこと
@@ -1109,3 +1109,107 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 | `gem 'jwt'` に版の制約がないので、`bundle update jwt` で jwt 3.3.0 になり、doorkeeper-openid_connect 1.8.9 との組み合わせを確かめていない状態になる | 対応しない（作業計画で人間が判断）。RP と同じく、Gemfile のほかの gem にも版の制約は書いていない。PLAN.md 7 章の jwt と doorkeeper の行に、一時固定で入れたことを書いた |
 | kid のテストで、`n` の base64url の計算が、同じファイルの既存のテストと重なっている | 対応しない。2 か所だけで、それぞれのテストを単独で読めるようにした |
 | 足したテストの多くが `authorization_params(nonce: SecureRandom.hex(16), code_verifier: SecureRandom.urlsafe_base64(48))` を繰り返している | 対応しない。既存のテストと同じ書き方。ヘルパーに既定値を持たせると、既存のテストもすべて書き換わる |
+
+## Step 0-g: CI（GitHub Actions）（2026-10-08）
+
+- ブランチ / PR: `upgrade/step0g-ci` / （PR 作成後に記入）
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 前倒しの判断
+
+- PLAN.md では、CI を最後の「仕上げ」で設定する計画だった。Step 1（Rails 7.0）以降は `app:update` や `load_defaults` で変更が大きくなるので、Step 1 の前に前倒しした（人間の判断）。PR のたびに、手元と同じ検査がきれいな環境で流れることを確かめられる
+- Dependabot は仕上げに残した。アップグレード中の「一度に上げるのは 1 つだけ」とぶつかるため
+- PLAN.md の仕上げにあった「GitHub Actions」と「CI での OP の署名鍵の扱い」を 0-g に移した。10 章の完了条件に「CI が通る（Step 0-g 以降）」を足した（人間が承認）
+
+### 作業計画で決めたこと
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| ジョブの分け方 | `rails`（3 アプリの matrix）・`e2e`・`public-safety` と、結果をまとめる `ci-result` | 検査の種類ごとに分けると、Ruby と bundle の準備をジョブの数だけ繰り返す。アプリごとなら準備は 1 回で、どのアプリのどの検査が落ちたかはステップで分かる。前の検査が失敗しても後の検査は流す。ブランチ保護で必須にするのを `ci-result` だけにすると、matrix の名前やジョブが変わってもブランチ保護を直さなくて済む |
+| 動かす条件 | epic と main への PR と push、`workflow_dispatch` | `upgrade/*` への push でも動かすと PR と二重になる。paths で絞ると、ブランチ保護で必須にしたときに、動かなかった PR が止まる。`main` にはワークフローのファイルがないので、epic を取り込むまで `main` への push では動かない |
+| ランナー | `ubuntu-24.04` に固定 | Ruby 3.1.7 のビルド済みのものは `ubuntu-26.04` にない。`ubuntu-latest` が 26.04 に移ると入らなくなる |
+| Ruby | `ruby/setup-ruby` で各アプリの `.ruby-version` を読み、`bundler-cache: true` | 版の置き場所を増やさない。bundle の置き場所も手元と同じ各アプリの `vendor/bundle` になる |
+| Node | `e2e/.node-version` を足し、`e2e/mise.toml` からも読ませる | `actions/setup-node` は `mise.toml` を読めない。アプリの `.ruby-version` と同じ形にして、版の置き場所を 1 つにする。mise ごと入れる `jdx/mise-action` は、アプリのディレクトリで mise が Ruby を入れようとするのを止める設定が要り、GitHub・ruby 以外の action が増えるので採らなかった |
+| E2E の起動スクリプト | mise がなければ PATH の Ruby で動かす | CI には mise がない。手元の挙動は変わらない |
+| lock のプラットフォーム | 3 アプリの lock に `x86_64-linux` を足す | setup-ruby は frozen で入れるので、lock にないプラットフォームでは入らない見込み。frozen を外すと CI が毎回 lock を解決し直し、手元と同じ版である保証がなくなる |
+| OP の署名鍵 | CI の `rails` ジョブで、OP のときだけ、E2E の起動スクリプトと同じ方法で作る | アプリのコードを変えずに済む。テストは鍵の中身に依存しない（Step 0-d-2）。鍵をコミットするのは安全チェックの対象で、initializer でテスト時に作るのはアプリの変更になる |
+| E2E のブラウザ | `--with-deps --only-shell chromium` で毎回入れる | 手元も headless shell で流れている。Playwright の CI の文書（playwright.dev の Continuous Integration）は、復元にかかる時間がダウンロードと同じくらいなので、ブラウザのバイナリのキャッシュを勧めていない |
+| E2E が失敗したとき | レポート・トレースと 3 アプリの `log/development.log` を artifact に 7 日残す | リポジトリは public で、GitHub の文書は artifact の取得に要るのをリポジトリの読み取り権限としているので、誰でも取れるものとして扱う。中のトークンと Cookie は、CI の使い捨ての署名鍵と DB で作られたもので（鍵そのものは artifact に入れない）、ユーザーの資格情報は元からリポジトリにあるダミー |
+| 安全チェック | 追跡中の全ファイルを `--files` で、PR（push は前後の範囲）のコミットメッセージを `--message` で検査する。PR のタイトル・本文は検査しない | 全ファイルが今は通るので、差分でなく全体を不変条件にできる。PR の本文を編集したときにも動かすには、全ジョブが流れ直さないよう別のワークフローが要る。本文は CLAUDE.md の手順で `--message` を通してから出している |
+| action | コミットの SHA で固定し、版を行末のコメントに書く。公開から 2 週間以上たった版。`permissions` は `contents: read` だけ、checkout は `persist-credentials: false` | タグは付け替えられる。仕上げの Dependabot はこの形のまま更新できる |
+| ブランチ保護 | epic と main で `ci-result` の通過を必須にする（設定は人間）。「ブランチを最新にすること」は必須にしない | epic に入る PR は 1 本ずつ |
+
+### 作業の記録
+
+| 対象 | 対応 |
+|---|---|
+| 3 アプリの `Gemfile.lock` | `bundle lock --add-platform x86_64-linux` をアプリごとに実行し、アプリごとにコミットした（RS → RP → OP） |
+| `e2e/.node-version`・`e2e/mise.toml` | Node の版（24.21.0）を `.node-version` に移し、`mise.toml` は `idiomatic_version_file_enable_tools = ["node"]` だけにした |
+| `e2e/scripts/start-server.sh` | mise があれば `mise exec --`、なければ PATH の Ruby で動かす。サーバーは今までどおり `exec` で起動する |
+| `.github/workflows/ci.yml` | 上の「作業計画で決めたこと」のとおり |
+| ドキュメント | PLAN.md（ロードマップ、PR の単位、0-g の節、仕上げ、10 章）、TIPS.md（CI の結果の読み方）、`e2e/README.md`（Node の版、CI） |
+
+### lock の確かめ方
+
+- `git diff -U0 Gemfile.lock` で増えたのは、3 アプリとも `nokogiri (1.18.10-x86_64-linux-gnu)` とその依存の `racc (~> 1.4)` の行、`sqlite3 (1.7.3-x86_64-linux)`、`PLATFORMS` の `x86_64-linux` だけ。消えた行はない
+- `Bundler::LockfileParser` で前後の lock を読み、プラットフォームを除いた gem 名と版の組（RS 98・RP 110・OP 99）、`DEPENDENCIES`、`RUBY VERSION`、`BUNDLED WITH` が同じことを比べた。比べるスクリプトは、lock の puma の版を書き換えると違いを報告した
+- 手元の `bundle check` が通り、3 アプリの検査と E2E は前と同じ結果
+
+### E2E の起動スクリプトの確かめ方
+
+- mise がある経路: 今までどおり `mise exec -- npm test` で 10 passed
+- mise がない経路: `env -i` で PATH を mise の Ruby 3.1.7 と Node 24.21.0 の `bin` と `/usr/bin:/bin` だけにして `npm test` を流し、10 passed。署名鍵の生成は、手動確認用の鍵を動かさないよう、同じコマンドを scratchpad で mise なしに実行して確かめた（`BEGIN RSA PRIVATE KEY`、パーミッション 600）
+- `.node-version` に移した後も、mise は `e2e/.node-version` から 24.21.0 を読む（`mise ls --current`）。`mise trust` のやり直しは要らなかった
+
+### ワークフローの確かめ方（push の前）
+
+- YAML として読めることを Ruby で確かめた。ジョブとステップの並びは計画どおり
+- 安全チェックのコミットメッセージの部分を取り出し、PR・push・ブランチの新規作成（`before` が 0）・`workflow_dispatch` の 4 通りで流した。PR と push はこの Step のコミットを検査し、残りの 2 つは飛ばす。参照を動かさない一時的なコミット（`git commit-tree`）にホームディレクトリのパスを入れると、exit 1 で止まった
+- 追跡中の全ファイルの検査は、ワークフローを足した後も通る
+
+### 遭遇した問題
+
+1. 鍵を作るステップの `run:` を 1 行で書いたところ、値の中の `perm: 0o600` の「`: `」で YAML の構文エラー（`mapping values are not allowed in this context`）になった。ブロックスカラー（`run: |`）にした
+2. `start-server.sh` の最後を `exec run bin/rails server ...` にすると、`exec` はシェルの関数を実行できない。サーバーの起動だけは mise の有無で `exec` の行を書き分けた（書いている途中で気づき、コミットの前に直した）
+3. ブランチを `git switch -c upgrade/step0g-ci origin/epic/rails-8.1-upgrade` で作ると、上流が `origin/epic/rails-8.1-upgrade` になり、引数なしの `git push` が epic に向かうおそれがあった。`git branch --unset-upstream` で外した
+4. PLAN.md の表の行を `perl -CSD -i -pe` で置換しようとしたが、何も変わらずに正常に終わった。`-CSD` だけではスクリプトの中の日本語が UTF-8 として読まれない。`-Mutf8` を付けると当たることを確かめ、TIPS.md に書いた（置換は Edit で行った）
+
+### CI の結果
+
+PR #20 の最初の実行（head は `docs: record step 0-g and update the upgrade plan` のコミット）で、5 ジョブ（`rails` の 3 つ、`e2e`、`public-safety`）と `ci-result` が通った。全体は約 2 分。ログで次のことを確かめた。
+
+- Ruby は 3.1.7（x86_64-linux）、Bundler は lock の `BUNDLED WITH` の 2.3.27。nokogiri は `1.18.10 (x86_64-linux-gnu)`、sqlite3 は `1.7.3 (x86_64-linux)` が入り、ffi 1.15.3 はソースからビルドできた
+- minitest: OP 25 runs・RP 19 runs・RS 8 runs、0 failures。RuboCop は 3 アプリとも `no offenses detected`、`zeitwerk:check` は `All is good!`、brakeman は `Security Warnings: 0`・`Ignored Warnings: 2`
+- bundler-audit は advisory のデータベースを取得し（2026-10-07 の版。手元は 2026-10-06 の版。どちらも 1261 件）、3 アプリとも `No vulnerabilities found`
+- E2E: Node 24.21.0（`e2e/.node-version` から）、Chrome Headless Shell 153.0.8010.12 だけを入れて 10 passed。OP の署名鍵は起動スクリプトが作った
+- 安全チェック: 追跡中の全ファイルと、PR の 9 コミットのメッセージ
+- bundle のキャッシュは、最初の実行で保存された。`e2e` ジョブの RP・RS は、先に終わった `rails` ジョブが保存したキャッシュを復元した。npm のキャッシュも `actions/setup-node` が保存した
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 「Playwright の CI の文書はブラウザのキャッシュを勧めていない」「artifact はサインインした誰でも取れる」を、この Step で出典を確かめずに書いている | 確かめて直した。Playwright の文書（Continuous Integration）は、復元にかかる時間がダウンロードと同じくらいなので、ブラウザのバイナリのキャッシュを勧めていない。GitHub の文書（ワークフローの artifact のダウンロード）は、取得に要るのをリポジトリの読み取り権限としており、サインインには触れていない。「誰でも取得できるものとして扱う」に直した |
+| ワークフローのコメント「ブランチ保護で必須にするのはこのジョブだけ」が、まだ設定されていないブランチ保護を現在形で書いている（CLAUDE.md「まだ存在しないものを現在形で書かない」） | 「必須にする候補はこのジョブだけにして」に直した |
+| TIPS.md の mise なしの E2E のコマンドに、確かめたときに付けた `LANG=ja_JP.UTF-8` がない | 足した |
+| `e2e/README.md` の「中のトークン・Cookie・署名鍵は CI の使い捨て」が、artifact に署名鍵が入っているように読める | 「トークンと Cookie は CI の使い捨ての署名鍵と DB で作られたもの（鍵そのものは artifact に入れない）」に直した（LOG.md も同じ） |
+| bundler-audit の `--update` で、新しい advisory が出ると、変更と関係のない PR でも CI が落ちる | 構成は変えない（作業計画で決めたこと）。落ちたときの手順を TIPS.md の「CI の結果を読む」に書いた |
+| 署名鍵を作る 1 行が、ワークフローと `e2e/scripts/start-server.sh` で重なっている | 対応しない。1 行だけで、ワークフローのコメントで起動スクリプトと同じ方法だと書いている。共通にすると、E2E の起動スクリプトに鍵だけを作るモードを足すことになる |
+| E2E がジョブの `timeout-minutes`（30 分）で打ち切られると、artifact が残らない | 対応しない。Playwright の起動待ちは 1 アプリ 120 秒、テストは 1 本 30 秒（既定）で、10 本が約 20 秒で終わるので、30 分に届く前に Playwright が失敗として終わる |
+| `public-safety` が、ランナーのイメージに入っている Ruby（ubuntu-24.04 は 3.2.3）に依存している | 対応しない。スクリプトは Ruby 2.6 の構文の範囲で書いてあり、macOS 標準の Ruby でも動かしている。イメージから Ruby が外れたら setup-ruby に替える |
+| advisory のデータベースを matrix の 3 ジョブで別々に取得している | 対応しない。1 回数秒で、取得した版はジョブのログ（`last updated`・`commit`）で分かる |
+
+### ブランチ保護の設定
+
+人間が GitHub の Settings → Rules → Rulesets で、ブランチのルールセット `upgrade-branches` を作った。設定の内容は `gh api` で読んで確かめた。
+
+| 項目 | 設定 |
+|---|---|
+| 対象 | `epic/rails-8.1-upgrade` だけ（Active） |
+| 必須のチェック | `ci-result`（提供元は GitHub Actions）。「ブランチを最新にすること」はオフ |
+| PR | 必須。承認は 0 人、マージの方法はマージコミットだけ（CLAUDE.md の「マージコミットで取り込む」） |
+| そのほか | ブランチの削除と force push を禁止 |
+| 迂回 | リポジトリの管理者が、PR に限って迂回できる |
+
+- 作業計画からの変更点: `main` は対象にしなかった（人間の判断）。`main` にはまだ `.github/workflows/ci.yml` がないので、`main` から切ったブランチの PR では CI が動かず、`ci-result` を必須にすると待ちのままになるため。epic を `main` に取り込んだ後（仕上げ）に、`main` をルールセットの対象に足す
+- 設定の後、PR #20 で `ci-result` が必須のチェックとして扱われ（`gh pr checks 20 --required`）、通っていることを確かめた
