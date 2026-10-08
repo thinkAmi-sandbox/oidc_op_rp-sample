@@ -832,7 +832,7 @@ gem ごとに RS → RP → OP の順で `bundle update <gem> --conservative` �
 
 ## Step 0-f-2: RS・RP の oauth2 系の gem の更新（2026-10-08）
 
-- ブランチ / PR: `upgrade/step0f2-oauth2` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step0f2-oauth2` / [#18](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/18)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 着手時に確かめ直したこと
