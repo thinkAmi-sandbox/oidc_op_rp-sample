@@ -255,8 +255,8 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 - [ ] GitHub Actions（minitest、E2E、RuboCop、oxlint・oxfmt、bundler-audit、brakeman、zeitwerk:check、安全チェック）
 - [ ] CI で OP の署名鍵 `rails_open_id_provider/jwtRS256.key` がないときの minitest の扱いを決める（OP は起動時に鍵を読む。0-d-2 では手動確認用の鍵を使った）
-- [ ] 3 アプリの lock に `x86_64-linux` を足す（gem の版は変えない）
-- [ ] CI で E2E を流せるようにする（Node の版を `e2e/.node-version` に置く、`e2e/scripts/start-server.sh` を mise がなくても動くようにする）
+- [x] 3 アプリの lock に `x86_64-linux` を足す（gem の版は変えない）
+- [x] CI で E2E を流せるようにする（Node の版を `e2e/.node-version` に置く、`e2e/scripts/start-server.sh` を mise がなくても動くようにする）
 - 着手時の調査で決めたこと（人間が承認。理由は LOG.md の Step 0-g）
   - ジョブ: `rails`（3 アプリの matrix。RuboCop・`zeitwerk:check`・minitest・bundler-audit・brakeman を順に流し、前の検査が失敗しても後の検査を流す）、`e2e`（oxlint・oxfmt・Playwright）、`public-safety`（安全チェック）、`ci-result`（3 つの結果をまとめる。ブランチ保護で必須にするのはこれだけ）
   - 動かす条件: epic と main への PR、epic と main への push、手動（`workflow_dispatch`）。`upgrade/*` への push と、paths の絞り込みはなし

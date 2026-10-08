@@ -1138,3 +1138,38 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 | 安全チェック | 追跡中の全ファイルを `--files` で、PR（push は前後の範囲）のコミットメッセージを `--message` で検査する。PR のタイトル・本文は検査しない | 全ファイルが今は通るので、差分でなく全体を不変条件にできる。PR の本文を編集したときにも動かすには、全ジョブが流れ直さないよう別のワークフローが要る。本文は CLAUDE.md の手順で `--message` を通してから出している |
 | action | コミットの SHA で固定し、版を行末のコメントに書く。公開から 2 週間以上たった版。`permissions` は `contents: read` だけ、checkout は `persist-credentials: false` | タグは付け替えられる。仕上げの Dependabot はこの形のまま更新できる |
 | ブランチ保護 | epic と main で `ci-result` の通過を必須にする（設定は人間）。「ブランチを最新にすること」は必須にしない | epic に入る PR は 1 本ずつ |
+
+### 作業の記録
+
+| 対象 | 対応 |
+|---|---|
+| 3 アプリの `Gemfile.lock` | `bundle lock --add-platform x86_64-linux` をアプリごとに実行し、アプリごとにコミットした（RS → RP → OP） |
+| `e2e/.node-version`・`e2e/mise.toml` | Node の版（24.21.0）を `.node-version` に移し、`mise.toml` は `idiomatic_version_file_enable_tools = ["node"]` だけにした |
+| `e2e/scripts/start-server.sh` | mise があれば `mise exec --`、なければ PATH の Ruby で動かす。サーバーは今までどおり `exec` で起動する |
+| `.github/workflows/ci.yml` | 上の「作業計画で決めたこと」のとおり |
+| ドキュメント | PLAN.md（ロードマップ、PR の単位、0-g の節、仕上げ、10 章）、TIPS.md（CI の結果の読み方）、`e2e/README.md`（Node の版、CI） |
+
+### lock の確かめ方
+
+- `git diff -U0 Gemfile.lock` で増えたのは、3 アプリとも `nokogiri (1.18.10-x86_64-linux-gnu)` とその依存の `racc (~> 1.4)` の行、`sqlite3 (1.7.3-x86_64-linux)`、`PLATFORMS` の `x86_64-linux` だけ。消えた行はない
+- `Bundler::LockfileParser` で前後の lock を読み、プラットフォームを除いた gem 名と版の組（RS 98・RP 110・OP 99）、`DEPENDENCIES`、`RUBY VERSION`、`BUNDLED WITH` が同じことを比べた。比べるスクリプトは、lock の puma の版を書き換えると違いを報告した
+- 手元の `bundle check` が通り、3 アプリの検査と E2E は前と同じ結果
+
+### E2E の起動スクリプトの確かめ方
+
+- mise がある経路: 今までどおり `mise exec -- npm test` で 10 passed
+- mise がない経路: `env -i` で PATH を mise の Ruby 3.1.7 と Node 24.21.0 の `bin` と `/usr/bin:/bin` だけにして `npm test` を流し、10 passed。署名鍵の生成は、手動確認用の鍵を動かさないよう、同じコマンドを scratchpad で mise なしに実行して確かめた（`BEGIN RSA PRIVATE KEY`、パーミッション 600）
+- `.node-version` に移した後も、mise は `e2e/.node-version` から 24.21.0 を読む（`mise ls --current`）。`mise trust` のやり直しは要らなかった
+
+### ワークフローの確かめ方（push の前）
+
+- YAML として読めることを Ruby で確かめた。ジョブとステップの並びは計画どおり
+- 安全チェックのコミットメッセージの部分を取り出し、PR・push・ブランチの新規作成（`before` が 0）・`workflow_dispatch` の 4 通りで流した。PR と push はこの Step のコミットを検査し、残りの 2 つは飛ばす。参照を動かさない一時的なコミット（`git commit-tree`）にホームディレクトリのパスを入れると、exit 1 で止まった
+- 追跡中の全ファイルの検査は、ワークフローを足した後も通る
+
+### 遭遇した問題
+
+1. 鍵を作るステップの `run:` を 1 行で書いたところ、値の中の `perm: 0o600` の「`: `」で YAML の構文エラー（`mapping values are not allowed in this context`）になった。ブロックスカラー（`run: |`）にした
+2. `start-server.sh` の最後を `exec run bin/rails server ...` にすると、`exec` はシェルの関数を実行できない。サーバーの起動だけは mise の有無で `exec` の行を書き分けた（書いている途中で気づき、コミットの前に直した）
+3. ブランチを `git switch -c upgrade/step0g-ci origin/epic/rails-8.1-upgrade` で作ると、上流が `origin/epic/rails-8.1-upgrade` になり、引数なしの `git push` が epic に向かうおそれがあった。`git branch --unset-upstream` で外した
+4. PLAN.md の表の行を `perl -CSD -i -pe` で置換しようとしたが、何も変わらずに正常に終わった。`-CSD` だけではスクリプトの中の日本語が UTF-8 として読まれない。`-Mutf8` を付けると当たることを確かめ、TIPS.md に書いた（置換は Edit で行った）
