@@ -1198,3 +1198,18 @@ PR #20 の最初の実行（head は `docs: record step 0-g and update the upgra
 | E2E がジョブの `timeout-minutes`（30 分）で打ち切られると、artifact が残らない | 対応しない。Playwright の起動待ちは 1 アプリ 120 秒、テストは 1 本 30 秒（既定）で、10 本が約 20 秒で終わるので、30 分に届く前に Playwright が失敗として終わる |
 | `public-safety` が、ランナーのイメージに入っている Ruby（ubuntu-24.04 は 3.2.3）に依存している | 対応しない。スクリプトは Ruby 2.6 の構文の範囲で書いてあり、macOS 標準の Ruby でも動かしている。イメージから Ruby が外れたら setup-ruby に替える |
 | advisory のデータベースを matrix の 3 ジョブで別々に取得している | 対応しない。1 回数秒で、取得した版はジョブのログ（`last updated`・`commit`）で分かる |
+
+### ブランチ保護の設定
+
+人間が GitHub の Settings → Rules → Rulesets で、ブランチのルールセット `upgrade-branches` を作った。設定の内容は `gh api` で読んで確かめた。
+
+| 項目 | 設定 |
+|---|---|
+| 対象 | `epic/rails-8.1-upgrade` だけ（Active） |
+| 必須のチェック | `ci-result`（提供元は GitHub Actions）。「ブランチを最新にすること」はオフ |
+| PR | 必須。承認は 0 人、マージの方法はマージコミットだけ（CLAUDE.md の「マージコミットで取り込む」） |
+| そのほか | ブランチの削除と force push を禁止 |
+| 迂回 | リポジトリの管理者が、PR に限って迂回できる |
+
+- 作業計画からの変更点: `main` は対象にしなかった（人間の判断）。`main` にはまだ `.github/workflows/ci.yml` がないので、`main` から切ったブランチの PR では CI が動かず、`ci-result` を必須にすると待ちのままになるため。epic を `main` に取り込んだ後（仕上げ）に、`main` をルールセットの対象に足す
+- 設定の後、PR #20 で `ci-result` が必須のチェックとして扱われ（`gh pr checks 20 --required`）、通っていることを確かめた

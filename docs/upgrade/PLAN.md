@@ -265,7 +265,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
   - E2E: ブラウザは `npx playwright install --with-deps --only-shell chromium`（手元と同じ headless shell）で、キャッシュしない。失敗したときは、レポート・トレースと 3 アプリの `log/development.log` を artifact に 7 日残す（中の値は CI の使い捨ての環境のもの）
   - 安全チェック: 追跡中の全ファイルを `--files` で、PR（push は前後の範囲）のコミットメッセージを `--message` で検査する。PR のタイトル・本文は検査しない
   - action はコミットの SHA で固定し、版を行末のコメントに書く。公開から 2 週間以上たった版を使う。`permissions` は `contents: read` だけ
-  - ブランチ保護（設定は人間）: epic と main で `ci-result` の通過を必須にする
+  - ブランチ保護（設定は人間）: ルールセットで、epic への PR に `ci-result` の通過を必須にする。`main` は epic を取り込むまでワークフローがないので、仕上げで対象に足す（LOG.md の Step 0-g「ブランチ保護の設定」）
 
 調べたこと（着手時の 2026-10-08）:
 
@@ -311,6 +311,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 - [ ] README の「How to use」に Ruby の入れ方を書く。各アプリの `mise.toml` は初回に `mise trust` が必要なこと、Ruby のバージョンは `.ruby-version` と Gemfile の `ruby` の両方にあること（mise は Gemfile を優先して読む）
 - [ ] 各バージョンのサポート終了時期の確認方法を本計画に追記（次回アップグレードへの備え）
 - [ ] epic → main をマージコミットで取り込む
+- [ ] ルールセット `upgrade-branches`（Step 0-g）の対象に `main` を足す。epic を取り込んだ後に行う（取り込む前は、`main` から切ったブランチの PR で CI が動かず、`ci-result` が待ちのままになる）
 
 ## 7. 周辺 gem の更新時期
 
