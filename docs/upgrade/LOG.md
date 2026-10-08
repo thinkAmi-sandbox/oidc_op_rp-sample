@@ -1173,3 +1173,14 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 2. `start-server.sh` の最後を `exec run bin/rails server ...` にすると、`exec` はシェルの関数を実行できない。サーバーの起動だけは mise の有無で `exec` の行を書き分けた（書いている途中で気づき、コミットの前に直した）
 3. ブランチを `git switch -c upgrade/step0g-ci origin/epic/rails-8.1-upgrade` で作ると、上流が `origin/epic/rails-8.1-upgrade` になり、引数なしの `git push` が epic に向かうおそれがあった。`git branch --unset-upstream` で外した
 4. PLAN.md の表の行を `perl -CSD -i -pe` で置換しようとしたが、何も変わらずに正常に終わった。`-CSD` だけではスクリプトの中の日本語が UTF-8 として読まれない。`-Mutf8` を付けると当たることを確かめ、TIPS.md に書いた（置換は Edit で行った）
+
+### CI の結果
+
+PR #20 の最初の実行（head は `docs: record step 0-g and update the upgrade plan` のコミット）で、5 ジョブ（`rails` の 3 つ、`e2e`、`public-safety`）と `ci-result` が通った。全体は約 2 分。ログで次のことを確かめた。
+
+- Ruby は 3.1.7（x86_64-linux）、Bundler は lock の `BUNDLED WITH` の 2.3.27。nokogiri は `1.18.10 (x86_64-linux-gnu)`、sqlite3 は `1.7.3 (x86_64-linux)` が入り、ffi 1.15.3 はソースからビルドできた
+- minitest: OP 25 runs・RP 19 runs・RS 8 runs、0 failures。RuboCop は 3 アプリとも `no offenses detected`、`zeitwerk:check` は `All is good!`、brakeman は `Security Warnings: 0`・`Ignored Warnings: 2`
+- bundler-audit は advisory のデータベースを取得し（2026-10-07 の版。手元は 2026-10-06 の版。どちらも 1261 件）、3 アプリとも `No vulnerabilities found`
+- E2E: Node 24.21.0（`e2e/.node-version` から）、Chrome Headless Shell 153.0.8010.12 だけを入れて 10 passed。OP の署名鍵は起動スクリプトが作った
+- 安全チェック: 追跡中の全ファイルと、PR の 9 コミットのメッセージ
+- bundle のキャッシュは、最初の実行で保存された。`e2e` ジョブの RP・RS は、先に終わった `rails` ジョブが保存したキャッシュを復元した。npm のキャッシュも `actions/setup-node` が保存した

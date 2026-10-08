@@ -253,8 +253,8 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 当初は仕上げで設定する計画だったが、Step 1 以降は変更が大きいので、Step 1 の前に前倒しした（人間の判断。理由は LOG.md の Step 0-g）。Dependabot は「一度に上げるのは 1 つだけ」とぶつかるので、仕上げに残す。
 
-- [ ] GitHub Actions（minitest、E2E、RuboCop、oxlint・oxfmt、bundler-audit、brakeman、zeitwerk:check、安全チェック）
-- [ ] CI で OP の署名鍵 `rails_open_id_provider/jwtRS256.key` がないときの minitest の扱いを決める（OP は起動時に鍵を読む。0-d-2 では手動確認用の鍵を使った）
+- [x] GitHub Actions（minitest、E2E、RuboCop、oxlint・oxfmt、bundler-audit、brakeman、zeitwerk:check、安全チェック）
+- [x] CI で OP の署名鍵 `rails_open_id_provider/jwtRS256.key` がないときの minitest の扱いを決める（OP は起動時に鍵を読む。0-d-2 では手動確認用の鍵を使った）
 - [x] 3 アプリの lock に `x86_64-linux` を足す（gem の版は変えない）
 - [x] CI で E2E を流せるようにする（Node の版を `e2e/.node-version` に置く、`e2e/scripts/start-server.sh` を mise がなくても動くようにする）
 - 着手時の調査で決めたこと（人間が承認。理由は LOG.md の Step 0-g）
