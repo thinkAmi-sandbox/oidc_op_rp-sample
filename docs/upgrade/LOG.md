@@ -964,7 +964,7 @@ oauth2 の CHANGELOG（2.0.0）と、GitHub の PR・issue で確かめた。
 
 ## Step 0-f-3: OP の doorkeeper 系の gem の更新（2026-10-08）
 
-- ブランチ / PR: `upgrade/step0f3-doorkeeper` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step0f3-doorkeeper` / [#19](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/19)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 着手時に確かめ直したこと
