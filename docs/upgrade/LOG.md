@@ -1109,3 +1109,32 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 | `gem 'jwt'` に版の制約がないので、`bundle update jwt` で jwt 3.3.0 になり、doorkeeper-openid_connect 1.8.9 との組み合わせを確かめていない状態になる | 対応しない（作業計画で人間が判断）。RP と同じく、Gemfile のほかの gem にも版の制約は書いていない。PLAN.md 7 章の jwt と doorkeeper の行に、一時固定で入れたことを書いた |
 | kid のテストで、`n` の base64url の計算が、同じファイルの既存のテストと重なっている | 対応しない。2 か所だけで、それぞれのテストを単独で読めるようにした |
 | 足したテストの多くが `authorization_params(nonce: SecureRandom.hex(16), code_verifier: SecureRandom.urlsafe_base64(48))` を繰り返している | 対応しない。既存のテストと同じ書き方。ヘルパーに既定値を持たせると、既存のテストもすべて書き換わる |
+
+## Step 0-g: CI（GitHub Actions）（2026-10-08）
+
+- ブランチ / PR: `upgrade/step0g-ci` / （PR 作成後に記入）
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 前倒しの判断
+
+- PLAN.md では、CI を最後の「仕上げ」で設定する計画だった。Step 1（Rails 7.0）以降は `app:update` や `load_defaults` で変更が大きくなるので、Step 1 の前に前倒しした（人間の判断）。PR のたびに、手元と同じ検査がきれいな環境で流れることを確かめられる
+- Dependabot は仕上げに残した。アップグレード中の「一度に上げるのは 1 つだけ」とぶつかるため
+- PLAN.md の仕上げにあった「GitHub Actions」と「CI での OP の署名鍵の扱い」を 0-g に移した。10 章の完了条件に「CI が通る（Step 0-g 以降）」を足した（人間が承認）
+
+### 作業計画で決めたこと
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| ジョブの分け方 | `rails`（3 アプリの matrix）・`e2e`・`public-safety` と、結果をまとめる `ci-result` | 検査の種類ごとに分けると、Ruby と bundle の準備をジョブの数だけ繰り返す。アプリごとなら準備は 1 回で、どのアプリのどの検査が落ちたかはステップで分かる。前の検査が失敗しても後の検査は流す。ブランチ保護で必須にするのを `ci-result` だけにすると、matrix の名前やジョブが変わってもブランチ保護を直さなくて済む |
+| 動かす条件 | epic と main への PR と push、`workflow_dispatch` | `upgrade/*` への push でも動かすと PR と二重になる。paths で絞ると、ブランチ保護で必須にしたときに、動かなかった PR が止まる。`main` にはワークフローのファイルがないので、epic を取り込むまで `main` への push では動かない |
+| ランナー | `ubuntu-24.04` に固定 | Ruby 3.1.7 のビルド済みのものは `ubuntu-26.04` にない。`ubuntu-latest` が 26.04 に移ると入らなくなる |
+| Ruby | `ruby/setup-ruby` で各アプリの `.ruby-version` を読み、`bundler-cache: true` | 版の置き場所を増やさない。bundle の置き場所も手元と同じ各アプリの `vendor/bundle` になる |
+| Node | `e2e/.node-version` を足し、`e2e/mise.toml` からも読ませる | `actions/setup-node` は `mise.toml` を読めない。アプリの `.ruby-version` と同じ形にして、版の置き場所を 1 つにする。mise ごと入れる `jdx/mise-action` は、アプリのディレクトリで mise が Ruby を入れようとするのを止める設定が要り、GitHub・ruby 以外の action が増えるので採らなかった |
+| E2E の起動スクリプト | mise がなければ PATH の Ruby で動かす | CI には mise がない。手元の挙動は変わらない |
+| lock のプラットフォーム | 3 アプリの lock に `x86_64-linux` を足す | setup-ruby は frozen で入れるので、lock にないプラットフォームでは入らない見込み。frozen を外すと CI が毎回 lock を解決し直し、手元と同じ版である保証がなくなる |
+| OP の署名鍵 | CI の `rails` ジョブで、OP のときだけ、E2E の起動スクリプトと同じ方法で作る | アプリのコードを変えずに済む。テストは鍵の中身に依存しない（Step 0-d-2）。鍵をコミットするのは安全チェックの対象で、initializer でテスト時に作るのはアプリの変更になる |
+| E2E のブラウザ | `--with-deps --only-shell chromium` で毎回入れる | 手元も headless shell で流れている。Playwright の CI の文書は、ブラウザのキャッシュを勧めていない |
+| E2E が失敗したとき | レポート・トレースと 3 アプリの `log/development.log` を artifact に 7 日残す | リポジトリは public で、サインインした誰でも artifact を取れる。中のトークン・Cookie・署名鍵は CI の使い捨ての環境のもので、ユーザーの資格情報は元からリポジトリにあるダミー |
+| 安全チェック | 追跡中の全ファイルを `--files` で、PR（push は前後の範囲）のコミットメッセージを `--message` で検査する。PR のタイトル・本文は検査しない | 全ファイルが今は通るので、差分でなく全体を不変条件にできる。PR の本文を編集したときにも動かすには、全ジョブが流れ直さないよう別のワークフローが要る。本文は CLAUDE.md の手順で `--message` を通してから出している |
+| action | コミットの SHA で固定し、版を行末のコメントに書く。公開から 2 週間以上たった版。`permissions` は `contents: read` だけ、checkout は `persist-credentials: false` | タグは付け替えられる。仕上げの Dependabot はこの形のまま更新できる |
+| ブランチ保護 | epic と main で `ci-result` の通過を必須にする（設定は人間）。「ブランチを最新にすること」は必須にしない | epic に入る PR は 1 本ずつ |

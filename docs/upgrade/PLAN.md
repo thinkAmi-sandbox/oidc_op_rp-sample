@@ -35,7 +35,7 @@
 | 固定 | `main`（タグ `rails-6.1`）。作業中は変更しない |
 | epic | `epic/rails-8.1-upgrade`（`main` から作成。開始を示す空コミットあり） |
 | 作業ブランチ | `upgrade/<step>-<内容>`。epic から切り、PR の向き先は epic |
-| PR の単位 | Step 0 はサブステップ（0-a〜0-f。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR |
+| PR の単位 | Step 0 はサブステップ（0-a〜0-g。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR |
 | 取り込み | 最後に epic → main をマージコミットで取り込む（squash しない） |
 | worktree | 作業用 worktree は epic を元にする |
 | main への外部 PR | 入った場合は epic に main を取り込む |
@@ -51,6 +51,7 @@
 | 0-d | 3.1 | 6.1 | RuboCop・bundler-audit・brakeman・SimpleCov の導入（既存違反は凍結）、minitest、脆弱性のある gem の更新（0-d-3） |
 | 0-e | 3.1 | 6.1 | 既存コードの RuboCop 違反の修正 |
 | 0-f | 3.1 | 6.1 | 周辺 gem の更新 |
+| 0-g | 3.1 | 6.1 | CI（GitHub Actions）。仕上げから前倒し |
 | 1 | 3.1 | **7.0.x** | `sprockets-rails` 明示、`app:update`、`load_defaults 7.0` |
 | 2 | **3.2** | 7.0 | Ruby のみ |
 | 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応） |
@@ -60,7 +61,7 @@
 | 7 | 3.3 | **8.1.x** | 最終目標の Rails |
 | 8 | **3.4** | 8.1 | 標準ライブラリから外れた gem の明示、chilled string 警告への対応 |
 | 9（任意） | 4.0 | 8.1 | 依存 gem が対応済みなら実施 |
-| 仕上げ | — | — | CI・Dependabot・README 更新、epic → main |
+| 仕上げ | — | — | Dependabot・README 更新、epic → main |
 
 ## 6. 各 Step の詳細
 
@@ -248,6 +249,40 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 ダウンロード（0-f-1 の作業計画で承認済み。0-f-3 の着手時に版とサイズが同じことを確かめた）: doorkeeper 5.5.4（100 KB）・5.6.9（104 KB）・5.7.1（104 KB）、doorkeeper-openid_connect 1.8.9（24 KB）、jwt 2.10.3（54 KB。OP の `vendor/bundle` に入れた）
 
+### Step 0-g: CI（GitHub Actions）
+
+当初は仕上げで設定する計画だったが、Step 1 以降は変更が大きいので、Step 1 の前に前倒しした（人間の判断。理由は LOG.md の Step 0-g）。Dependabot は「一度に上げるのは 1 つだけ」とぶつかるので、仕上げに残す。
+
+- [ ] GitHub Actions（minitest、E2E、RuboCop、oxlint・oxfmt、bundler-audit、brakeman、zeitwerk:check、安全チェック）
+- [ ] CI で OP の署名鍵 `rails_open_id_provider/jwtRS256.key` がないときの minitest の扱いを決める（OP は起動時に鍵を読む。0-d-2 では手動確認用の鍵を使った）
+- [ ] 3 アプリの lock に `x86_64-linux` を足す（gem の版は変えない）
+- [ ] CI で E2E を流せるようにする（Node の版を `e2e/.node-version` に置く、`e2e/scripts/start-server.sh` を mise がなくても動くようにする）
+- 着手時の調査で決めたこと（人間が承認。理由は LOG.md の Step 0-g）
+  - ジョブ: `rails`（3 アプリの matrix。RuboCop・`zeitwerk:check`・minitest・bundler-audit・brakeman を順に流し、前の検査が失敗しても後の検査を流す）、`e2e`（oxlint・oxfmt・Playwright）、`public-safety`（安全チェック）、`ci-result`（3 つの結果をまとめる。ブランチ保護で必須にするのはこれだけ）
+  - 動かす条件: epic と main への PR、epic と main への push、手動（`workflow_dispatch`）。`upgrade/*` への push と、paths の絞り込みはなし
+  - ランナーは `ubuntu-24.04` に固定する。Ruby は `ruby/setup-ruby` で各アプリの `.ruby-version` を読み、`bundler-cache` で各アプリの `vendor/bundle` をキャッシュする。Node は `actions/setup-node` で `e2e/.node-version` を読む
+  - OP の署名鍵: CI の `rails` ジョブで、OP のときだけ、起動する検査の前に E2E の起動スクリプトと同じ方法で作る。アプリのコードは変えない。E2E は起動スクリプトが作る
+  - E2E: ブラウザは `npx playwright install --with-deps --only-shell chromium`（手元と同じ headless shell）で、キャッシュしない。失敗したときは、レポート・トレースと 3 アプリの `log/development.log` を artifact に 7 日残す（中の値は CI の使い捨ての環境のもの）
+  - 安全チェック: 追跡中の全ファイルを `--files` で、PR（push は前後の範囲）のコミットメッセージを `--message` で検査する。PR のタイトル・本文は検査しない
+  - action はコミットの SHA で固定し、版を行末のコメントに書く。公開から 2 週間以上たった版を使う。`permissions` は `contents: read` だけ
+  - ブランチ保護（設定は人間）: epic と main で `ci-result` の通過を必須にする
+
+調べたこと（着手時の 2026-10-08）:
+
+| 項目 | 分かったこと |
+|---|---|
+| Ruby 3.1.7 | `ruby/setup-ruby` v1.325.0 の `ruby-builder-versions.json` に 3.1.7 がある。ビルド済みの Ruby は `ubuntu-22.04`・`ubuntu-24.04` にあり、`ubuntu-26.04` にはない（ruby-builder の toolcache）。`ubuntu-latest` は使わない |
+| Ruby の版の読ませ方 | setup-ruby は `ruby-version` を省くと、`working-directory` の `.ruby-version` を最初に読む。各アプリの `mise.toml` は settings だけ |
+| bundle のキャッシュ | `bundler-cache: true` は、lock があると `bundle config --local deployment true`（frozen。置き場所は `vendor/bundle`）で入れる。Bundler は lock の `BUNDLED WITH`（2.3.27） |
+| lock のプラットフォーム | 3 アプリとも `arm64-darwin`・`x86_64-darwin-19` だけ。epic の lock のコピーで `bundle lock --add-platform x86_64-linux` を試すと、増えるのは nokogiri 1.18.10（`x86_64-linux-gnu`）・sqlite3 1.7.3（`x86_64-linux`）の行と `PLATFORMS` の 1 行だけ。ffi・bcrypt・puma などは元から ruby プラットフォームで、Linux ではソースからビルドされる |
+| Node の版 | `actions/setup-node` の `node-version-file` は `.nvmrc`・`.node-version`・`.tool-versions`・`package.json` を読み、`mise.toml` は読まない |
+| E2E の起動スクリプト | `e2e/scripts/start-server.sh` は `mise exec --` で `ruby`・`bin/rails` を呼ぶので、mise のない CI では動かない |
+| OP の署名鍵 | `rails_open_id_provider/config/initializers/doorkeeper_openid_connect.rb` が起動時に `jwtRS256.key` を読む。minitest と `zeitwerk:check` も起動するので鍵が要る。テストは鍵の中身に依存しない |
+| RP・RS の環境変数 | 起動時は `ENV[...]` を読むだけで、`.env` がなくても起動する。テストはコミット済みの `.env.test`、E2E は `.env_e2e` を読む |
+| 安全チェック | 追跡中の全ファイルを `--files` に渡すと通る。`main` から epic までの 204 コミット（マージコミット 11 を含む）のメッセージも、`--message` で全部通る |
+| Playwright のブラウザ | 設定は headless の既定のままなので、手元も headless shell で流れている。Playwright の CI の文書は、ブラウザのキャッシュを勧めていない |
+| action の版 | `actions/checkout` v7.0.1、`ruby/setup-ruby` v1.325.0、`actions/setup-node` v6.5.0、`actions/upload-artifact` v7.0.1（どれも公開から 2 週間以上たった版） |
+
 ### Step 1〜9
 
 「8. 各 Step 共通の手順」に従う。Step 固有の作業はロードマップの表のとおり。補足:
@@ -271,8 +306,6 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 ### 仕上げ
 
-- [ ] GitHub Actions（minitest、E2E、RuboCop、oxlint、bundler-audit、brakeman、安全チェック）
-- [ ] CI で OP の署名鍵 `rails_open_id_provider/jwtRS256.key` がないときの minitest の扱いを決める（OP は起動時に鍵を読む。0-d-2 では手動確認用の鍵を使った）
 - [ ] Dependabot（bundler、npm、GitHub Actions をまとまった単位で更新）。CI ができてから有効にする
 - [ ] README の「Tested Environment」を更新。アップグレード前のコードはタグ `rails-6.1` にあること、Next.js 製 RP は新しい OP で確認していないことを書く
 - [ ] README の「How to use」に Ruby の入れ方を書く。各アプリの `mise.toml` は初回に `mise trust` が必要なこと、Ruby のバージョンは `.ruby-version` と Gemfile の `ruby` の両方にあること（mise は Gemfile を優先して読む）
@@ -362,6 +395,7 @@ oxlint / oxfmt の導入条件:
 - [ ] `bin/rails zeitwerk:check` が通る（Step 1 以降）
 - [ ] `db:drop db:setup` で空から作り直して E2E が通る（E2E の起動時に E2E 用の DB で毎回行われる。RS は `schema.rb` がないので `db:drop db:create`）
 - [ ] 公開物の安全チェック（`scripts/check-public-safety --staged`）が通る
+- [ ] CI（GitHub Actions）が通る（Step 0-g 以降）
 - [ ] LOG.md と本計画のチェックリストを更新した
 
 ## 11. 人間が判断するところ
