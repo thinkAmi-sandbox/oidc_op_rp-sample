@@ -21,24 +21,39 @@ esac
 
 export RAILS_ENV=development
 
+# mise があれば、アプリの .ruby-version の Ruby で動かす。mise のない CI（GitHub Actions）では、
+# ruby/setup-ruby が PATH に入れた Ruby で動かす
+if command -v mise >/dev/null 2>&1; then use_mise=1; else use_mise=; fi
+run() {
+  if [ -n "$use_mise" ]; then
+    mise exec -- "$@"
+  else
+    "$@"
+  fi
+}
+
 cd "$(dirname "$0")/../../$app"
 
 case "$app" in
   rails_open_id_provider)
     # ID トークンの署名鍵。手動確認用の鍵と共用し、なければ作る（秘密鍵は gitignore 対象で、コミットしない）
     if [ ! -f jwtRS256.key ]; then
-      mise exec -- ruby -ropenssl -e 'File.write("jwtRS256.key", OpenSSL::PKey::RSA.new(4096).to_pem, perm: 0o600)'
+      run ruby -ropenssl -e 'File.write("jwtRS256.key", OpenSSL::PKey::RSA.new(4096).to_pem, perm: 0o600)'
     fi
-    mise exec -- bin/rails db:drop db:setup
+    run bin/rails db:drop db:setup
     ;;
   rails_relying_party_of_backend)
-    mise exec -- bin/rails db:drop db:setup
+    run bin/rails db:drop db:setup
     ;;
   rails_resource_server)
     # RS は DB を使わず、schema.rb もないので db:setup はできない。空の DB だけ作る
-    mise exec -- bin/rails db:drop db:create
+    run bin/rails db:drop db:create
     ;;
 esac
 
 # pid ファイルを分け、手動確認用のサーバーの pid ファイルが残っていても起動できるようにする
-exec mise exec -- bin/rails server -p "$port" -P tmp/pids/e2e_server.pid
+if [ -n "$use_mise" ]; then
+  exec mise exec -- bin/rails server -p "$port" -P tmp/pids/e2e_server.pid
+else
+  exec bin/rails server -p "$port" -P tmp/pids/e2e_server.pid
+fi
