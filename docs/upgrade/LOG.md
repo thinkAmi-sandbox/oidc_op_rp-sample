@@ -1112,7 +1112,7 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 
 ## Step 0-g: CI（GitHub Actions）（2026-10-08）
 
-- ブランチ / PR: `upgrade/step0g-ci` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step0g-ci` / [#20](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/20)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 前倒しの判断
