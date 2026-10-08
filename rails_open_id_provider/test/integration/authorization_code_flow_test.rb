@@ -62,7 +62,7 @@ class AuthorizationCodeFlowTest < ActionDispatch::IntegrationTest
     id_token = issue_tokens(nonce: nonce)['id_token']
     get oauth_discovery_keys_path
 
-    claims = JSON::JWT.decode(id_token, JSON::JWK::Set.new(response.parsed_body['keys']), [:RS256])
+    claims, = JWT.decode(id_token, nil, true, algorithms: ['RS256'], jwks: response.parsed_body)
 
     assert_equal(
       { 'iss' => 'http://localhost:3780', 'aud' => oauth_applications(:my_op).uid, 'sub' => users(:user).id.to_s,
