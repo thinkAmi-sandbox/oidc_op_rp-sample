@@ -17,14 +17,15 @@ class AuthorizationEndpointTest < ActionDispatch::IntegrationTest
                   'http://localhost:3781/auth/my_op/callback', Doorkeeper::AccessGrant.last.token
   end
 
-  test '登録されていない redirect_uri では、エラーの説明を 200 で表示する' do
+  # doorkeeper 5.6.7 から、エラー画面をエラーの種類に応じたステータスで返す（5.6.6 までは 200）
+  test '登録されていない redirect_uri では、エラーの説明を 400 で表示する' do
     sign_in users(:user)
 
     params = authorization_params(nonce: SecureRandom.hex(16), code_verifier: SecureRandom.urlsafe_base64(48))
 
     get oauth_authorization_path, params: params.merge(redirect_uri: 'http://localhost:3781/unregistered/callback')
 
-    assert_response :ok
+    assert_response :bad_request
     assert_select 'main pre', text: I18n.t('doorkeeper.errors.messages.invalid_redirect_uri')
   end
 
