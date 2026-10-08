@@ -914,7 +914,7 @@ PLAN.md の 0-f-2 にある版と事実を、作業計画の前に確かめ直�
 
 - ログイン: RP → OP でログイン → RP に戻り「ログインしました」とユーザーのメールアドレスが表示される。OP のログで、トークン要求の本文に client_id と client_secret（`[FILTERED]`）があることを確かめた。同意画面は出ず、OP は認可要求に 302 で応えた
 - introspection 用 RP: ログイン → 同意 → RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke は 200、revoke の後は 401。RS の introspect は `active: true`（`exp - iat = 600`）→ `active: false` が 2 回。RS のクライアントクレデンシャルの要求も、本文に client_id と client_secret がある
-- 3 アプリの `log/development.log` と RP・RS の標準出力に、非推奨・警告・認証の失敗はない（既存の `/stylesheets/application.css` と `/favicon.ico` の 404 だけ）
+- 3 アプリの `log/development.log` の手動確認の分と、RP・RS の標準出力（起動から停止まで通して読んだ）に、非推奨・警告・認証の失敗はない（既存の `/stylesheets/application.css` と `/favicon.ico` の 404 だけ）。RP の nonce はセッションと ID トークンで一致した。OP の標準出力は最後の部分しか残っておらず、その範囲にも警告はない
 - 手動確認用の環境: 手動確認の直前に、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが作業の前と一致することを確かめた。手動確認で、RP の development DB は `sessions` が 6 → 8 件（`op_users` は既存のユーザーのまま 1 件）、OP の development DB は `oauth_access_grants` が 5 → 7 件、`oauth_access_tokens` が 15 → 20 件（ログイン 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）に増え、ハッシュが変わった。ほかのテーブルの件数と、RS の DB・鍵・`.env` のハッシュは変わっていない。DB は戻さず、以降の Step の基準は手動確認の後のハッシュにする
 
 ### 遭遇した問題
@@ -924,7 +924,18 @@ PLAN.md の 0-f-2 にある版と事実を、作業計画の前に確かめ直�
 
 ### 確認結果
 
-- minitest: 各コミットの前に流して、RS 8 runs、RP 17 runs（テストを足した後は 19 runs）、0 failures（非推奨警告は `:raise` のまま）。OP は変えていない
+- minitest: 各コミットの前に流して、RS 8 runs、RP 19 runs（最初のコミットでテストを 2 本足した後の件数。0-f-1 の後は 17 runs）、0 failures（非推奨警告は `:raise` のまま）。OP は変えていない
 - E2E: 各コミットの前に流して、どれも 10 passed
 - RuboCop: RS・RP とも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）。無視リストを空にした bundler-audit で、jwt・oauth2・omniauth・faraday は報告されない。brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 2`
-- 3 アプリとも `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動と launch.json で確認し、Puma 6.6.1 で起動する
+- 3 アプリとも `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動と launch.json で確認した。Puma の版を起動の出力で確かめたのは RS・RP（6.6.1）で、OP は起動の出力が残っておらず確かめていない（OP の gem はこの Step で変えていない）
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| RP・RS の標準出力に警告がないと書いているが、`preview_logs` の検索は部分一致で、正規表現で探した結果は 0 件だっただけ | 止めたサーバーの出力を起動から停止まで通して読み、RP・RS に警告・非推奨がないことを確かめた。OP は最後の部分しか残っていないことを書き足した |
+| 3 アプリが Puma 6.6.1 で起動すると書いているが、この Step で版を見たのは RP だけ | RS も起動の出力で 6.6.1 を確かめた。OP は確かめていないと書いた |
+| RP を 17 runs で流したと読めるが、テストを足すコミットが最初なので、gem を上げたどのコミットの前も 19 runs | 19 runs に直し、17 runs は 0-f-1 の後の件数だと書いた |
+| `jwt` と `faraday` を Gemfile に版の制約なしで足したので、`--conservative` を付けない `bundle update` で jwt 3.x に上がる。faraday-net_http 3.0.2 の固定も lock にしかない | 対応しない。Gemfile のほかの gem も版の制約を書いていない。faraday-net_http は cgi などと同じ一時固定のやり方で、0-f-1 のコードレビューで同じ判断をした。gem を上げるたびに lock の差分を確かめている |
+| テスト (a) はブロックの引数を `request` にして、統合テストの `request` を隠している。(b) は `token_request` | 対応しない。(a) は同じファイルの既存のテスト（code_verifier）と同じ書き方。(b) はブロックの外の `request`（コールバックの要求）を使うので名前を変えた |
+| RS はリクエストのたびに `OAuth2::Client` を作り、クライアントクレデンシャルでトークンを取り直す | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う |
