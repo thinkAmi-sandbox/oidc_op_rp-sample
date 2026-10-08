@@ -16,6 +16,30 @@ class AuthorizationCodeFlowTest < ActionDispatch::IntegrationTest
     assert_select 'input[type=submit][value=Authorize]'
   end
 
+  # 同意画面は、同じアプリ・ユーザー・scope の revoke されていないトークンがあると省かれる。
+  # 有効なトークンで省かれることは E2E の logout.spec.ts が確かめている
+  test '期限切れでも revoke されていないトークンがあれば、同意画面を出さずに認可コードを付けてリダイレクトする' do
+    freeze_time
+    issue_tokens
+    travel 10.minutes + 1.second
+
+    get oauth_authorization_path, params: authorization_params(nonce: SecureRandom.hex(16),
+                                                               code_verifier: SecureRandom.urlsafe_base64(48))
+
+    assert_redirected_to %r{\Ahttp://localhost:3781/auth/my_op/callback\?code=[^&]+\z}
+  end
+
+  test 'revoke 済みのトークンしかないと、同意画面が出る' do
+    access_token = issue_tokens['access_token']
+    Doorkeeper::AccessToken.by_token(access_token).revoke
+
+    get oauth_authorization_path, params: authorization_params(nonce: SecureRandom.hex(16),
+                                                               code_verifier: SecureRandom.urlsafe_base64(48))
+
+    assert_response :ok
+    assert_select 'input[type=submit][value=Authorize]'
+  end
+
   test '同意すると、認可コードを付けて redirect_uri へリダイレクトする' do
     sign_in users(:user)
 
@@ -45,6 +69,15 @@ class AuthorizationCodeFlowTest < ActionDispatch::IntegrationTest
         'nonce' => nonce, 'lifetime' => 120 },
       claims.slice('iss', 'aud', 'sub', 'nonce').merge('lifetime' => claims['exp'] - claims['iat'])
     )
+  end
+
+  test 'ID トークンのヘッダーの kid は、JWKS の kid と同じ' do
+    id_token = issue_tokens['id_token']
+    get oauth_discovery_keys_path
+
+    header = JSON.parse(Base64.urlsafe_decode64(id_token.split('.').first))
+
+    assert_equal response.parsed_body['keys'].first['kid'], header['kid']
   end
 
   test 'userinfo はアクセストークンの持ち主の sub とメールアドレスを返す' do
