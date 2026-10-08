@@ -885,6 +885,27 @@ PLAN.md の 0-f-2 にある版と事実を、作業計画の前に確かめ直�
 - 応答の parse は `SnakyHash::StringKeyed`（Hash のサブクラス）になる。userinfo の応答で `sub`・`email` の読み方が変わらないことを確かめた
 - `redirect_uri` は、更新の後もコールバックのクエリ付きのまま送られる（足したテスト (b)）
 
+#### URL の既定値が相対パスになった経緯
+
+oauth2 の CHANGELOG（2.0.0）と、GitHub の PR・issue で確かめた。
+
+| 時期 | 出来事 |
+|---|---|
+| 2016 年・2018 年 | issue #245・#386: `site` にパスを含めても（例: `https://example.com/blog`）、`/oauth/token` のように `/` で始まる既定値が URL のパスを置き換え、`site` のパスが捨てられる。パスの下に OAuth のエンドポイントを置くサイト（WordPress など）につながらない |
+| 2019 年 7 月 | PR #461: 先頭の `/` を外して `oauth/token` と設定すれば、`site` のパスの下につながること（Faraday の時点でできていた）をテストで示した |
+| 2019 年 8 月（2.0.0 で公開） | PR #469: 設定を変えなくても動くよう、既定値を `oauth/authorize`・`oauth/token` にした。CHANGELOG では BREAKING の扱い |
+
+- RP の `site`（`http://localhost:3780/oauth/authorize`）は、1.4.7 が `site` のパスを捨てていたので、本来は不要なパスが付いていても動いていた。明記した `authorize_url`・`token_url` は、この挙動を保つためのもの。`site` を `http://localhost:3780` に直すのは、epic を main に取り込んだ後の改善として扱う
+- RS は `token_url` を明記しない（人間が判断）。RS の 4 つの環境ファイル（`.env`・`.env.test`・`.env_e2e`・`.env_template`）の `OIDC_PROVIDER_HOST` はどれも `http://localhost:3780` で、1.4.7 と 2.0.25 の既定値で同じ URL（`http://localhost:3780/oauth/token`）になる。違いが出るのはパス付きの `site` のときだけで、その場合は 1.4.7 の挙動が issue #245 の不具合にあたる（下の表。oauth2 1.4.7 と 2.0.25 の `OAuth2::Client#token_url` で確かめた）
+
+  | `site` | 1.4.7 | 2.0.25 の既定値 | 2.0.25 で `token_url: '/oauth/token'` を明記 |
+  |---|---|---|---|
+  | `http://localhost:3780` | `http://localhost:3780/oauth/token` | 同じ | 同じ |
+  | `http://localhost:3780/` | `http://localhost:3780/oauth/token` | 同じ | 同じ |
+  | `http://example.test/op`（仮） | `http://example.test/oauth/token` | `http://example.test/op/oauth/token` | `http://example.test/oauth/token` |
+
+  RS の introspect の要求は `OIDC_PROVIDER_HOST` に文字列で `/oauth/introspect` をつなぐので、仮の例ではトークンの要求と introspect の要求のパスがそろうのは既定値のほう
+
 ### テストの追加
 
 - RP に 2 本を足した（上の「作業計画で決めたこと」）。RP は 17 runs → 19 runs
@@ -938,4 +959,5 @@ PLAN.md の 0-f-2 にある版と事実を、作業計画の前に確かめ直�
 | RP を 17 runs で流したと読めるが、テストを足すコミットが最初なので、gem を上げたどのコミットの前も 19 runs | 19 runs に直し、17 runs は 0-f-1 の後の件数だと書いた |
 | `jwt` と `faraday` を Gemfile に版の制約なしで足したので、`--conservative` を付けない `bundle update` で jwt 3.x に上がる。faraday-net_http 3.0.2 の固定も lock にしかない | 対応しない。Gemfile のほかの gem も版の制約を書いていない。faraday-net_http は cgi などと同じ一時固定のやり方で、0-f-1 のコードレビューで同じ判断をした。gem を上げるたびに lock の差分を確かめている |
 | テスト (a) はブロックの引数を `request` にして、統合テストの `request` を隠している。(b) は `token_request` | 対応しない。(a) は同じファイルの既存のテスト（code_verifier）と同じ書き方。(b) はブロックの外の `request`（コールバックの要求）を使うので名前を変えた |
+| RS は `token_url` を明記せず、相対パスの既定値に頼っている。`OIDC_PROVIDER_HOST` をパス付きにすると 1.4.7 と違う URL に送る | 対応しない（人間が判断）。上の「URL の既定値が相対パスになった経緯」 |
 | RS はリクエストのたびに `OAuth2::Client` を作り、クライアントクレデンシャルでトークンを取り直す | 対応しない。元からの挙動で、アップグレード中は変えない。epic を main に取り込んだ後の改善として扱う |
