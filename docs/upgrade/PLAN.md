@@ -191,20 +191,21 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 
 #### 0-f-2: oauth2 系（RS・RP）
 
-予定（決めた経緯は LOG.md の Step 0-f-1「作業計画で決めたこと」）:
+決めた経緯は LOG.md の Step 0-f-1「作業計画で決めたこと」、作業の記録は LOG.md の Step 0-f-2。
 
-- [ ] RS: jwt 2.10.3（oauth2 1.4.7 のうちに上げる）→ oauth2 2.0.25（`OAuth2::Client.new` に `auth_scheme: :request_body` を足す）→ faraday 2.14.4（faraday-net_http は 3.0.2 に一時固定）
-- [ ] RP: テストを足す（トークン要求の本文に client_id・secret があり Authorization ヘッダーがないこと、`redirect_uri`）→ jwt を Gemfile に明記して 2.10.3 → oauth2 2.0.25 と omniauth-oauth2 1.9.0（`client_options` に `auth_scheme: :request_body`・`authorize_url`・`token_url` を明記）→ omniauth 2.1.4 → faraday を Gemfile に明記して 2.14.4
-- [ ] 上げた gem の advisory（oauth2・jwt）を `.bundler-audit.yml` から消す
+- [x] RS: jwt 2.10.3（oauth2 1.4.7 のうちに上げる）→ oauth2 2.0.25（`OAuth2::Client.new` に `auth_scheme: :request_body` を足す）→ faraday 2.14.4（faraday-net_http は 3.0.2 に一時固定）
+- [x] RP: テストを足す（トークン要求の本文に client_id・secret があり Authorization ヘッダーがないこと、`redirect_uri`）→ jwt を Gemfile に明記して 2.10.3 → oauth2 2.0.25 と omniauth-oauth2 1.9.0（`client_options` に `auth_scheme: :request_body`・`authorize_url`・`token_url` を明記）→ omniauth 2.1.4 → faraday を Gemfile に明記して 2.14.4
+- [x] 上げた gem の advisory（oauth2・jwt）を `.bundler-audit.yml` から消す
+- [x] gem は RS・RP の両方で同じ順に上げた（jwt → oauth2 → faraday。RP は oauth2 の後に omniauth）
 
-0-f-1 の作業計画のときに調べたこと（rubygems の API・gemspec・CHANGELOG・タグ間のソース。着手時に版と事実を確かめ直す）:
+0-f-1 の作業計画のときに調べたこと（rubygems の API・gemspec・CHANGELOG・タグ間のソース）。0-f-2 の着手時（2026-10-08）に、版・依存・advisory と、作業に関わる事実を確かめ直した（確かめた範囲は LOG.md の Step 0-f-2「着手時に確かめ直したこと」）:
 
 | gem | 分かったこと | テスト・E2E で守られているか |
 |---|---|---|
 | oauth2 2.0.25 | 依存は `faraday >= 0.17.3, < 4`・`jwt >= 1.0, < 4`・`logger ~> 1.2`・`rack < 4` ほか。新しく入るのは version_gem・snaky_hash・auth-sanitizer・anonymous_loader（RS は hashie 5.1.0 も）。`--conservative` を付けないと logger・jwt・faraday も動く | — |
 | | 2.0.0 で `auth_scheme` の既定値が `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パス（`oauth/authorize`・`oauth/token`）になった。RP は `site` がパス付きなので、URL が `.../oauth/authorize/oauth/token` になる | RS の認証方式はテストあり。RP の認証方式はなし（先に足す）。RP の URL は認可要求・ログインのテストと E2E |
 | | 応答の parse が snaky_hash になる（`raw_info` などのクラスが Hash から変わる。`id_token`・`sub`・`email` のキーは変わらない）。extra tokens の警告は 2.0.10 から既定で出ない。`raise_errors`・`token_method`・`get_token` の引数は同じ。`redirect_uri` はクエリが付いたまま送られる | クラスの変化はなし。`redirect_uri` はなし（先に足す） |
-| omniauth-oauth2 1.9.0 | `oauth2 >= 2.0.2, < 3`、`omniauth ~> 2.0`。PKCE・`callback_url`・`client_options` の渡し方は 1.7.1 と同じ。1.8 で state の確認が error パラメーターの確認より先になり、1.9 で state を `secure_compare` で比べる。state のない error のコールバックは `csrf_detected` に、セッションに state がないと NoMethodError になる | エラーの経路はテストなし（LOG に記録する） |
+| omniauth-oauth2 1.9.0 | `oauth2 >= 2.0.2, < 3`、`omniauth ~> 2.0`。PKCE・`callback_url`・`client_options` の渡し方は 1.7.1 と同じ。1.7.2 で state の確認が error パラメーターの確認より先になり（0-f-2 で直した）、1.9 で state を `secure_compare` で比べる。state のない error のコールバックは `csrf_detected` に、セッションに state がないと NoMethodError になる | エラーの経路はテストなし（LOG に記録する） |
 | omniauth 2.1.4 | `callback_url` は 2.0.4 と同じ（クエリ付き）。`rack >= 2.2.3` と logger が依存に入る。rack-protection は `--conservative` なら 2.1.0 のまま（3.2.0 まで上げられる。4.x は rack 3 が必要） | — |
 | jwt 2.10.3 | 依存は `base64 >= 0`（0.1.1 で足りる）。`my_op.rb` が使う `JWT.decode`（鍵を探すブロック付き）・`JWT::JWK::RSA.import` と、テストが使う `JWT::JWK::RSA.new(..., kid:)` で非推奨の警告は出ない。テストが期待する例外クラスも変わらない | RP の ID トークンの検証のテスト |
 | faraday 2.14.4 | Ruby 3.0 以上。依存は `faraday-net_http >= 2.0, < 3.5`・json・logger。アプリの `Faraday.get` / `Faraday.post` の呼び方は変わらず、既定のミドルウェア（url_encoded と net_http）も同じ。User-Agent の文字列だけが変わる。faraday-multipart・faraday-retry・ruby2_keywords は lock から外れる見込み | RS・RP のテスト（WebMock）と E2E |
@@ -285,13 +286,13 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 |---|---|---|---|
 | mail | 2.7.1 | 0-a で 2.8.1（済）→ 0-d-3 で 2.9.1（済） | 0-a は Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした。0-d-3 は advisory の修正 |
 | nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19 系最新 | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
-| jwt（RP は直接使う。RS は oauth2 経由の間接依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（RP は Gemfile に明記、RS は間接のまま） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる |
+| jwt（RP は直接使う。RS は oauth2 経由の間接依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる |
 | json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f-3 で外れる | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だが、OP は署名だけで decode しないため影響なし。doorkeeper-openid_connect 1.8.4 で jwt に置き換わった。OP の minitest が json-jwt で ID トークンを検証しているので、0-f-3 で ruby-jwt に書き直す |
 | nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済）。msgpack は 0-d-3 で 1.8.5（済） | 0-a は clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新。0-d-3 は advisory の修正 |
 | thor（railties 経由） | 1.1.0 | 0-f-1 で 1.5.0（済） | 1.1.0 は Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし）。1.2.0 で出なくなった。railties 6.1 は `~> 1.0` |
-| oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
-| faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（oauth2 の後） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
-| faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定 → Ruby を上げる各 Step で見直す | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない |
+| oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（済。同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
+| faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（済。oauth2 の後。RP は Gemfile に明記） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
+| faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Ruby を上げる各 Step で見直す | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない |
 | doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（交互に上げる）→ 5.8 以上・1.8.10 以上は Step 1 の後 → doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正されるが、openid_connect 1.8.0 は doorkeeper 5.6 未満を要求する。必須のマイグレーションはない（0-f の調査で確認） |
 | devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ Step 1 の後に 5.x | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認） |
 | dotenv-rails | 2.7.6 | 0-f-1 で 3.2.0（済） | 読むファイルの順番と、既にある環境変数を上書きしないことは 2.x と同じ。3.x はテストのたびに ENV を戻し、Rails のログに変数名を出す |

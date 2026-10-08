@@ -829,3 +829,102 @@ gem ごとに RS → RP → OP の順で `bundle update <gem> --conservative` �
 | RP のトップページがセッションを DB に書くというのは推測 | E2E 用の DB で、トップページを 1 回開くとセッションの行が 1 件増えることを確かめた |
 | gem 内のパスを `gem名-バージョン/` から書いていない（`railties-7.0.8.7` の `templates/bin/rails.tt`） | `railties-7.0.8.7/lib/rails/generators/rails/app/templates/bin/rails.tt` に直した |
 | cgi 0.3.7 は lock にしか残らないので、`--conservative` を付けない `bundle update` で黙って 0.5.2 に変わる | 対応しない。json・bigdecimal・logger・base64 と同じ一時固定のやり方で、Ruby を上げる各 Step で合わせ直す（PLAN.md 8 章の 4）。default gem の版は gem を上げるたびに lock で確かめている |
+
+## Step 0-f-2: RS・RP の oauth2 系の gem の更新（2026-10-08）
+
+- ブランチ / PR: `upgrade/step0f2-oauth2` / （PR 作成後に記入）
+- バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
+
+### 着手時に確かめ直したこと
+
+PLAN.md の 0-f-2 にある版と事実を、作業計画の前に確かめ直した。
+
+| 項目 | 結果 |
+|---|---|
+| 版（rubygems の API） | oauth2 2.0.25、omniauth-oauth2 1.9.0、omniauth 2.1.4、faraday 2.14.4、jwt の 2.x は 2.10.3 で、0-f-1 の調査と同じ。jwt は 3.3.0 が出ているが、3.x には上げない |
+| 依存（API v2） | oauth2 2.0.25・omniauth-oauth2 1.9.0・omniauth 2.1.4・faraday 2.14.4・faraday-net_http 3.0.2・jwt 2.10.3 の依存は PLAN.md の表と同じ |
+| advisory | ローカルの ruby-advisory-db は upstream の最新のコミットと同じ（2026-10-06）。GitHub Advisory Database でも、対象の gem と新しく入る gem に新しい advisory はない |
+| lock の解決 | epic の lock のコピーに `BUNDLE_GEMFILE` を向けて `bundle lock` だけを実行し、gem ごとに変わる gem を事前に確かめた。faraday は faraday-net_http を一時固定しないと、`--conservative` では 2.0.0 で止まる |
+| oauth2 2.0.25 のソース | `authorize_url` は `oauth/authorize`、`token_url` は `oauth/token`、`auth_scheme` は `:basic_auth` が既定。`:request_body` は本文に client_id・client_secret を足す（1.4.7 と同じ）。`AuthCode#get_token` は渡された `redirect_uri` をそのまま本文に入れる |
+| omniauth-oauth2 1.9.0・omniauth 2.1.4 のソース | `build_access_token` は `redirect_uri: callback_url` を渡し、`callback_url` はクエリ付き（`full_host + callback_path + query_string`。omniauth 2.0.4 と同じ）。`callback_phase` は state を error より先に確かめ、`secure_compare` で比べる。`OAuth2::TimeoutError`・`OAuth2::ConnectionError` も `:timeout` として扱う |
+
+### 作業計画で決めたこと
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版 | PLAN.md の版のまま | 上の「着手時に確かめ直したこと」 |
+| RP に足すテスト | 2 本に分けて `test/integration/my_op_login_test.rb` に足し、gem を上げる前に単独でコミットする。(a) トークン要求は client_id と client_secret を本文で送り、Authorization ヘッダーを付けない、(b) トークン要求の `redirect_uri` は、認可要求の `redirect_uri` にコールバックのクエリ（code・state）が付いたもの | 本文で認証することは 1 つの振る舞いなので (a) は 1 本にまとめた。introspection 用の provider は同じストラテジーで client_id が違うだけなので足さない |
+| `rubocop:disable` | RS `apples_controller.rb`・RP `my_op.rb` とも今のまま残す | 下の「`rubocop:disable`」 |
+| ブラウザでの手動確認 | gem をすべて上げた後に 1 回。development DB は戻さず、変化を件数で記録する | 両方の流れは E2E が毎コミット確かめている。DB を戻すには上書きが要る |
+| コミットの順番 | 0-f-1 と同じく gem ごとに RS → RP | RP のテストだけは、gem を上げる前に最初にコミットした |
+
+### gem ごとの対応
+
+| gem | バージョン | アプリ | 対応 |
+|---|---|---|---|
+| jwt | 2.2.3 → 2.10.3（RS）、2.5.0 → 2.10.3（RP） | RS・RP | RS は oauth2 1.4.7（`jwt < 3.0`）のうちに上げた。RP は Gemfile に明記した（`my_op.rb` が直接使う）。依存に base64 が入るが lock は 0.1.1 のまま |
+| oauth2 | 1.4.7 → 2.0.25 | RS・RP | 下の「oauth2 2.x の既定値」。snaky_hash 2.0.7・version_gem 1.1.15・auth-sanitizer 0.2.3・anonymous_loader 0.1.3 が入る。RS は hashie 5.1.0 が入り、multi_json が外れる（RP は hashie 4.1.0 と multi_json が残る） |
+| omniauth-oauth2 | 1.7.1 → 1.9.0 | RP | oauth2 と同時（1.7.1 は `oauth2 ~> 1.4`、1.9.0 は `>= 2.0.2`） |
+| omniauth | 2.0.4 → 2.1.4 | RP | 依存が `rack >= 2.2.3` と logger になったが、lock は rack 2.2.24・logger 1.5.0・rack-protection 2.1.0 のまま |
+| faraday / faraday-net_http | 1.10.6 / 1.0.1 → 2.14.4 / 3.0.2 | RS・RP | faraday-net_http を 3.0.2 に一時固定した。RP は faraday を Gemfile に明記した（JWKS の取得と introspection 画面で直接使う）。1.x の adapter 群・faraday-multipart・faraday-retry・multipart-post・ruby2_keywords が外れる |
+
+- 一時固定は、過去の Step と同じく Gemfile に `gem 'faraday-net_http', '3.0.2'` を足して `bundle update` → 外して `bundle lock --local` → Gemfile が戻り、lock に 3.0.2 が残ることを確かめた
+- 作業の後の RS・RP の lock を epic と比べ、変わったのは上の gem と、それに伴って入る・外れる gem だけで、default gem（json 2.6.1・bigdecimal 3.1.1・logger 1.5.0・base64 0.1.1、RP の cgi 0.3.7）と concurrent-ruby 1.1.9 が動いていないことを確かめた。`bin/rails runner` で読み込まれる net-http は 0.3.0.1、uri は 0.12.4（どちらも lock になく、Ruby 3.1.7 の default gem）
+- OP の lock は変わっていない
+- 上げた gem の advisory（jwt の CVE-2026-45363、oauth2 の CVE-2026-54603）は、その gem のコミットで `.bundler-audit.yml` から消した
+
+### oauth2 2.x の既定値
+
+設定を足す前にテストを流し、既定値の変化で何が変わるかを確かめてから、1.4.7 と同じ挙動に固定した。
+
+| アプリ | 設定を足す前 | 足した設定 |
+|---|---|---|
+| RS | クライアントクレデンシャルの要求で、client_id と client_secret が本文から Authorization ヘッダー（Basic）に移り、既存のテストが落ちた | `OAuth2::Client.new` に `auth_scheme: :request_body`。`site` はパスなしなので、相対の `oauth/token` でも URL は同じ（テストが URL を確かめている） |
+| RP | `site` が `/oauth/authorize` 付きなので、トークン要求の URL が `/oauth/authorize/oauth/token` になり、Authorization ヘッダー（Basic）が付いた。認可要求の URL のテストも落ちた | `client_options` に `authorize_url: '/oauth/authorize'`・`token_url: '/oauth/token'`（1.4.7 の既定値と同じ絶対パス）と `auth_scheme: :request_body`。`site` はそのまま |
+
+- 応答の parse は `SnakyHash::StringKeyed`（Hash のサブクラス）になる。userinfo の応答で `sub`・`email` の読み方が変わらないことを確かめた
+- `redirect_uri` は、更新の後もコールバックのクエリ付きのまま送られる（足したテスト (b)）
+
+### テストの追加
+
+- RP に 2 本を足した（上の「作業計画で決めたこと」）。RP は 17 runs → 19 runs
+- 壊すと落ちることの確認: oauth2 1.4.7 のうちに、`client_options` に `auth_scheme: :basic_auth` を足すと (a) だけが落ち、`callback_url` からクエリを外すと (b) だけが落ちた。どちらも戻して通ることを確かめた
+- oauth2 2.0.25 に上げて設定を足す前は、トークン要求のあるテスト 15 本（(a)・(b) を含む）が、WebMock に登録していない URL（`/oauth/authorize/oauth/token`）への要求でエラーになり、認可要求の URL のテスト 1 本が落ちた
+
+### `rubocop:disable`
+
+- RS `apples_controller.rb` の `validate_bearer_token`: disable を無視して測ると、AbcSize は 30.95/17 のまま、MethodLength は 19/10 → 20/10。disable は要るままで、理由（流れを 1 か所で読める）も変わらないので残した
+- RP `my_op.rb`: 書き換えたのはクラス本体の `option :client_options` で、disable の範囲（`id_token_payload` の MethodLength、`fetch_public_keys`〜`verify_nonce!` の Rails/Output）の外。jwt・faraday の更新では中身を変えていない
+- どちらも RuboCop（`Lint/RedundantCopDisableDirective` を含む）で指摘なし
+
+### CHANGELOG・ソースで確かめたこと
+
+アプリの挙動に関わりうるものだけを残す。
+
+| gem | 内容 | アプリへの影響 |
+|---|---|---|
+| jwt 2.6〜2.10 | 2.10.0 で非推奨の警告が増えた。2.7.0 で文字列でない `kid` を拒む。2.10.3 は空の HMAC 鍵を拒む（advisory の修正） | テストの出力とサーバーの出力に非推奨の警告は出ない。ID トークンの検証のテスト 6 本は、同じ例外クラスで落ちる。RP は RS256 だけを使う |
+| omniauth-oauth2 1.8〜1.9 | state の確認が error より先になった（1.7.2 から。PLAN.md の表の「1.8 で」を直した）。1.9.0 で state を `secure_compare` で比べ、セッションに state がないと NoMethodError。タイムアウトの rescue が増えた | エラーの経路（同意の拒否、state の不一致）はテストも E2E もなく、確かめていない |
+| omniauth 2.1 | rack の要求を 2.2.3 以上に、`after_request_phase` の追加、test mode での `omniauth.origin` の扱い、`callback_path` の nil の修正 | RP は test mode と `after_request_phase` を使わない |
+| faraday 2 | 既定の connection は url_encoded のミドルウェアと net_http の adapter。User-Agent が `Faraday v2.14.4` になる | アプリは `Faraday.get` / `Faraday.post` に URL・ハッシュ・ヘッダーを渡すだけ。`FARADAY_DEPRECATE=warn` を付けてテストを流しても、非推奨の警告は出ない |
+
+### 手動確認
+
+全部の gem を上げた後に、`.claude/launch.json` で 3 アプリを起動して確かめた（ログインと同意は人間が操作）。
+
+- ログイン: RP → OP でログイン → RP に戻り「ログインしました」とユーザーのメールアドレスが表示される。OP のログで、トークン要求の本文に client_id と client_secret（`[FILTERED]`）があることを確かめた。同意画面は出ず、OP は認可要求に 302 で応えた
+- introspection 用 RP: ログイン → 同意 → RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke は 200、revoke の後は 401。RS の introspect は `active: true`（`exp - iat = 600`）→ `active: false` が 2 回。RS のクライアントクレデンシャルの要求も、本文に client_id と client_secret がある
+- 3 アプリの `log/development.log` と RP・RS の標準出力に、非推奨・警告・認証の失敗はない（既存の `/stylesheets/application.css` と `/favicon.ico` の 404 だけ）
+- 手動確認用の環境: 手動確認の直前に、3 アプリの development DB・`jwtRS256.key`・RP / RS の `.env` のハッシュが作業の前と一致することを確かめた。手動確認で、RP の development DB は `sessions` が 6 → 8 件（`op_users` は既存のユーザーのまま 1 件）、OP の development DB は `oauth_access_grants` が 5 → 7 件、`oauth_access_tokens` が 15 → 20 件（ログイン 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）に増え、ハッシュが変わった。ほかのテーブルの件数と、RS の DB・鍵・`.env` のハッシュは変わっていない。DB は戻さず、以降の Step の基準は手動確認の後のハッシュにする
+
+### 遭遇した問題
+
+1. lock のコピーで事前に確かめたとき、`diff` の出力（行頭が `> ` の 2 文字）に `git diff` 用の正規表現（行頭が 1 文字）を使ったため、変化がないように見えた。空白の数を合わせてやり直した
+2. ブラウザペインが画面に出ていない状態では、AI から表示できない。手動確認の前に、人間にペインを開いてもらった
+
+### 確認結果
+
+- minitest: 各コミットの前に流して、RS 8 runs、RP 17 runs（テストを足した後は 19 runs）、0 failures（非推奨警告は `:raise` のまま）。OP は変えていない
+- E2E: 各コミットの前に流して、どれも 10 passed
+- RuboCop: RS・RP とも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リスト込み）。無視リストを空にした bundler-audit で、jwt・oauth2・omniauth・faraday は報告されない。brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 2`
+- 3 アプリとも `bin/rails zeitwerk:check` が通り、`bin/rails runner` で起動する。`bin/rails s` は E2E の起動と launch.json で確認し、Puma 6.6.1 で起動する
