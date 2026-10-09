@@ -34,7 +34,7 @@
      5. 既にある部品の設定・既定値の変化は A。gem・インフラ・部品を新しく足すもの（4 の新しい構成）と、使っていない機能を動かし始めるもの（Active Storage のマイグレーションなど）は採用しない
      6. 一度きりの移行の影響（Cookie の鍵の算出方式が変わり、ログインが一度切れるなど）は A として追随し、移行用のコードは書かない
      7. ログの出力の変化は A。アプリが足した伏せる対象（`filter_parameters` の `:code`）は 4 にあたるので残す
-     8. A で E2E のスナップショットが変わったときは、理由を確かめたうえで更新し、LOG.md に書く
+     8. A で E2E のスナップショット、または minitest の応答のスナップショット（Step 1-b-2）が変わったときは、理由を確かめたうえで更新し、LOG.md に書く。スナップショットの更新は、変化を起こしたコミットに一緒に入れる。B にあたる変化が出たら、更新せずに止まって人間に確かめる
 3. 脆弱性が公表されている gem の修正は即時に行う。設定の改善（PKCE 必須化、secret のハッシュ化など）は epic を main に取り込んだ後に別作業で行う。見送った改善は [docs/IMPROVEMENTS.md](../IMPROVEMENTS.md) に記録する
 4. `app:update` が提案する新しい構成（Propshaft、Solid Queue/Cache/Cable、Kamal、Thruster など）は採用しない
 5. 伊藤さん式の「ステージング確認・本番デプロイ」は、「3 アプリ通しの E2E ＋ OP の応答のスナップショットとの比較＋ PR レビュー」に置き換える
@@ -47,7 +47,7 @@
 | タグ `rails-6.1-prepared` | Ruby 3.1.7 / Rails 6.1.7.10、Step 0 完了時点。epic の PR [#20](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/20) のマージコミット |
 | epic | `epic/rails-8.1-upgrade`（`main` から作成。開始を示す空コミットあり） |
 | 作業ブランチ | `upgrade/<step>-<内容>`。epic から切り、PR の向き先は epic |
-| PR の単位 | Step 0 はサブステップ（0-a〜0-g。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR（Step 1 の後のサブステップ 1-b は、1-b-1（起動の途中の読み込みの検出）と 1-b-2（周辺 gem）の 2 つの PR に分ける） |
+| PR の単位 | Step 0 はサブステップ（0-a〜0-g。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR（Step 1 の後のサブステップ 1-b は、1-b-1（起動の途中の読み込みの検出）・1-b-2（応答のスナップショットのテスト）・1-b-3（周辺 gem）の 3 つの PR に分ける） |
 | 取り込み | 最後に epic → main をマージコミットで取り込む（squash しない） |
 | worktree | 作業用 worktree は epic を元にする |
 | main への外部 PR | 入った場合は epic に main を取り込む |
@@ -65,7 +65,7 @@
 | 0-f | 3.1 | 6.1 | 周辺 gem の更新 |
 | 0-g | 3.1 | 6.1 | CI（GitHub Actions）。仕上げから前倒し |
 | 1 | 3.1 | **7.0.x** | annotate 3.2.0、`app:update`、`load_defaults 7.0`、concurrent-ruby 1.3.7 |
-| 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、Rails 7.0 以上を必要とする周辺 gem（1-b-2。devise 5.x、doorkeeper 5.8 以上など） |
+| 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、3 アプリの応答のスナップショットのテスト（1-b-2）、Rails 7.0 以上を必要とする周辺 gem（1-b-3。devise 5.x、doorkeeper 5.8 以上など） |
 | 2 | **3.2** | 7.0 | Ruby のみ |
 | 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応） |
 | 4 | **3.3** | 7.1 | Ruby のみ |
@@ -353,9 +353,9 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | backtrace_silencers.rb | `BACKTRACE` 環境変数の扱いは railties 7.0.10 にない。7.0 の雛形からは消えたが、この initializer は残す（Step 3 で見直す） |
 | `app:update` | sprockets と test_unit の railtie を読み込んでいないので、Sprockets とテストの雛形は飛ばされる。`db/schema.rb` を `ActiveRecord::Schema[6.1].define` に書き換え、`active_storage:update` で Active Storage のマイグレーションを 3 本足す。7.0 の雛形から消えた `application_controller_renderer.rb`・`mime_types.rb`・`cookies_serializer.rb`・`wrap_parameters.rb`・`backtrace_silencers.rb` は消さない |
 
-### Step 1-b: 起動の途中の読み込みの検出と、Rails 7.0 を必要とする周辺 gem
+### Step 1-b: 起動の途中の読み込みの検出、応答のスナップショットのテストと、Rails 7.0 を必要とする周辺 gem
 
-PR を 1-b-1（起動の途中の読み込みの検出）と 1-b-2（周辺 gem）に分ける。1-b-1 を先に epic に入れ、1-b-2 で gem を上げたときに、gem が起動の途中に Rails の部品を読み込むようになれば CI で分かるようにする（人間が判断。経緯は LOG.md の Step 1-b-1）。
+PR を 1-b-1（起動の途中の読み込みの検出）・1-b-2（応答のスナップショットのテスト）・1-b-3（周辺 gem）に分ける。1-b-1 と 1-b-2 を先に epic に入れ、1-b-3 で gem を上げたときに、gem が起動の途中に Rails の部品を読み込むようになれば CI で分かり、応答が変われば PR のスナップショットの差分で分かるようにする（人間が判断。経緯は LOG.md の Step 1-b-1・1-b-2）。当初は周辺 gem を 1-b-2 としていたが、1-b-2 の着手時に 1-b-3 に移した。
 
 #### 1-b-1: 起動の途中の読み込みを CI で検出する
 
@@ -384,9 +384,41 @@ Step 1 で、RP の `config/application.rb` の serializer の設定が起動の
 | 検出できる範囲（作業の途中で分かった） | initializer `anti_manner` には `before: :eager_load!` しか指定がないので、Railtie の読み込みの順（Gemfile の先頭）の位置、つまり Rails の各フレームワークの initializer の直後で検査を終える。OP の test では 217 個中 103 番目で、アプリの `load_config_initializers` は 150 番目、`eager_load!` は 211 番目。検出できるのは `config/application.rb`、`Bundler.require` で gem を require するとき、`config/environments/*.rb`、Rails 自身の initializer。ほかの gem の initializer（web-console・devise・doorkeeper など）と `config/initializers/*.rb` は検出できない。Gemfile の末尾に置いても、アプリの `config/initializers` より前に終える点は変わらず、ほかの gem の require を見られなくなる |
 | RuboCop | `Bundler/DuplicatedGroup` は `group` のブロックを数え、`gem` の `groups:` は数えない。`Bundler/OrderedGems` は `-`・`_` を無視して並べ、コメントで区切る |
 
-#### 1-b-2: Rails 7.0 を必要とする周辺 gem
+#### 1-b-2: 3 アプリの応答のスナップショットのテスト
 
-1-b-1 が epic に入ってから、調べて作業計画を出す。候補は Step 1 の「決めたこと」と 7 章。
+Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・本文）を使い捨ての統合テストで書き出し、前後で diff して Rails の既定値への追随（DEF-7.0-15・33〜35）を見つけた。この比べ方を、毎回の minitest と CI で流れるスナップショットのテストにする。PR のスナップショットの差分を、既定値への追随の解説の根拠にし、1-b-3（doorkeeper 5.8 で `Pragma` が戻るなど）や仕上げの Dependabot の更新でも変化に気づけるようにするため。アプリのコードと設定は変えない。
+
+- [ ] 3 アプリに `test/integration/response_snapshot_test.rb`（1 テスト 1 応答）、伏せる処理の `test/support/response_snapshot_helper.rb`（3 アプリで同じ内容）、スナップショットの `test/snapshots/responses/<名前>.txt` を足す（RS → RP → OP の順に、アプリごとのコミット）
+- [ ] 実行ごとに同じになること（seed を変えて 2 回、`CI=1`）と、わざと壊すと落ちることを確かめる（確かめた後で戻す）
+- [ ] 更新の方法と扱いを TIPS.md・CLAUDE.md に書く
+- 着手時の作業計画で決めたこと（人間が承認）
+  - 番号: この作業を 1-b-2 とし、周辺 gem を 1-b-3 に移す。ブランチは `upgrade/step1b-response-snapshot`
+  - 対象の応答: Step 1 の書き出し（OP 20・RP 5・RS 2）に足して、RS 3・RP 11・OP 26。足すのは、RS の introspect が `active: false` の 401、RP の introspection 用の画面・認可要求・コールバック・コールバックの後の画面・ID トークンの検証に失敗したコールバック・`/auth/failure`、OP のログイン成功・`/users/sign_up`・クライアントクレデンシャルのトークン・revoke の後の introspect・同意画面を省く認可要求・`/oauth/applications`。`/oauth/authorized_applications`（fixtures の作成時刻を表示する）と `/oauth/applications/:id`（client secret を表示する）、使っていない経路は足さない
+  - 時刻は各テストで `travel_to` で固定し、時刻の値（`created_at`・`iat`・`exp`）も伏せずに比べる
+  - ヘッダーは名前を小文字にして並べ替える。値は比べ、`X-Request-Id`・`X-Runtime` と、本文から決まる `ETag`・`Content-Length` は値だけを伏せる（ヘッダーがあるかどうかは比べる）。`Set-Cookie` は名前と属性を比べ、値だけを伏せる
+  - 伏せる値は、ヘッダー名・クエリのパラメーター名（`code`・`state`・`nonce`・`code_challenge`）・hidden field の名前・JSON のキー（`access_token`・`refresh_token`・`id_token`、JWKS の `n`・`kid`）で決める。文字列の形では伏せない。`client_id`・ユーザー ID（fixtures で決まる）・`expires_in` は伏せない
+  - JSON の本文は、キーの順を変えずに整形する（E2E のスナップショットはキーを並べ替える）。伏せた値は E2E と同じく型を残す（`<ACCESS_TOKEN:string>`）
+  - 更新は `UPDATE_SNAPSHOTS=1 bin/rails test`。ファイルがないときは、この環境変数がなければ失敗する（E2E の扱いにそろえる）。更新したときの扱いは 3 章の 2 の境目の 8
+  - development だけの応答の差（`Server-Timing`、rack-mini-profiler・web-console）と、test 環境では出ない CSRF のトークンは、このテストでも E2E でも扱わない。Rails を上げる Step で、これまでどおり development の応答ヘッダーを `curl` で見る
+  - CI は変えない（既存の `bin/rails test` がこのテストも流し、スナップショットのファイルは `public-safety` ジョブの検査の対象に入る）
+  - PR は 1 つ
+
+調べたこと（着手時の 2026-10-09）:
+
+| 項目 | 分かったこと |
+|---|---|
+| Step 1 の書き出しの道具 | 1 テストで全応答を順に書き出す形。正規表現で伏せ、`client_id`・`sub`・`iat`・`exp`・`created_at` まで伏せていた。ETag も伏せていた |
+| test 環境の CSRF | `allow_forgery_protection = false` なので、`csrf_meta_tags` も `authenticity_token` も出ない |
+| 時刻 | 使い捨てのテストで `travel_to` で時刻を固定すると、トークン応答の `created_at`、introspect の `exp`・`iat`、ID トークンの `iat`・`exp` は 2 回流して同じだった |
+| ユーザー ID・client_id | fixtures の ID はラベルから決まり、2 回流して同じ。client_id は fixtures と `.env.test` の固定のダミー |
+| 実行ごとに変わる値 | OP: doorkeeper が作るトークン・認可コード、JWKS の `n`・`kid`（署名鍵は手元と CI で違う）、ID トークン。RP: omniauth が作る `state`・`nonce`・`code_challenge`。共通: Cookie の値、`X-Request-Id`、`X-Runtime`。fixtures の `created_at` は `travel_to` の前に入るので実時刻（`/oauth/authorized_applications` が表示する） |
+| 安全チェック | `oauth-param` ルールはキー名と 8 文字以上の値で検出し、`<ACCESS_TOKEN>` のような山かっこの置き換えは検出しない。HTML の hidden field の値は検出しない |
+| CI | `rails` ジョブが各アプリで `bin/rails test`（`CI=true` で eager load）を流し、`public-safety` ジョブが追跡中の全ファイルを検査する |
+| E2E のスナップショット | `e2e/baseline/*.json`。JSON のキーを並べ替え、伏せた値は型を残す。ないときは黙って作らず、更新は `npx playwright test --update-snapshots` |
+
+#### 1-b-3: Rails 7.0 を必要とする周辺 gem
+
+1-b-2 が epic に入ってから、調べて作業計画を出す。候補は Step 1 の「決めたこと」と 7 章。
 
 ### Step 2〜9
 
