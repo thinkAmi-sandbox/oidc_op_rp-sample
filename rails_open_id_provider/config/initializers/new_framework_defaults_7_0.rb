@@ -38,7 +38,7 @@ Rails.application.config.active_support.remove_deprecated_time_with_zone_name = 
 # This makes test cases behave closer to an actual request or job.
 # Several features that are normally disabled in test, such as Active Record query cache
 # and asynchronous queries will then be enabled.
-# Rails.application.config.active_support.executor_around_test_case = true
+Rails.application.config.active_support.executor_around_test_case = true
 
 # Set both the `:open_timeout` and `:read_timeout` values for `:smtp` delivery method.
 Rails.application.config.action_mailer.smtp_timeout = 5
@@ -53,7 +53,7 @@ Rails.application.config.active_storage.video_preview_arguments =
 Rails.application.config.active_record.automatic_scope_inversing = true
 
 # Raise when running tests if fixtures contained foreign key violations
-# Rails.application.config.active_record.verify_foreign_keys_for_fixtures = true
+Rails.application.config.active_record.verify_foreign_keys_for_fixtures = true
 
 # Disable partial inserts.
 # This default means that all columns will be referenced in INSERT queries
