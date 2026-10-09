@@ -349,7 +349,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | RuboCop | `TargetRailsVersion: 7.0` にした設定を scratchpad に置いて 3 アプリを流すと、新しい指摘はない |
 | development.rb の `file_watcher` | Rails 6.1 の雛形は `config.file_watcher = ActiveSupport::EventedFileUpdateChecker` を出すが、7.0 の development.rb と Gemfile の雛形には file_watcher の行も listen もない |
 | `raise_on_open_redirects` | 判定はホスト名だけで、ポートは見ない。doorkeeper 5.7.1 は `allow_other_host: true` を渡す。omniauth のリダイレクトは Rack の 302。RP の `redirect_to` はパスだけ |
-| RP の session_store の serializer | `rails_relying_party_of_backend/config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`initialize!` より前に `ActiveRecord::Base` を読み込む。`new_framework_defaults_7_0.rb` に書いた AR::Base の設定は RP では効かず、`load_defaults 7.0` で効く見込み |
+| RP の session_store の serializer | `rails_relying_party_of_backend/config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`initialize!` より前に `ActiveRecord::Base` を読み込む。`new_framework_defaults_7_0.rb` に書いた AR::Base の設定は RP では効かず、`load_defaults 7.0` で効く見込み。後で、`disable_to_s_conversion` は `load_defaults 7.0` でも効かないと分かり、RP `77c26df` で設定を initializer の `ActiveSupport.on_load(:active_record)` に移した（[defaults/rails-7.0.md](defaults/rails-7.0.md) の「補足」） |
 | backtrace_silencers.rb | `BACKTRACE` 環境変数の扱いは railties 7.0.10 にない。7.0 の雛形からは消えたが、この initializer は残す（Step 3 で見直す） |
 | `app:update` | sprockets と test_unit の railtie を読み込んでいないので、Sprockets とテストの雛形は飛ばされる。`db/schema.rb` を `ActiveRecord::Schema[6.1].define` に書き換え、`active_storage:update` で Active Storage のマイグレーションを 3 本足す。7.0 の雛形から消えた `application_controller_renderer.rb`・`mime_types.rb`・`cookies_serializer.rb`・`wrap_parameters.rb`・`backtrace_silencers.rb` は消さない |
 

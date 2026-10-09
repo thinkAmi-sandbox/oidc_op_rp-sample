@@ -21,6 +21,7 @@
 |---|---|---|
 | RuboCop | `mise exec -- bundle exec rubocop` | `no offenses detected` |
 | minitest | `mise exec -- bin/rails test` | 0 failures。RP の出力の `Authentication failure!` は想定どおり（ID トークンの検証失敗のテスト） |
+| minitest（CI と同じ eager load あり） | `CI=1 mise exec -- bin/rails test` | 上と同じ件数で 0 failures。Step 1（Rails 7.0 の雛形）から、test 環境は `ENV["CI"]` があると eager load する（DEF-7.0-08） |
 | Zeitwerk | `mise exec -- bin/rails zeitwerk:check` | `All is good!` |
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
 | bundler-audit | `mise exec -- bundle exec bundle-audit check` | `No vulnerabilities found`（無視リスト込み） |

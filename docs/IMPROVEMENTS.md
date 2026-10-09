@@ -24,6 +24,7 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 | IMP-006 | 独自ストラテジーの `site` を OP のベース URL に直す | RP | コードの整理 | 未着手 |
 | IMP-007 | introspect 用のトークンを使い回す | RS | 性能 | 未着手 |
 | IMP-008 | 上書きしている doorkeeper のビューを新しい雛形に合わせる | OP | コードの整理 | 未着手 |
+| IMP-009 | 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する | RP・OP | コードの整理 | 未着手 |
 
 ## IMP-001: PKCE を必須にし、S256 だけを受け付ける
 
@@ -107,3 +108,13 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: 同意画面などの HTML が変わる。アップグレード中は挙動を変えない
 - 確かめ方: OP のテスト（同意画面、form_post、エラー画面、同意の拒否）と E2E のログイン
 - 記録した Step: 0-f-3
+
+## IMP-009: 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する
+
+- 対象: activerecord-session_store（RP）、web-console（RP・OP の development）
+- 現状: activerecord-session_store は `Bundler.require` の時点で（`activerecord-session_store-2.1.0/lib/action_dispatch/session/active_record_store.rb`）、web-console は initializer の `web_console.permissions` で（`web-console-4.2.1/lib/web_console/railtie.rb`）、`ActionDispatch::Request` を読み込む（activerecord-session_store 2.3.0・web-console 4.3.0 でも同じ）。そのため、`config/initializers` に書いた `ActionDispatch::Request` の設定（`new_framework_defaults_*.rb` を含む）は、RP と OP の development では効かず、`load_defaults` を上げたときに効く
+- 改善案: gem に修正を送る（`ActiveSupport.on_load` で読み込みを遅らせる）。あわせて、起動の途中に読み込まれた部品を書き出して許可した一覧と比べるテストを各アプリに置き、CI で検出する（Rails 本体の rails/rails#56201「Load hook guard」は main にだけ入っていて、8.1.4 までのリリースにはない）
+- 経緯: docs/upgrade/defaults/rails-7.0.md の「補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）」、LOG.md の Step 1「遭遇した問題」と「コードレビュー」。アプリのコードが原因だったもの（RP の `config/application.rb` の serializer の設定）は、Step 1 で直した
+- 見送った理由: gem の修正はこのリポジトリの範囲外で、アップグレード中は挙動を変えない。今の RP・OP の development では `action_dispatch_request` が読み込まれるのが正しい状態なので、CI のテストは gem ごとの許可の一覧を持つことになる。それまでは、Step ごとに手で確かめる（PLAN.md 12 章、TIPS.md の「設定の値と応答の比較」）
+- 確かめ方: TIPS.md の「設定の値と応答の比較」の確かめ方で、`action_dispatch_request` が起動の途中に読み込まれなくなること
+- 記録した Step: 1

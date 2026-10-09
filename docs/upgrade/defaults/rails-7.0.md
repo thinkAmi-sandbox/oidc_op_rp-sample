@@ -196,7 +196,7 @@
 
 - 種類: Rails のヘルパーの出力 / 対象: RP・OP
 - 何が変わるか: `<link rel="stylesheet" media="..." href="..." />` が `<link rel="stylesheet" href="..." media="..." />` になる。RP のレイアウト（`media: 'all'` を明示）と、OP の doorkeeper のレイアウト（既定の `media="screen"`）の両方
-- なぜ: Rails 7.0 で、`stylesheet_link_tag` が既定で `media="screen"` を付けないこともできるようになり（`config.action_view.apply_stylesheet_media_default`。Step 1 のグループ 7 で有効にする）、`tag_options` の最初のハッシュから `media` がなくなった。`media` は後から入るので `href` の後になる。6.1 は最初のハッシュの 2 番目に `"media" => "screen"` があり、渡した `media:` はその位置の値を上書きしていた（`actionview-6.1.7.10` と `actionview-7.0.10` の `lib/action_view/helpers/asset_tag_helper.rb` の `stylesheet_link_tag`）
+- なぜ: Rails 7.0 で、`stylesheet_link_tag` が既定で `media="screen"` を付けないこともできるようになり（`config.action_view.apply_stylesheet_media_default`。Step 1 のグループ 7 で有効にした。DEF-7.0-35）、`tag_options` の最初のハッシュから `media` がなくなった。`media` は後から入るので `href` の後になる。6.1 は最初のハッシュの 2 番目に `"media" => "screen"` があり、渡した `media:` はその位置の値を上書きしていた（`actionview-6.1.7.10` と `actionview-7.0.10` の `lib/action_view/helpers/asset_tag_helper.rb` の `stylesheet_link_tag`）
 - 3 アプリへの影響: 属性の値は同じで、並びだけが違う。ブラウザの解釈は同じ。Rails 7.0.10 にしたコミットで起き、応答の前後比較で見つけた
 - 扱い: 追随
 - 出典: [rails/rails#41215](https://github.com/rails/rails/pull/41215)、[rails/rails#41472](https://github.com/rails/rails/pull/41472)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.11.19 `config.action_view.apply_stylesheet_media_default`」（並びが変わることそのものはガイドにない）

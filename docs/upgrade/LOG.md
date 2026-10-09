@@ -1284,9 +1284,20 @@ PR #20 の最初の実行（head は `docs: record step 0-g and update the upgra
 
 ### 確認結果
 
-- minitest: RS 8 runs・RP 19 runs・OP 25 runs、0 failures（非推奨警告は `:raise`）。アプリやテストのコードのコミットの前に毎回流した。`CI=1`（eager load あり）でも同じ件数で通る
+- minitest: RS 8 runs・RP 19 runs（コードレビューでテストを足した後は 20 runs）・OP 25 runs、0 failures（非推奨警告は `:raise`）。アプリやテストのコードのコミットの前に毎回流した。`CI=1`（eager load あり）でも同じ件数で通る
 - E2E: 同じく毎回流して 10 passed。スナップショットの差分なし
 - RuboCop（`TargetRailsVersion: 7.0`）: 3 アプリとも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リストから CVE-2024-54133 と concurrent-ruby の 3 件を消した）。brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 2`
 - 3 アプリとも `bin/rails c` で Rails 7.0.10・`load_defaults 7.0`、`bin/rails s` は E2E と launch.json で起動、`zeitwerk:check` は `All is good!`
 - 応答の前後比較（使い捨ての統合テスト）: Rails 7.0.10 にしたとき、`app:update` の後、各グループの後に、RS 2・RP 5・OP 20 の応答を書き出して比べた。変わったのは DEF-7.0-15・33〜35 の項目だけ
 - `log/development.log` に非推奨警告はない
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| RP のセッションを JSON で保存することを確かめるテストがなく、serializer の設定を `on_load` に移した変更（`77c26df`）が手動の確認だけで守られている | RP の `test/integration/sessions_test.rb` に「セッションは sessions テーブルに JSON で保存する」を足した。serializer を `:marshal` にしたときと、設定を消したときに `JSON::ParserError` で落ちることを確かめた。RP は 19 runs → 20 runs |
+| PLAN.md の Step 1 の「調べたこと」の RP の行が「`load_defaults 7.0` で効く見込み」のままで、後で分かったことと食い違う | 行の末尾に、`disable_to_s_conversion` は `load_defaults 7.0` でも効かないと分かり、`77c26df` で移したことと、defaults/rails-7.0.md の「補足」への参照を足した |
+| DEF-7.0-15 に「グループ 7 で有効にする」と未来形が残っている | 「グループ 7 で有効にした。DEF-7.0-35」に直した |
+| TIPS.md の「確認のコマンド」に、CI と同じ条件（eager load あり）の minitest がない | `CI=1 mise exec -- bin/rails test` の行を足した |
+| フレームワークの早い読み込みを、Step ごとの手作業で確かめる申し送りだけにしている | 対応しない（epic の範囲を超える）。CI で検出する案を、下の IMP-009 に含めた |
+| gem（activerecord-session_store・web-console）の早い読み込みを「epic の範囲外」として見送ったが、IMPROVEMENTS.md に足す案を出していない（CLAUDE.md） | 人間の承認を得て、docs/IMPROVEMENTS.md に IMP-009 として足した |
