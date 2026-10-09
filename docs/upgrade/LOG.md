@@ -1477,7 +1477,7 @@ Step 1 で使い捨ての統合テストで行った応答の前後比較を、�
 
 ## Step 1-b-3-1: Rails 7.0 を必要とする周辺 gem（RP の gem・jbuilder・devise）（2026-10-09）
 
-- ブランチ / PR: `upgrade/step1b-rails70-gems` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step1b-rails70-gems` / [#24](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/24)
 - バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。jbuilder 2.13.0 → 2.15.1（RP・OP）、activerecord-session_store 2.1.0 → 2.2.0・omniauth-rails_csrf_protection 1.0.0 → 1.0.2（RP）、devise 4.9.4 → 5.0.4（OP）
 - 追随した gem の既定値・雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 1-b-3）」に記録した（DEF-7.0-38〜42）
 
