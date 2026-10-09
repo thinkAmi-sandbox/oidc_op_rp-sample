@@ -1,0 +1,16 @@
+HTTP 302
+cache-control: no-cache
+content-length: <CONTENT_LENGTH>
+content-type: text/html; charset=utf-8
+location: http://www.example.com/
+referrer-policy: strict-origin-when-cross-origin
+set-cookie: _my_app_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+<html><body>You are being <a href="http://www.example.com/">redirected</a>.</body></html>

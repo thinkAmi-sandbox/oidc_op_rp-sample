@@ -1,0 +1,9 @@
+HTTP 302
+cache-control: no-cache
+content-length: <CONTENT_LENGTH>
+location: http://localhost:3780/oauth/authorize?client_id=test-dummy-rp-my-op-client-id&code_challenge=<CODE_CHALLENGE>&code_challenge_method=S256&nonce=<NONCE>&redirect_uri=http%3A%2F%2Fwww.example.com%2Fauth%2Fmy_op%2Fcallback&response_type=code&scope=openid&state=<STATE>
+set-cookie: _my_app_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+
+Redirecting to http://localhost:3780/oauth/authorize?client_id=test-dummy-rp-my-op-client-id&code_challenge=<CODE_CHALLENGE>&code_challenge_method=S256&nonce=<NONCE>&redirect_uri=http%3A%2F%2Fwww.example.com%2Fauth%2Fmy_op%2Fcallback&response_type=code&scope=openid&state=<STATE>

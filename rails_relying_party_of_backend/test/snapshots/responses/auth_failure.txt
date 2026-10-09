@@ -1,0 +1,9 @@
+HTTP 301
+cache-control: no-cache
+content-length: <CONTENT_LENGTH>
+content-type: text/html
+location: http://www.example.com/
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+
+<html><body>You are being <a href="http://www.example.com/">redirected</a>.</body></html>
