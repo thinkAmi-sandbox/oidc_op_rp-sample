@@ -67,6 +67,7 @@
 | 1 | 3.1 | **7.0.x** | annotate 3.2.0、`app:update`、`load_defaults 7.0`、concurrent-ruby 1.3.7 |
 | 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、3 アプリの応答のスナップショットのテスト（1-b-2）、Rails 7.0 以上を必要とする周辺 gem（1-b-3。devise 5.x、doorkeeper 5.8 以上など） |
 | 2 | **3.2** | 7.0 | Ruby のみ |
+| スキル化 | 3.2 | 7.0 | `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（13 章） |
 | 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応） |
 | 4 | **3.3** | 7.1 | Ruby のみ |
 | 5 | 3.3 | **7.2.x** | `Rails.application.secrets` 削除への対応、sqlite3 2.x、annotate → annotaterb |
@@ -528,14 +529,18 @@ oxlint / oxfmt の導入条件:
 ## 10. 完了条件（各 Step 共通）
 
 - [ ] 3 アプリで `bin/rails c` と `bin/rails s` が起動する
-- [ ] minitest が全件通る（非推奨警告は `:raise`）
+- [ ] minitest が全件通る（非推奨警告は `:raise`）。`CI=1`（eager load あり）でも通る
+- [ ] 起動の途中の読み込みの検査（`ANTI_MANNER=1 bin/rails runner 1`）が test・development で通る（Step 1-b-1 以降）
 - [ ] E2E が全件通り、スナップショットとの比較に差分がない
 - [ ] RuboCop で新しい違反がない
 - [ ] bundler-audit と brakeman で新しい警告がない
+- [ ] 無視リストを空にした設定で bundler-audit を流し、解消した advisory を無視リストから消した
+- [ ] lock に入れた default gem と、一時固定した gem の版が、意図せず動いていない（7 章）
 - [ ] `bin/rails zeitwerk:check` が通る（Step 1 以降）
 - [ ] `db:drop db:setup` で空から作り直して E2E が通る（E2E の起動時に E2E 用の DB で毎回行われる。RS は `schema.rb` がないので `db:drop db:create`）
 - [ ] 公開物の安全チェック（`scripts/check-public-safety --staged`）が通る
 - [ ] CI（GitHub Actions）が通る（Step 0-g 以降）
+- [ ] 手動確認用の環境（TIPS.md の「手動確認用の環境」のファイル）のハッシュが、作業の前後で同じ（手動確認をした Step は、手動確認の後の値を新しい基準にする）
 - [ ] LOG.md と本計画のチェックリストを更新した
 
 ## 11. 人間が判断するところ
@@ -561,20 +566,68 @@ oxlint / oxfmt の導入条件:
 
 ## 13. スキル化の計画
 
-Step 1 を一度手作業で通した後に、`/rails-upgrade` を入口とする 1 つのスキルを作る（作業名を引数で渡し、中身は参照用の別ファイルに分ける）。
+1-b-3 と Step 2（Ruby 3.2）を手作業で通した後に、`/rails-upgrade` を入口とする 1 つのスキルを作る（作業名を引数で渡し、中身は参照用の別ファイルに分ける）。gem の手順と Ruby の手順も一度手作業で確かめてからまとめるため。スキルと、下の 4 の「スキルを作る PR」のスクリプトを 1 つの PR にし、Step 3 の前に epic に入れる。当初は Step 1 の後に作る計画だったが、Step 1 の後の振り返り（2026-10-09）で、振り分けの基準・作業の分け方・作る時期を見直した。
 
-| # | 作業 | 内容 |
-|---|---|---|
-| 1 | research | 調査と Step の計画作り（承認待ちで止まる） |
-| 2 | gems | 周辺 gem の振り分けと更新 |
-| 3 | patch | Rails のパッチ版の最新化と非推奨警告の解消 |
-| 4 | rails-minor | Rails のマイナーバージョンアップ（`app:update` の振り分け、`load_defaults`、`TargetRailsVersion`） |
-| 5 | ruby | Ruby のバージョンアップ（`TargetRubyVersion` の更新と指摘の修正を含む） |
-| 6 | verify | 完了条件のチェック |
-| 7 | record | LOG.md の記録（公開物の記載ルールに沿った置き換え → 安全チェック）、`/code-review`、PR 作成（`--base` 必須） |
-| 8 | resume | PLAN.md と LOG.md から次の作業を判断 |
+### 1. 振り分けの基準
 
-スキルには手順だけを書き、バージョン固有の知識は LOG.md に残す。コマンドの実行や確認の手順のコツ（[TIPS.md](TIPS.md)）は、スキルの参照用のファイルに移す。
+| 置き場所 | 書くもの |
+|---|---|
+| スキル | 毎回同じ順で行い、抜けると事故になる手順と、人間に確かめる関門 |
+| リポジトリのスクリプト（`scripts/`） | 3 アプリに固有の道具。スキルから呼ぶ |
+| PLAN.md・LOG.md・[defaults/](defaults/) | 人間が決めること、版ごとの知識、一度きりのこと |
+| [TIPS.md](TIPS.md) | コマンドのつまずきと、使えたやり方。スキルは該当の節を指し、中身を写さない |
+
+### 2. 作業
+
+| # | 作業 | 内容 | 人間に確かめる関門 |
+|---|---|---|---|
+| 1 | resume | PLAN.md と LOG.md から次の作業を判断する | — |
+| 2 | research | 調査と Step の作業計画（8 章の 1）。調べたことを PLAN.md の Step の節に移す | 作業計画の承認 |
+| 3 | gems | 周辺 gem の振り分け（7 章）と、1 gem ずつの更新。守られていない挙動のテストを先に足す | ダウンロード、一時固定、B にあたる変化（3 章の 2） |
+| 4 | patch | Rails のパッチ版の最新化と、非推奨警告の解消 | ダウンロード |
+| 5 | rails-lock | Rails のマイナーを上げたときの lock の解決 | default gem を置き換える依存の一時固定、依存で増えた gem のダウンロード |
+| 6 | rails-app-update | `app:update` の振り分け | 差分の確認 |
+| 7 | rails-defaults | `new_framework_defaults_*.rb` をグループごとに有効にする繰り返し | グループの順、各グループの解説への返事 |
+| 8 | rails-load-defaults | `load_defaults` を上げ、`new_framework_defaults_*.rb` と不要になった initializer を消す。`TargetRailsVersion` を上げる | 解説への返事 |
+| 9 | explain-defaults | 既定値への追随の解説と記録（3 章の 2 の手順）。3・6〜8 から呼ぶ | 解説への返事 |
+| 10 | ruby | Ruby のバージョンアップ。Step 2 を手作業で通してから中身を書く | — |
+| 11 | verify | 完了条件（10 章）の確認 | 手動確認の時期 |
+| 12 | record | LOG.md の記録（公開物の記載ルールに沿った置き換え → 安全チェック）、`/code-review`、PR のタイトルと本文の提案（`scripts/check-public-safety --message` を通す） | push と PR の作成（人間が行う） |
+
+当初の 4（rails-minor）を 5〜8 の 4 つに分け、既定値への追随の解説と記録を 9 として独立させた。作業をまたいで使う手順（下の 3 の「アプリごとのコミット」と「手動確認」）は、参照用のファイルに 1 つずつ書く。
+
+### 3. スキルに書く要点（Step 1 で分かったこと）
+
+- rails-lock: `--conservative` を付けても周辺の gem まで動く。旧 lock の gem をすべて固定し、Rails の構成 gem だけを外して解決させ、どうしても動く gem を割り出す（TIPS.md「gem の更新」）。default gem を置き換える依存の一時固定と、依存で増えた gem のダウンロードの確認（Step 1 の ruby2_keywords）を関門にする
+- rails-app-update: `yes a` で全上書き → アプリの独自設定を戻す → 使わない機能のマイグレーションを消す → 差分を人間が確認する
+- rails-defaults: グループを決める → 設定の値を test と development の両方で前後比較する（`on_load` で入る値は、クラスを先に読み込んでから読む）→ 応答のスナップショットの差分を見る → 解説・提案（9）→ 返事 → 記録 → アプリごとのコミット
+- explain-defaults: 項目ごとに「何が変わるか・なぜ・影響・提案」を出典付きで解説 → 返事 → defaults/ への記録の docs のコミット → アプリごとのコミット（メッセージから ID を指す）。根拠に、応答のスナップショットの差分と、起動の途中の読み込みの検査の結果を使う
+- アプリごとのコミット: ほかのアプリの変更を `git stash push -u -- <ディレクトリ>` で退避し、そのアプリだけで minitest・E2E を流してからコミットする。`git rm` のステージ済みの削除が別のコミットに紛れる点に注意する（TIPS.md「コミット」）
+- verify: 10 章（`CI=1` の minitest、無視リストを空にした bundler-audit、lock の default gem の版、手動確認用の環境のハッシュを含む）
+- 手動確認: ブラウザペインが画面に出ているかを確かめてから、パスワードの入力と同意を人間に頼む。いつ行うかは Step ごとに人間と決める
+
+### 4. リポジトリのスクリプト
+
+| スクリプト（名前は仮） | 中身 | 入れる時期・PR | 確かめ方 |
+|---|---|---|---|
+| （済）起動の途中の読み込みの検出 | a-nti_manner_kick_course と CI のステップ | 1-b-1 | — |
+| （済）応答のスナップショット | 各アプリの minitest | 1-b-2 | — |
+| `scripts/check-apps` | 3 アプリの検査（RuboCop、`zeitwerk:check`、起動の途中の読み込み（test・development）、minitest（`CI=1` も）、bundler-audit、brakeman）と E2E。アプリと検査を引数で絞れる。CI は変えない | 1-b-3 の PR（gem を上げる前のコミット） | 1-b-3 と Step 2 で使い、CI と同じ結果になること。使いながら直す |
+| `scripts/compare-config` | 設定の値の書き出し（test・development。`on_load` の対象のクラスを先に読み込み、非推奨の値は `Deprecation.silence` で読む）と前後の比較 | スキルを作る PR | Step 1 の `load_defaults 7.0` のコミットの前後で流し、違うのが DEF-7.0-24 だけになること |
+| `scripts/resolve-lock` | lock のコピーで、旧 lock の gem を固定し、指定した gem だけを外して解決させ、動く gem を出す | スキルを作る PR | タグ `rails-6.1-prepared` の lock で Rails 7.0.10 を解決し、Step 1 の結果（動くのは zeitwerk と annotate だけ）と同じになること |
+| `scripts/restore-app-config` | `app:update` の後に、アプリの独自設定（一覧はスクリプトが持つ）を戻す | スキルを作る PR | タグ `rails-6.1-prepared` を worktree に出して Rails 7.0.10 で `app:update` を流し、Step 1 の `app:update` のコミットと同じになること |
+
+Rails のマイナーを上げるときにしか使わない 3 つは、Step 3 より前に実際の作業で試せないので、Step 1 を再現して確かめる。
+
+### 5. スキルにしないもの
+
+| もの | 置き場所 |
+|---|---|
+| 版の選び方などの判断 | PLAN.md・LOG.md |
+| 版ごとの設定の中身 | defaults/ |
+| 一度きりの修正（RP の serializer の件など） | LOG.md・defaults/ |
+| push・PR の作成 | 人間 |
+| CI の結果の読み方 | TIPS.md |
 
 ## 14. 未決事項
 
