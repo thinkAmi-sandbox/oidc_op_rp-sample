@@ -1,7 +1,7 @@
 # Rails 7.0 の既定値への追随
 
 - 版: Rails 6.1.7.10 → 7.0.10（Ruby 3.1.7）
-- Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: （PR 作成後に記入）
+- Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: [#21](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/21)
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
@@ -228,6 +228,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
   - ブログ: Arkency「[I do not blindly trust setting things in new_framework_defaults initializers anymore](https://blog.arkency.com/i-do-not-blindly-trust-setting-things-in-new-framework-defaults-initializers-anymore/)」（2025-06-10。Rails 7.1 で、gem が `ActiveRecord::Base` を早く読み込んだため `new_framework_defaults_7_1.rb` の設定が効かなかった例）
   - Rails ガイド: v7.0 版には該当の節がないので、最新版の [Rails アプリケーションを設定する](https://railsguides.jp/configuring.html)「6 読み込みフック」（`ActiveRecord::Base` などを不注意に読み込むと、Rails との暗黙の取り決めに違反する）
 - **後の Step への申し送り**: `new_framework_defaults_*.rb` を有効にするたびに、上の確かめ方で、起動の途中に読み込まれる部品が増えていないかを、test と development の両方で見る（development だけで使う gem がある）。gem を上げたときも同じ
+  - Step 1-b-1 から、`config/application.rb` と gem の require による読み込みは、CI で a-nti_manner_kick_course が検出する。ほかの gem の initializer、`config/initializers`、`action_dispatch_request` は検出できないので、引き続き値の比較と上の確かめ方で見る。上の確かめ方は `config/initializers` を読む直前の時点を見るので、`config/initializers` の中での読み込みは値の比較で見つける（PLAN.md の Step 1-b-1、TIPS.md の「設定の値と応答の比較」）
 
 ### DEF-7.0-16: `action_dispatch.cookies_serializer = :json`
 

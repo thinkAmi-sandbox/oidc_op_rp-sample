@@ -5,6 +5,11 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 ruby '3.1.7'
 
+# config/application.rb や gem の require が、起動の途中で Rails の部品（ActiveRecord::Base など）を読み込むと検出する。
+# ほかの gem の initializer と config/initializers は検出できない（docs/upgrade/PLAN.md の Step 1-b-1）。
+# 環境変数 ANTI_MANNER があるときだけ動く。ほかの gem より先に Bundler.require で読ませるため、先頭に置く
+gem 'a-nti_manner_kick_course', groups: %i[development test]
+
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails', branch: 'main'
 gem 'rails', '~> 7.0.10'
 # Use sqlite3 as the database for Active Record

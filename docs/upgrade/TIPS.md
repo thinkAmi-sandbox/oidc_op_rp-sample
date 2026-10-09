@@ -24,11 +24,12 @@
 | minitest（CI と同じ eager load あり） | `CI=1 mise exec -- bin/rails test` | 上と同じ件数で 0 failures。Step 1（Rails 7.0 の雛形）から、test 環境は `ENV["CI"]` があると eager load する（DEF-7.0-08） |
 | Zeitwerk | `mise exec -- bin/rails zeitwerk:check` | `All is good!` |
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
+| 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」 |
 | bundler-audit | `mise exec -- bundle exec bundle-audit check` | `No vulnerabilities found`（無視リスト込み） |
 | brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`、`Ignored Warnings: 2` |
 | E2E | `e2e/` で `mise exec -- npm test` | 約 10 秒で 10 passed。手動確認用のサーバーが動いていると起動に失敗する |
 
-CI（`.github/workflows/ci.yml`）も同じコマンドを流す。違いは、OP の署名鍵をジョブの中で作ること、bundler-audit に `--update` を付けて advisory のデータベースの最新を使うこと、E2E を mise なしで流すこと。
+CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途中の読み込みは test と development の両方）。違いは、OP の署名鍵をジョブの中で作ること、bundler-audit に `--update` を付けて advisory のデータベースの最新を使うこと、E2E を mise なしで流すこと。
 
 ## CI の結果を読む
 
@@ -57,7 +58,10 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す。違いは、O
 
 - `new_framework_defaults_*.rb` の設定は、有効にする前後で `rails runner` から実際の値を書き出して比べる。設定ファイルの値ではなく、クラスに入った値（`ActiveRecord::Base.partial_inserts` など）を読む。`on_load` の中で値が入る設定があるので、読む前に `ActionView::Base`・`ActionController::Base`・`ActionDispatch::Request`・`ActiveRecord::Base` などを読み込んでおく。test と development の両方で比べる（development だけで使う gem が、起動の途中にクラスを読み込むことがある。Step 1 の web-console）
 - 非推奨のメソッドの値を読むと、test 環境の `deprecation = :raise` で例外になる。`ActiveSupport::Deprecation.silence { ... }` で包む
-- 起動の途中に読み込まれた部品は、`require "./config/application"` の後と、`Rails.application.initializer("probe", before: :load_config_initializers) { ... }` を足して `Rails.application.initialize!` した後に、`ActiveSupport.instance_variable_get(:)` で値のある名前を見ると分かる。誰が読み込んだかは、`ActiveSupport.on_load(:active_record) { puts caller }` を先に仕込むと分かる（Step 1）
+- 起動の途中に読み込まれた部品は、`require "./config/application"` の後と、`Rails.application.initializer("probe", before: :load_config_initializers) { ... }` を足して `Rails.application.initialize!` した後に、`ActiveSupport.instance_variable_get(:@loaded)` で値のある名前を見ると分かる。誰が読み込んだかは、`ActiveSupport.on_load(:active_record) { puts caller }` を先に仕込むと分かる（Step 1）
+- 起動の途中の読み込みは、Step 1-b-1 から a-nti_manner_kick_course で検出する（上の「確認のコマンド」。CI でも流す）。見つけると `on_load(:active_record)` などの名前と疑わしい行を出して終了コード 1 で止まる。疑わしい行が gem の中を指すときは、`ANTI_MANNER_DEBUG=1` でスタックトレース全部を出し、アプリの行を探す（Step 1 の RP の serializer の設定は `activerecord-session_store-2.1.0/lib/active_record/session_store/session.rb` を指し、全部を出すと `config/application.rb` の行が出た）
+  - 検出できるのは、`config/application.rb`、`Bundler.require` で gem を require するとき、`config/environments/*.rb`、Rails 自身の initializer まで。gem の検査は Rails の各フレームワークの initializer の直後で終わるので、ほかの gem の initializer（web-console など）と `config/initializers/*.rb` は検出できない。監視の一覧に `action_dispatch_request` もない。これらで設定が効かなくなっていないかは、上の値の比較（有効にする前後で、test と development の値を書き出す）で確かめる。上の `@loaded` の確かめ方は `config/initializers` を読む直前の時点を見るので、`config/initializers` の中での読み込みは見えない。どこで読み込まれたかは `on_load { puts caller }` で探す
+  - `ANTI_MANNER` を付けたまま、ほかのコマンド（`bin/rails test` など）を流さない。gem が起動の途中で終了コード 0 で終えるので、何も検査せずに成功したように見える
 - 応答の前後比較は、使い捨ての統合テスト（scratchpad に置き、`bin/rails test <パス>` で流す）で、ステータス・ヘッダー・本文を書き出して `diff` する。トークン・CSRF のトークン・Cookie の値・`X-Request-Id`・`X-Runtime` などは伏せる。ETag も比べるときは、同じ設定で 2 回書き出して、毎回変わるもの（本文にトークンを含む応答）を先に見分けておく
 
 ## 手動確認用の環境
