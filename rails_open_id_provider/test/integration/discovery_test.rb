@@ -15,6 +15,15 @@ class DiscoveryTest < ActionDispatch::IntegrationTest
     )
   end
 
+  # 現在の挙動の記録。RP・RS は使わない。doorkeeper-openid_connect 1.8.9 の Webfinger は href に root_url を使うが、
+  # OP の routes には root がない
+  test 'Webfinger は root_url がなくて落ちる' do
+    error = assert_raises(NoMethodError) do
+      get '/.well-known/webfinger', params: { resource: 'acct:user@example.com' }
+    end
+    assert_match(/undefined method `root_url'/, error.message)
+  end
+
   test 'JWKS に署名鍵の公開鍵が 1 つだけ RS256 の署名用として出る' do
     get oauth_discovery_keys_path
 
