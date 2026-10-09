@@ -1,7 +1,7 @@
 # Rails 7.0 の既定値への追随
 
 - 版: Rails 6.1.7.10 → 7.0.10（Ruby 3.1.7）
-- Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: （PR 作成後に記入）
+- Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: [#21](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/21)
 - 記録のルールは [README.md](README.md)
 
 ## 一覧

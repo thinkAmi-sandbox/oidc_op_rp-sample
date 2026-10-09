@@ -1216,7 +1216,7 @@ PR #20 の最初の実行（head は `docs: record step 0-g and update the upgra
 
 ## Step 1: Rails 7.0（2026-10-08〜2026-10-09）
 
-- ブランチ / PR: `upgrade/step1-rails70` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step1-rails70` / [#21](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/21)
 - バージョン: Ruby 3.1.7（変更なし）/ Rails 6.1.7.10 → 7.0.10
 - 追随した Rails の既定値は、項目ごとに [defaults/rails-7.0.md](defaults/rails-7.0.md) に記録した（DEF-7.0-01〜37）。このログには、判断の経緯と、項目に収まらないことを書く
 
@@ -1290,6 +1290,14 @@ PR #20 の最初の実行（head は `docs: record step 0-g and update the upgra
 - 3 アプリとも `bin/rails c` で Rails 7.0.10・`load_defaults 7.0`、`bin/rails s` は E2E と launch.json で起動、`zeitwerk:check` は `All is good!`
 - 応答の前後比較（使い捨ての統合テスト）: Rails 7.0.10 にしたとき、`app:update` の後、各グループの後に、RS 2・RP 5・OP 20 の応答を書き出して比べた。変わったのは DEF-7.0-15・33〜35 の項目だけ
 - `log/development.log` に非推奨警告はない
+
+### CI の結果
+
+PR #21 の最後の実行（head は `docs: record the code review of step 1` のコミット。PR #21 の実行はこの 1 回だけ）で、5 ジョブ（`rails` の 3 つ、`e2e`、`public-safety`）と `ci-result` が通った。全体は約 1 分半。ログで次のことを確かめた。
+
+- minitest: RS 8 runs・RP 20 runs・OP 25 runs、0 failures（手元と同じ件数）。RuboCop は 3 アプリとも `no offenses detected`、`zeitwerk:check` は `All is good!`、bundler-audit は `No vulnerabilities found`、brakeman は `Security Warnings: 0`・`Ignored Warnings: 2`
+- E2E: 10 passed
+- 安全チェック: 追跡中の全ファイルと、PR の 57 コミットのメッセージ
 
 ### コードレビュー（`/code-review`）
 
