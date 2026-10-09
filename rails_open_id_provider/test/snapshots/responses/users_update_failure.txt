@@ -1,0 +1,74 @@
+HTTP 200
+cache-control: max-age=0, private, must-revalidate
+content-length: <CONTENT_LENGTH>
+content-type: text/html; charset=utf-8
+etag: <ETAG>
+referrer-policy: strict-origin-when-cross-origin
+set-cookie: _rails_open_id_provider_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>RailsOpenIdProvider</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    
+    
+  </head>
+
+  <body>
+    <h2>Edit User</h2>
+
+<form class="edit_user" id="edit_user" action="/users" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="put" autocomplete="off" />
+    <div id="error_explanation" data-turbo-cache="false">
+    <h2>
+      1 error prohibited this user from being saved:
+    </h2>
+    <ul>
+        <li>Current password is invalid</li>
+    </ul>
+  </div>
+
+
+  <div class="field">
+    <label for="user_email">Email</label><br />
+    <input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" />
+  </div>
+
+
+  <div class="field">
+    <label for="user_password">Password</label> <i>(leave blank if you don't want to change it)</i><br />
+    <input autocomplete="new-password" type="password" name="user[password]" id="user_password" />
+      <br />
+      <em>6 characters minimum</em>
+  </div>
+
+  <div class="field">
+    <label for="user_password_confirmation">Password confirmation</label><br />
+    <input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" />
+  </div>
+
+  <div class="field">
+    <div class="field_with_errors"><label for="user_current_password">Current password</label></div> <i>(we need your current password to confirm your changes)</i><br />
+    <div class="field_with_errors"><input autocomplete="current-password" type="password" name="user[current_password]" id="user_current_password" /></div>
+  </div>
+
+  <div class="actions">
+    <input type="submit" name="commit" value="Update" data-disable-with="Update" />
+  </div>
+</form>
+<h3>Cancel my account</h3>
+
+<div>Unhappy? <form class="button_to" method="post" action="/users"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button data-confirm="Are you sure?" data-turbo-confirm="Are you sure?" type="submit">Cancel my account</button></form></div>
+
+<a href="javascript:history.back()">Back</a>
+
+  </body>
+</html>
+

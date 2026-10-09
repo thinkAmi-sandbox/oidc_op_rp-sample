@@ -1,0 +1,71 @@
+HTTP 200
+cache-control: max-age=0, private, must-revalidate
+content-length: <CONTENT_LENGTH>
+content-type: text/html; charset=utf-8
+etag: <ETAG>
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>RailsOpenIdProvider</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    
+    
+  </head>
+
+  <body>
+    <h2>Sign up</h2>
+
+<form class="new_user" id="new_user" action="/users" accept-charset="UTF-8" method="post">
+    <div id="error_explanation" data-turbo-cache="false">
+    <h2>
+      3 errors prohibited this user from being saved:
+    </h2>
+    <ul>
+        <li>Email has already been taken</li>
+        <li>Password confirmation doesn&#39;t match Password</li>
+        <li>Password is too short (minimum is 6 characters)</li>
+    </ul>
+  </div>
+
+
+  <div class="field">
+    <div class="field_with_errors"><label for="user_email">Email</label></div><br />
+    <div class="field_with_errors"><input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" /></div>
+  </div>
+
+  <div class="field">
+    <div class="field_with_errors"><label for="user_password">Password</label></div>
+    <em>(6 characters minimum)</em>
+    <br />
+    <div class="field_with_errors"><input autocomplete="new-password" type="password" name="user[password]" id="user_password" /></div>
+  </div>
+
+  <div class="field">
+    <div class="field_with_errors"><label for="user_password_confirmation">Password confirmation</label></div><br />
+    <div class="field_with_errors"><input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" /></div>
+  </div>
+
+  <div class="actions">
+    <input type="submit" name="commit" value="Sign up" data-disable-with="Sign up" />
+  </div>
+</form>
+  <a href="/users/sign_in">Log in</a><br />
+
+
+
+
+
+
+
+  </body>
+</html>
+
