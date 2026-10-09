@@ -40,6 +40,9 @@
 | DEF-7.0-30 | `active_support.disable_to_s_conversion = true` | `load_defaults`（グループ 3。`config/application.rb`） | 3 アプリ | 追随 |
 | DEF-7.0-31 | `active_support.cache_format_version = 7.0` | `load_defaults`（グループ 3。`config/application.rb`） | 3 アプリ | 追随 |
 | DEF-7.0-32 | `action_controller.raise_on_open_redirects = true` | `load_defaults`（グループ 4） | 3 アプリ | 追随 |
+| DEF-7.0-33 | `action_dispatch.default_headers`（`X-XSS-Protection: 0`） | `load_defaults`（グループ 5） | 3 アプリ | 追随 |
+| DEF-7.0-34 | `action_view.button_to_generates_button_tag = true` | `load_defaults`（グループ 6） | 3 アプリ | 追随 |
+| DEF-7.0-35 | `action_view.apply_stylesheet_media_default = false` | `load_defaults`（グループ 7） | 3 アプリ | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -199,7 +202,7 @@
 
 ## `load_defaults`（`new_framework_defaults_7_0.rb`）
 
-グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。グループ 3 は、SQL や内部の処理だけが変わるもの。グループ 4 は、今のリダイレクトが対象にならないもの。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
+グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。グループ 3 は、SQL や内部の処理だけが変わるもの。グループ 4 は、今のリダイレクトが対象にならないもの。グループ 5〜7 は、応答のヘッダーや HTML が変わるもの（1 つずつ有効にして、そのたびに応答を書き出して比べた）。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
 
 RP では、グループ 1・2 を有効にした時点で、一部の設定（DEF-7.0-24・25・27）が効かなかった。原因と対応は、すぐ下の「補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）」。
 
@@ -393,4 +396,34 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
   - RS: リダイレクトしない
 - 扱い: 追随
 - 出典: コミット [rails/rails@5e93cff](https://github.com/rails/rails/commit/5e93cff835)（PR を経ずに入ったコミット）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.9.17 `config.action_controller.raise_on_open_redirects`」、[セキュリティガイド v7.0](https://railsguides.jp/v7.0/security.html)「4.1 リダイレクト」（オープンリダイレクトの危険。この設定そのものの説明はない）
+- コミット: （コミット後に記入）
+
+### DEF-7.0-33: `action_dispatch.default_headers`（`X-XSS-Protection: 0`）
+
+- 種類: `load_defaults`（グループ 5）/ 対象: 3 アプリ
+- 何が変わるか: Rails のコントローラーが返す応答の `X-XSS-Protection` が `1; mode=block` → `0`。ほかの既定のヘッダー（`X-Frame-Options`・`X-Content-Type-Options`・`X-Download-Options`・`X-Permitted-Cross-Domain-Policies`・`Referrer-Policy`）は同じ。書き出した応答で変わった数は RS 2/2、RP 4/5、OP 19/20。変わらなかった 2 つは Rails のコントローラーを通らない応答（RP の omniauth が返す認可要求の 302、OP の未ログインで devise の FailureApp が返す 302）で、前後ともこのヘッダーが付かない
+- なぜ: このヘッダーが動かしていたブラウザの XSS Auditor は、主要なブラウザから取り除かれた（代わりは Content Security Policy）。古いブラウザでは Auditor がかえって脆弱性を生むことがあるので、OWASP は `0`（無効）を勧めている
+- 3 アプリへの影響: 今のブラウザはこのヘッダーを見ないので、画面と動作は同じ。テスト・E2E はこのヘッダーを確かめていない
+- 扱い: 追随
+- 出典: [rails/rails#41769](https://github.com/rails/rails/pull/41769)、[OWASP Secure Headers Project](https://owasp.org/www-project-secure-headers/#x-xss-protection)、[セキュリティガイド v7.0](https://railsguides.jp/v7.0/security.html)「9 HTTPセキュリティヘッダー」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.10.2 `config.action_dispatch.default_headers`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-34: `action_view.button_to_generates_button_tag = true`
+
+- 種類: `load_defaults`（グループ 6）/ 対象: 3 アプリ
+- 何が変わるか: `button_to` が、文字列を渡したときも `<input type="submit" value="...">` ではなく `<button type="submit">...</button>` を出す。書き出した応答で変わったのは OP の `/users/edit` の「Cancel my account」だけ（属性 `data-confirm`・`data-turbo-confirm` と送る先の `DELETE /users` は同じ）
+- なぜ: 6.1 までは、文字列を渡すと `<input>`、ブロックを渡すと `<button>` になり、渡し方で要素が変わって紛らわしかった。`<button>` にそろえる
+- 3 アプリへの影響: アプリのコードに `button_to` はなく、出るのは devise の gem のビュー（`devise-4.9.4/app/views/devise/registrations/edit.html.erb`）だけ。ボタンの文字・送る先・確認の属性が同じなので、「挙動を変えない」の定義の境目の 2（PLAN.md の 3 章）にあたる。テスト・E2E はこのページを開かない
+- 扱い: 追随
+- 出典: [rails/rails#40747](https://github.com/rails/rails/pull/40747)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.11.18 `config.action_view.button_to_generates_button_tag`」（[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.1 `ActionView::Helpers::UrlHelper#button_to`の振る舞いが変更された」は、保存済みのレコードを渡したときの HTTP メソッドの推論の話で、この設定とは別の変更）
+- コミット: （コミット後に記入）
+
+### DEF-7.0-35: `action_view.apply_stylesheet_media_default = false`
+
+- 種類: `load_defaults`（グループ 7）/ 対象: 3 アプリ
+- 何が変わるか: `stylesheet_link_tag` に `media` を渡さないとき、`media="screen"` を付けない。書き出した応答で変わったのは、doorkeeper のレイアウトを使う OP の 3 つ（同意画面・エラー画面・form_post）の `<link rel="stylesheet" href="/stylesheets/doorkeeper/application.css" />`。doorkeeper の管理画面のレイアウト（`app/views/layouts/doorkeeper/admin.html.erb`）も同じように変わる（書き出した応答には含めていない）
+- なぜ: `media` を省いたときのブラウザの既定は `all`。古い既定の `screen` を付けると、印刷のときなどに CSS が当たらない
+- 3 アプリへの影響: RP のレイアウトは `media: 'all'` を明示しているので変わらない。OP の CSS のファイルは `public/` になく、Sprockets も読み込んでいないので、前後とも 404 で見た目は変わらない。応答の `Link` ヘッダー（preload）も変わらない
+- 扱い: 追随
+- 出典: [rails/rails#41215](https://github.com/rails/rails/pull/41215)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.11.19 `config.action_view.apply_stylesheet_media_default`」
 - コミット: （コミット後に記入）
