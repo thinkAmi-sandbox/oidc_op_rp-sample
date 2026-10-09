@@ -2,6 +2,7 @@
 
 - 版: Rails 6.1.7.10 → 7.0.10（Ruby 3.1.7）
 - Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: [#21](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/21)
+- 周辺 gem: Step 1-b-3（ブランチ `upgrade/step1b-rails70-gems`）。DEF-7.0-38 から。下の「周辺 gem（Step 1-b-3）」
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
@@ -45,6 +46,7 @@
 | DEF-7.0-35 | `action_view.apply_stylesheet_media_default = false` | `load_defaults`（グループ 7） | 3 アプリ | 追随 |
 | DEF-7.0-36 | `active_support.key_generator_hash_digest_class = OpenSSL::Digest::SHA256` | `load_defaults`（グループ 8） | 3 アプリ | 追随 |
 | DEF-7.0-37 | 7.0 の雛形から消えた initializer を消す | `app:update` の雛形（手で消す） | 3 アプリ | 追随 |
+| DEF-7.0-38 | セッションの JSON で `<` `>` `&` を escape しなくなる | 周辺 gem（activerecord-session_store 2.2.0） | RP | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -464,3 +466,17 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 扱い: 追随。`backtrace_silencers.rb` は残す（`BACKTRACE` 環境変数の扱いは railties 7.0.10 になく、このファイルだけが担う。Step 3 で見直す）
 - 出典: [rails/rails#42538](https://github.com/rails/rails/pull/42538)、[rails/rails#43237](https://github.com/rails/rails/pull/43237)（`mime_types.rb`・`wrap_parameters.rb`・`backtrace_silencers.rb` を雛形から外した）、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.5 フレームワークのデフォルトを設定する」
 - コミット: RS `fd3eb40`、RP `b1f3552`、OP `400ed9c`（`switch to load_defaults 7.0`）
+
+## 周辺 gem（Step 1-b-3）
+
+Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、gem の既定値・雛形の変化。上げた版と順番は [PLAN.md](../PLAN.md) の Step 1-b-3、経緯は [LOG.md](../LOG.md) の Step 1-b-3。
+
+### DEF-7.0-38: セッションの JSON で `<` `>` `&` を escape しなくなる
+
+- 種類: 周辺 gem（activerecord-session_store 2.1.0 → 2.2.0）/ 対象: RP
+- 何が変わるか: `sessions` テーブルの `data` 列に書く JSON の文字列で、`<` `>` `&` を `\u003c`・`\u003e`・`\u0026` の形にせず、そのままの文字で書く。例: omniauth が Referer を入れる `omniauth.origin` が `"http://www.example.com/?a=1\u0026b=\u003cx\u003e"` → `"http://www.example.com/?a=1&b=<x>"`。読み戻す値は同じ
+- なぜ: 2.2.0 で multi_json への依存をやめ、`JsonSerializer.dump` が `MultiJson.dump` から Ruby 標準の `JSON.dump` になった。2.1.0 では、MultiJson が `json_gem` のアダプター（RP に oj はない）で Hash の `to_json` を呼び、Active Support の JSON の encoder を通っていた。この encoder は `escape_html_entities_in_json`（既定 `true`）のとき `<` `>` `&` を escape する。`JSON.dump` はこの encoder を通らない
+- 3 アプリへの影響: RP だけ（セッションを DB に保存するのは RP だけ）。minitest は、先に足した escape のテストだけが落ち、「JSON で保存し、読み戻すと同じ値」のテストとほかのテストは通った。E2E のログイン・ログアウト・introspection の流れも同じ。前の形で書かれた行も、どちらも正しい JSON なので `JSON.parse` で同じ値に読める。セッションに入る値は文字列・数値・Hash だけ（`user_id`、omniauth の state・nonce・pkce・origin・params、`_csrf_token`、flash）なので、Time などの形の違い（Active Support は ISO 8601、`JSON.dump` は `to_s`）は起きない。lock から multi_json 1.15.0 が消える（ほかに使う gem・コードはない）。起動の途中の読み込みと、応答のスナップショットは前後で同じ
+- 扱い: 追随。テストの期待値を新しい形にした
+- 出典: activerecord-session_store の CHANGELOG（2.2.0「Drop dependency on `multi_json`」）、コミット [rails/activerecord-session_store@536716a](https://github.com/rails/activerecord-session_store/commit/536716a98a)（[rails/activerecord-session_store#213](https://github.com/rails/activerecord-session_store/pull/213) を元にした）、`activerecord-session_store-2.2.0/lib/active_record/session_store.rb` の `JsonSerializer`、`activesupport-7.0.10/lib/active_support/json/encoding.rb`、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.3 `config.active_support.escape_html_entities_in_json`」「3.2.36 `config.session_store`」（session_store の serializer そのものの説明はガイドにない）
+- コミット: RP（`update activerecord-session_store to 2.2.0`）
