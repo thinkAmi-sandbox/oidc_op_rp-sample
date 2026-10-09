@@ -31,12 +31,45 @@ class ResponseSnapshotDeviseTest < ActionDispatch::IntegrationTest
     assert_response_snapshot 'users_sign_up'
   end
 
+  test 'ユーザー登録に失敗したときの応答' do
+    post user_registration_path,
+         params: { user: { email: users(:user).email, password: 'short', password_confirmation: 'other' } }
+
+    assert_response_snapshot 'users_sign_up_failure'
+  end
+
+  test 'ユーザー登録に成功したときの応答' do
+    post user_registration_path,
+         params: { user: { email: 'new-user@example.com', password: TEST_USER_PASSWORD,
+                           password_confirmation: TEST_USER_PASSWORD } }
+
+    assert_response_snapshot 'users_sign_up_success'
+  end
+
   test 'ユーザー編集画面の応答' do
     sign_in users(:user)
 
     get edit_user_registration_path
 
     assert_response_snapshot 'users_edit'
+  end
+
+  test 'ユーザー編集で、現在のパスワードを誤ったときの応答' do
+    sign_in users(:user)
+
+    put user_registration_path, params: { user: { email: users(:user).email, current_password: 'wrong-password' } }
+
+    assert_response_snapshot 'users_update_failure'
+  end
+
+  test 'ユーザー編集で、パスワードを変えたときの応答' do
+    sign_in users(:user)
+
+    put user_registration_path,
+        params: { user: { email: users(:user).email, password: 'new-password', password_confirmation: 'new-password',
+                          current_password: TEST_USER_PASSWORD } }
+
+    assert_response_snapshot 'users_update_success'
   end
 
   test 'ログアウトの応答' do

@@ -25,6 +25,7 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 | IMP-007 | introspect 用のトークンを使い回す | RS | 性能 | 未着手 |
 | IMP-008 | 上書きしている doorkeeper のビューを新しい雛形に合わせる | OP | コードの整理 | 未着手 |
 | IMP-009 | 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する | RP・OP | コードの整理 | 未着手 |
+| IMP-010 | OP のレイアウトに flash（ログイン失敗などのメッセージ）を出す | OP | 挙動の変更 | 未着手 |
 
 ## IMP-001: PKCE を必須にし、S256 だけを受け付ける
 
@@ -120,3 +121,13 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: gem の修正はこのリポジトリの範囲外で、アップグレード中は挙動を変えない。今の RP・OP の development では `action_dispatch_request` が読み込まれるのが正しい状態なので、CI のテストは gem ごとの許可の一覧を持つことになる。それまでは、Step ごとに手で確かめる（PLAN.md 12 章、TIPS.md の「設定の値と応答の比較」）。Step 1-b-1 で入れた a-nti_manner_kick_course は、gem の検査が Rails の各フレームワークの initializer の直後で終わる仕組みで、上の 3 つは設定で検出できるようにならない
 - 確かめ方: TIPS.md の「設定の値と応答の比較」の確かめ方で、`action_dispatch_request` が起動の途中に読み込まれなくなること
 - 記録した Step: 1（Step 1-b-1 で、CI で検出する範囲と残る範囲を書き足した）
+
+## IMP-010: OP のレイアウトに flash（ログイン失敗などのメッセージ）を出す
+
+- 対象: `rails_open_id_provider/app/views/layouts/application.html.erb`
+- 現状: レイアウトは flash（`notice`・`alert`）を描かない。devise のビューも flash を描かないので、誤ったパスワードでログインしても、ログイン画面に何も出ずに表示し直される。ログイン・ログアウトの成功のメッセージも出ない
+- 改善案: レイアウトに `notice`・`alert` を出す（`rails g devise:install` が最後に出す案内の 3 番目「Ensure you have flash messages in app/views/layouts/application.html.erb.」。`devise-5.0.4/lib/generators/templates/README`）
+- 経緯: LOG.md の Step 1-b-3「手動確認」。誤ったパスワードでログインしたときにメッセージが出なかった。レイアウトはタグ `rails-6.1` から変わっていない（`git diff rails-6.1 HEAD` で確かめた）。devise 5.0.4 でログイン失敗の文言が変わった（docs/upgrade/defaults/rails-7.0.md の DEF-7.0-41）が、画面には出ない
+- 見送った理由: 画面に出る文字が変わる。アップグレード中は挙動を変えない
+- 確かめ方: 応答のスナップショット（`users_sign_in_failure`・`users_sign_in_success` の後の画面など）を作り直して差分を見る。`user_sign_in_test.rb` は `flash[:alert]` の値を確かめている。E2E のログイン
+- 記録した Step: 1-b-3

@@ -2,6 +2,7 @@
 
 - 版: Rails 6.1.7.10 → 7.0.10（Ruby 3.1.7）
 - Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: [#21](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/21)
+- 周辺 gem: Step 1-b-3（1-b-3-1 はブランチ `upgrade/step1b-rails70-gems`、1-b-3-2 はブランチ `upgrade/step1b-doorkeeper`）。DEF-7.0-38 から。下の「周辺 gem（Step 1-b-3）」
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
@@ -45,6 +46,11 @@
 | DEF-7.0-35 | `action_view.apply_stylesheet_media_default = false` | `load_defaults`（グループ 7） | 3 アプリ | 追随 |
 | DEF-7.0-36 | `active_support.key_generator_hash_digest_class = OpenSSL::Digest::SHA256` | `load_defaults`（グループ 8） | 3 アプリ | 追随 |
 | DEF-7.0-37 | 7.0 の雛形から消えた initializer を消す | `app:update` の雛形（手で消す） | 3 アプリ | 追随 |
+| DEF-7.0-38 | セッションの JSON で `<` `>` `&` を escape しなくなる | 周辺 gem（activerecord-session_store 2.2.0） | RP | 追随 |
+| DEF-7.0-39 | devise のビューで、フォームの要素を `<br />` で区切らず `<p>` で包む | 周辺 gem（devise 5.0.4） | OP | 追随 |
+| DEF-7.0-40 | devise のエラーメッセージの部分の `data-turbo-cache="false"` が `data-turbo-temporary` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
+| DEF-7.0-41 | ログイン失敗の flash の文言が `Invalid email or password.` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
+| DEF-7.0-42 | devise の initializer を雛形に合わせ、失敗の応答を 422、リダイレクトを 303 にする | 周辺 gem の雛形（devise 5.0.4 の initializer） | OP | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -464,3 +470,60 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 扱い: 追随。`backtrace_silencers.rb` は残す（`BACKTRACE` 環境変数の扱いは railties 7.0.10 になく、このファイルだけが担う。Step 3 で見直す）
 - 出典: [rails/rails#42538](https://github.com/rails/rails/pull/42538)、[rails/rails#43237](https://github.com/rails/rails/pull/43237)（`mime_types.rb`・`wrap_parameters.rb`・`backtrace_silencers.rb` を雛形から外した）、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.5 フレームワークのデフォルトを設定する」
 - コミット: RS `fd3eb40`、RP `b1f3552`、OP `400ed9c`（`switch to load_defaults 7.0`）
+
+## 周辺 gem（Step 1-b-3）
+
+Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、gem の既定値・雛形の変化。上げた版と順番は [PLAN.md](../PLAN.md) の Step 1-b-3、経緯は [LOG.md](../LOG.md) の Step 1-b-3。
+
+### DEF-7.0-38: セッションの JSON で `<` `>` `&` を escape しなくなる
+
+- 種類: 周辺 gem（activerecord-session_store 2.1.0 → 2.2.0）/ 対象: RP
+- 何が変わるか: `sessions` テーブルの `data` 列に書く JSON の文字列で、`<` `>` `&` を `\u003c`・`\u003e`・`\u0026` の形にせず、そのままの文字で書く。例: omniauth が Referer を入れる `omniauth.origin` が `"http://www.example.com/?a=1\u0026b=\u003cx\u003e"` → `"http://www.example.com/?a=1&b=<x>"`。読み戻す値は同じ
+- なぜ: 2.2.0 で multi_json への依存をやめ、`JsonSerializer.dump` が `MultiJson.dump` から Ruby 標準の `JSON.dump` になった。2.1.0 では、MultiJson が `json_gem` のアダプター（RP に oj はない）で Hash の `to_json` を呼び、Active Support の JSON の encoder を通っていた。この encoder は `escape_html_entities_in_json`（既定 `true`）のとき `<` `>` `&` を escape する。`JSON.dump` はこの encoder を通らない
+- 3 アプリへの影響: RP だけ（セッションを DB に保存するのは RP だけ）。minitest は、先に足した escape のテストだけが落ち、「JSON で保存し、読み戻すと同じ値」のテストとほかのテストは通った。E2E のログイン・ログアウト・introspection の流れも同じ。前の形で書かれた行も、どちらも正しい JSON なので `JSON.parse` で同じ値に読める。セッションに入る値は文字列・数値・Hash だけ（`user_id`、omniauth の state・nonce・pkce・origin・params、`_csrf_token`、flash）なので、Time などの形の違い（Active Support は ISO 8601、`JSON.dump` は `to_s`）は起きない。lock から multi_json 1.15.0 が消える（ほかに使う gem・コードはない）。起動の途中の読み込みと、応答のスナップショットは前後で同じ
+- 扱い: 追随。テストの期待値を新しい形にした
+- 出典: activerecord-session_store の CHANGELOG（2.2.0「Drop dependency on `multi_json`」）、コミット [rails/activerecord-session_store@536716a](https://github.com/rails/activerecord-session_store/commit/536716a98a)（[rails/activerecord-session_store#213](https://github.com/rails/activerecord-session_store/pull/213) を元にした）、`activerecord-session_store-2.2.0/lib/active_record/session_store.rb` の `JsonSerializer`、`activesupport-7.0.10/lib/active_support/json/encoding.rb`、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.3 `config.active_support.escape_html_entities_in_json`」「3.2.36 `config.session_store`」（session_store の serializer そのものの説明はガイドにない）
+- コミット: RP（`update activerecord-session_store to 2.2.0`）
+
+### DEF-7.0-39: devise のビューで、フォームの要素を `<br />` で区切らず `<p>` で包む
+
+- 種類: 周辺 gem（devise 4.9.4 → 5.0.4）/ 対象: OP
+- 何が変わるか: devise の gem のビュー（sessions/new、registrations/new・edit、shared/_links）で、`<label>…</label><br />` が `<p><label>…</label></p>` に、入力欄とリンクも `<p>…</p>` になる。エラーのときは `<p><div class="field_with_errors">…</div></p>` になる（`<p>` の中に `<div>` は置けないので、ブラウザは `<p>` をそこで閉じる）。ステータス・ヘッダー・画面の文字・フォームの送り先と項目は同じ
+- なぜ: devise 5.0.0.rc の breaking change で、フォームの要素の区切りを `<br>` から `<p>` に変えた
+- 3 アプリへの影響: OP は devise のビューを上書きしていないので、gem のビューがそのまま出る。応答のスナップショットは 6 件（`users_sign_in`・`users_sign_in_failure`・`users_sign_up`・`users_sign_up_failure`・`users_edit`・`users_update_failure`）で、HTML の形だけが変わった。E2E のログイン（ラベルで入力欄を探す）は通った
+- 扱い: 追随（PLAN.md の 3 章の 2 の境目の 2）
+- 出典: devise の CHANGELOG（5.0.0.rc の breaking changes）、[heartcombo/devise#5494](https://github.com/heartcombo/devise/pull/5494)。devise は Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: OP（`update devise to 5.0.4`）
+
+### DEF-7.0-40: devise のエラーメッセージの部分の `data-turbo-cache="false"` が `data-turbo-temporary` になる
+
+- 種類: 周辺 gem（devise 4.9.4 → 5.0.4）/ 対象: OP
+- 何が変わるか: `devise/shared/_error_messages` の `<div id="error_explanation">` の属性が `data-turbo-cache="false"` から `data-turbo-temporary` になる
+- なぜ: Turbo 7.3.0 で `data-turbo-cache="false"` が非推奨になり、代わりの `data-turbo-temporary` に替えた（devise 5.0.0.rc の breaking change）
+- 3 アプリへの影響: OP は Turbo を使っていない（turbo-rails も JavaScript もない）ので、どちらの属性も働かない。応答のスナップショットは `users_sign_up_failure`・`users_update_failure` の 2 件が変わった
+- 扱い: 追随
+- 出典: devise の CHANGELOG（5.0.0.rc の breaking changes）、[Turbo v7.3.0 のリリースノート](https://github.com/hotwired/turbo/releases/tag/v7.3.0)。Rails ガイドに該当の節はない
+- コミット: OP（`update devise to 5.0.4`）
+
+### DEF-7.0-41: ログイン失敗の flash の文言が `Invalid email or password.` になる
+
+- 種類: 周辺 gem（devise 4.9.4 → 5.0.4）/ 対象: OP
+- 何が変わるか: 誤ったパスワードでログインしたときの `flash[:alert]` が `Invalid Email or password.` → `Invalid email or password.`。`devise-5.0.4/lib/devise/failure_app.rb` の `i18n_message` が、認証のキーの名前（`Email`）の先頭を小文字にしてから文言（`devise.failure.invalid` の `%{authentication_keys}`）に埋め、文がキーで始まるときだけ先頭を大文字に戻す
+- なぜ: 文の途中に大文字の `Email` が入る文法の誤りを直した（devise 5.0.0.rc の bug fix）
+- 3 アプリへの影響: OP のレイアウトは flash を出さないので、画面の文字は変わらず、応答のスナップショットにも出ない。OP の `config/locales/devise.en.yml` は gem の `en.yml` と同じで、4.9.4 と 5.0.4 で差がない。`user_sign_in_test.rb` の期待値を直した
+- 扱い: 追随
+- 出典: devise の CHANGELOG（5.0.0.rc の bug fixes）、[heartcombo/devise#4834](https://github.com/heartcombo/devise/pull/4834)。Rails ガイドに該当の節はない
+- コミット: OP（`update devise to 5.0.4`）
+
+### DEF-7.0-42: devise の initializer を雛形に合わせ、失敗の応答を 422、リダイレクトを 303 にする
+
+- 種類: 周辺 gem の雛形（devise 5.0.4 の `lib/generators/templates/devise.rb`）/ 対象: OP
+- 何が変わるか: `config/initializers/devise.rb` を 5.0.4 の雛形に合わせる。コメントの更新（`send_email_changed_notification` の説明、`navigational_formats` の例の `:turbo_stream`、warden の例の変数名、Turbolinks の節が Hotwire/Turbo の節になる）と、`config.responder.error_status = :unprocessable_entity`・`config.responder.redirect_status = :see_other` の 2 行が入る。コメントアウトされた `secret_key`・`pepper` の例の値は、install のときに作られた乱数なので今の値のまま残した。Devise のコントローラーの応答が次のように変わる
+  - ログイン・ユーザー登録・ユーザー編集の失敗: 200 → 422。`Rack::ETag` は 200・201 のときだけ ETag を付けるので、`ETag` がなくなり、`Cache-Control` が `max-age=0, private, must-revalidate` → `no-cache`（`rack-2.2.24/lib/rack/etag.rb`）
+  - ログイン・ユーザー登録・パスワードの変更の成功と、ログアウト: 302 → 303
+  - 未ログインで保護されたページ（doorkeeper の認可エンドポイントを含む）に来たときの FailureApp のリダイレクトは、responder を通らないので 302 のまま
+- なぜ: devise 4.9.0 で、responders 3.1 の設定を使い、失敗の応答とリダイレクトのステータスを変えられるようになった。既存のアプリとの互換のため gem の既定値は 200・302 のままで、新しいアプリの雛形に 422・303 を書くようになった（Hotwire/Turbo が期待する形。CHANGELOG は、将来の版で既定値が変わるかもしれないとしている）。OP の initializer は devise 4.8 の雛形で、この 2 行がなかった。gem の initializer の雛形にも追随すると人間が決めた（LOG.md の Step 1-b-3）
+- 3 アプリへの影響: ブラウザと OP の間の応答だけで、OP・RP・RS の間のやり取りは変わらない。303 でも 302 でも、ブラウザは POST・DELETE の後にリダイレクト先を GET で開くので、画面遷移は同じ（認可の途中のログインも、303 で `/oauth/authorize?...` に戻る）。422 の画面は本文が同じ。応答のスナップショット 7 件（`users_sign_in_failure`・`users_sign_up_failure`・`users_update_failure`・`users_sign_in_success`・`users_sign_up_success`・`users_update_success`・`users_sign_out`）が変わり、`user_sign_in_test.rb` のログイン失敗の期待値を 422 に直した。E2E のログイン・ログアウトは通った
+- 扱い: 追随。`:unprocessable_entity` は Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`）ので、Rack を 3.1 以上にする Step で雛形に合わせ直す（PLAN.md 7 章の devise の行）
+- 出典: `devise-4.9.4/CHANGELOG.md` の 4.9.0「Add support for Hotwire + Turbo」、[heartcombo/devise#5548](https://github.com/heartcombo/devise/pull/5548)、`devise-5.0.4/lib/generators/templates/devise.rb` の「Hotwire/Turbo configuration」、[Rails をはじめよう v7.0](https://railsguides.jp/v7.0/getting_started.html)「7.3 記事を1件作成する」（保存に失敗したら `status: :unprocessable_entity` で表示し直す）「7.5 記事を削除する」（`status: :see_other` でリダイレクトする）、[レイアウトとレンダリング v7.0](https://railsguides.jp/v7.0/layouts_and_rendering.html)「2.2.13.4 `:status` オプション」「2.3.1 リダイレクトのステータスコードを変更する」
+- コミット: OP（`follow the devise 5.0.4 initializer template`）

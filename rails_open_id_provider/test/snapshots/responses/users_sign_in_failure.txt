@@ -1,8 +1,7 @@
-HTTP 200
-cache-control: max-age=0, private, must-revalidate
+HTTP 422
+cache-control: no-cache
 content-length: <CONTENT_LENGTH>
 content-type: text/html; charset=utf-8
-etag: <ETAG>
 referrer-policy: strict-origin-when-cross-origin
 set-cookie: _rails_open_id_provider_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
 x-content-type-options: nosniff
@@ -27,13 +26,13 @@ x-xss-protection: 0
 
 <form class="new_user" id="new_user" action="/users/sign_in" accept-charset="UTF-8" method="post">
   <div class="field">
-    <label for="user_email">Email</label><br />
-    <input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" />
+    <p><label for="user_email">Email</label></p>
+    <p><input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" /></p>
   </div>
 
   <div class="field">
-    <label for="user_password">Password</label><br />
-    <input autocomplete="current-password" type="password" name="user[password]" id="user_password" />
+    <p><label for="user_password">Password</label></p>
+    <p><input autocomplete="current-password" type="password" name="user[password]" id="user_password" /></p>
   </div>
 
 
@@ -42,7 +41,7 @@ x-xss-protection: 0
   </div>
 </form>
 
-  <a href="/users/sign_up">Sign up</a><br />
+  <p><a href="/users/sign_up">Sign up</a></p>
 
 
 
