@@ -50,6 +50,7 @@
 | DEF-7.0-39 | devise のビューで、フォームの要素を `<br />` で区切らず `<p>` で包む | 周辺 gem（devise 5.0.4） | OP | 追随 |
 | DEF-7.0-40 | devise のエラーメッセージの部分の `data-turbo-cache="false"` が `data-turbo-temporary` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
 | DEF-7.0-41 | ログイン失敗の flash の文言が `Invalid email or password.` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
+| DEF-7.0-42 | devise の initializer を雛形に合わせ、失敗の応答を 422、リダイレクトを 303 にする | 周辺 gem の雛形（devise 5.0.4 の initializer） | OP | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -513,3 +514,16 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 扱い: 追随
 - 出典: devise の CHANGELOG（5.0.0.rc の bug fixes）、[heartcombo/devise#4834](https://github.com/heartcombo/devise/pull/4834)。Rails ガイドに該当の節はない
 - コミット: OP（`update devise to 5.0.4`）
+
+### DEF-7.0-42: devise の initializer を雛形に合わせ、失敗の応答を 422、リダイレクトを 303 にする
+
+- 種類: 周辺 gem の雛形（devise 5.0.4 の `lib/generators/templates/devise.rb`）/ 対象: OP
+- 何が変わるか: `config/initializers/devise.rb` を 5.0.4 の雛形に合わせる。コメントの更新（`send_email_changed_notification` の説明、`navigational_formats` の例の `:turbo_stream`、warden の例の変数名、Turbolinks の節が Hotwire/Turbo の節になる）と、`config.responder.error_status = :unprocessable_entity`・`config.responder.redirect_status = :see_other` の 2 行が入る。コメントアウトされた `secret_key`・`pepper` の例の値は、install のときに作られた乱数なので今の値のまま残した。Devise のコントローラーの応答が次のように変わる
+  - ログイン・ユーザー登録・ユーザー編集の失敗: 200 → 422。`Rack::ETag` は 200・201 のときだけ ETag を付けるので、`ETag` がなくなり、`Cache-Control` が `max-age=0, private, must-revalidate` → `no-cache`（`rack-2.2.24/lib/rack/etag.rb`）
+  - ログイン・ユーザー登録・パスワードの変更の成功と、ログアウト: 302 → 303
+  - 未ログインで保護されたページ（doorkeeper の認可エンドポイントを含む）に来たときの FailureApp のリダイレクトは、responder を通らないので 302 のまま
+- なぜ: devise 4.9.0 で、responders 3.1 の設定を使い、失敗の応答とリダイレクトのステータスを変えられるようになった。既存のアプリとの互換のため gem の既定値は 200・302 のままで、新しいアプリの雛形に 422・303 を書くようになった（Hotwire/Turbo が期待する形。CHANGELOG は、将来の版で既定値が変わるかもしれないとしている）。OP の initializer は devise 4.8 の雛形で、この 2 行がなかった。gem の initializer の雛形にも追随すると人間が決めた（LOG.md の Step 1-b-3）
+- 3 アプリへの影響: ブラウザと OP の間の応答だけで、OP・RP・RS の間のやり取りは変わらない。303 でも 302 でも、ブラウザは POST・DELETE の後にリダイレクト先を GET で開くので、画面遷移は同じ（認可の途中のログインも、303 で `/oauth/authorize?...` に戻る）。422 の画面は本文が同じ。応答のスナップショット 7 件（`users_sign_in_failure`・`users_sign_up_failure`・`users_update_failure`・`users_sign_in_success`・`users_sign_up_success`・`users_update_success`・`users_sign_out`）が変わり、`user_sign_in_test.rb` のログイン失敗の期待値を 422 に直した。E2E のログイン・ログアウトは通った
+- 扱い: 追随
+- 出典: `devise-4.9.4/CHANGELOG.md` の 4.9.0「Add support for Hotwire + Turbo」、[heartcombo/devise#5548](https://github.com/heartcombo/devise/pull/5548)、`devise-5.0.4/lib/generators/templates/devise.rb` の「Hotwire/Turbo configuration」、[Rails をはじめよう v7.0](https://railsguides.jp/v7.0/getting_started.html)「7.3 記事を1件作成する」（保存に失敗したら `status: :unprocessable_entity` で表示し直す）「7.5 記事を削除する」（`status: :see_other` でリダイレクトする）、[レイアウトとレンダリング v7.0](https://railsguides.jp/v7.0/layouts_and_rendering.html)「2.2.13.4 `:status` オプション」「2.3.1 リダイレクトのステータスコードを変更する」
+- コミット: OP（`follow the devise 5.0.4 initializer template`）
