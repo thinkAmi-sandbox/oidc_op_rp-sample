@@ -56,21 +56,21 @@ x-xss-protection: 0
   </tr>
   </thead>
   <tbody>
-    <tr id="application_311508750">
+    <tr id="application_607634479">
       <td class="align-middle">
-        <a href="/oauth/applications/311508750">Resource Server</a>
+        <a href="/oauth/applications/607634479">RP (my_op)</a>
       </td>
       <td class="align-middle">
-        <p>urn:ietf:wg:oauth:2.0:oob</p>
+        <p>http://localhost:3781/auth/my_op/callback</p>
       </td>
       <td class="align-middle">
         Yes
       </td>
       <td class="align-middle">
-        <a class="btn btn-link" href="/oauth/applications/311508750/edit">Edit</a>
+        <a class="btn btn-link" href="/oauth/applications/607634479/edit">Edit</a>
       </td>
       <td class="align-middle">
-        <form action="/oauth/applications/311508750" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+        <form action="/oauth/applications/607634479" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
   <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
 </form>
       </td>
@@ -94,21 +94,21 @@ x-xss-protection: 0
 </form>
       </td>
     </tr>
-    <tr id="application_607634479">
+    <tr id="application_311508750">
       <td class="align-middle">
-        <a href="/oauth/applications/607634479">RP (my_op)</a>
+        <a href="/oauth/applications/311508750">Resource Server</a>
       </td>
       <td class="align-middle">
-        <p>http://localhost:3781/auth/my_op/callback</p>
+        <p>urn:ietf:wg:oauth:2.0:oob</p>
       </td>
       <td class="align-middle">
         Yes
       </td>
       <td class="align-middle">
-        <a class="btn btn-link" href="/oauth/applications/607634479/edit">Edit</a>
+        <a class="btn btn-link" href="/oauth/applications/311508750/edit">Edit</a>
       </td>
       <td class="align-middle">
-        <form action="/oauth/applications/607634479" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+        <form action="/oauth/applications/311508750" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
   <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
 </form>
       </td>
