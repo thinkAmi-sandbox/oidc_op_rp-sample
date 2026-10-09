@@ -1312,7 +1312,7 @@ PR #21 の最後の実行（head は `docs: record the code review of step 1` �
 
 ## Step 1-b-1: 起動の途中の読み込みを CI で検出する（2026-10-09）
 
-- ブランチ / PR: `upgrade/step1b-anti-manner` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step1b-anti-manner` / [#22](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/22)
 - バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。a-nti_manner_kick_course 0.5.0 を 3 アプリの development・test に足した
 
 ### 作業計画で決めたこと
@@ -1358,8 +1358,17 @@ Step 1 の後に、人間が「gem やアプリのコードが起動の途中で
 - minitest: RS 8 runs・RP 20 runs・OP 25 runs、0 failures。`CI=1`（eager load あり）でも同じ件数で通る。gem を足したアプリのコミットの前に毎回流した
 - E2E: 同じく毎回流して 10 passed。スナップショットの差分なし
 - RuboCop: 3 アプリとも `no offenses detected`（Gemfile も対象）。bundler-audit: `No vulnerabilities found`。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`。`zeitwerk:check` は `All is good!`
-- `.github/workflows/ci.yml` は YAML として読め、`rails` ジョブのステップの順番と `env` が計画どおりなことを確かめた。CI での結果は PR を作った後に書く
+- `.github/workflows/ci.yml` は YAML として読め、`rails` ジョブのステップの順番と `env` が計画どおりなことを確かめた。CI での結果は下の「CI の結果」
 - 手動確認用の環境: 作業の前と後で、9 ファイル（3 アプリの development DB、OP の署名鍵、RP・RS の `.env`、3 アプリの `tmp/development_secret.txt`）のハッシュが、Step 1 の手動確認の後と同じだった
+
+### CI の結果
+
+PR #22 の最初の実行（head は `docs: record the code review of step 1-b-1` のコミット）で、5 ジョブ（`rails` の 3 つ、`e2e`、`public-safety`）と `ci-result` が通った。全体は約 1 分。ログで次のことを確かめた。
+
+- 新しい 2 ステップ（`起動の途中の読み込み（test）`・`（development）`）: 3 アプリとも、両方で `✅Congratulations!` が出た。`ANTI_MANNER` と `RAILS_ENV` がステップの `env` にあるのはこの 2 ステップだけ
+- minitest: RS 8 runs・RP 20 runs・OP 25 runs、0 failures（手元と同じ件数）。RuboCop は 3 アプリとも `no offenses detected`、`zeitwerk:check` は `All is good!`、bundler-audit は `No vulnerabilities found`、brakeman は `Security Warnings: 0`・`Ignored Warnings: 2`
+- E2E: 10 passed
+- 安全チェック: 追跡中の全ファイルと、PR の 8 コミットのメッセージ
 
 ### コードレビュー（`/code-review`）
 
