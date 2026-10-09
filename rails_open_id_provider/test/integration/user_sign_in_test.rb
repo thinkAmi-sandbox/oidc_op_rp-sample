@@ -14,7 +14,7 @@ class UserSignInTest < ActionDispatch::IntegrationTest
     post user_session_path, params: { user: { email: users(:user).email, password: SecureRandom.hex(8) } }
 
     assert_response :ok
-    assert_equal 'Invalid Email or password.', flash[:alert]
+    assert_equal 'Invalid email or password.', flash[:alert]
   end
 
   test '未ログインで認可エンドポイントに来ると、ログイン画面へリダイレクトする' do

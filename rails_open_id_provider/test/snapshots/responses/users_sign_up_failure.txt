@@ -25,7 +25,7 @@ x-xss-protection: 0
     <h2>Sign up</h2>
 
 <form class="new_user" id="new_user" action="/users" accept-charset="UTF-8" method="post">
-    <div id="error_explanation" data-turbo-cache="false">
+    <div id="error_explanation" data-turbo-temporary>
     <h2>
       3 errors prohibited this user from being saved:
     </h2>
@@ -38,27 +38,26 @@ x-xss-protection: 0
 
 
   <div class="field">
-    <div class="field_with_errors"><label for="user_email">Email</label></div><br />
-    <div class="field_with_errors"><input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" /></div>
+    <p><div class="field_with_errors"><label for="user_email">Email</label></div></p>
+    <p><div class="field_with_errors"><input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" /></div></p>
   </div>
 
   <div class="field">
-    <div class="field_with_errors"><label for="user_password">Password</label></div>
-    <em>(6 characters minimum)</em>
-    <br />
-    <div class="field_with_errors"><input autocomplete="new-password" type="password" name="user[password]" id="user_password" /></div>
+    <p><div class="field_with_errors"><label for="user_password">Password</label></div></p>
+      <p><em>(6 characters minimum)</em></p>
+    <p><div class="field_with_errors"><input autocomplete="new-password" type="password" name="user[password]" id="user_password" /></div></p>
   </div>
 
   <div class="field">
-    <div class="field_with_errors"><label for="user_password_confirmation">Password confirmation</label></div><br />
-    <div class="field_with_errors"><input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" /></div>
+    <p><div class="field_with_errors"><label for="user_password_confirmation">Password confirmation</label></div></p>
+    <p><div class="field_with_errors"><input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" /></div></p>
   </div>
 
   <div class="actions">
     <input type="submit" name="commit" value="Sign up" data-disable-with="Sign up" />
   </div>
 </form>
-  <a href="/users/sign_in">Log in</a><br />
+  <p><a href="/users/sign_in">Log in</a></p>
 
 
 

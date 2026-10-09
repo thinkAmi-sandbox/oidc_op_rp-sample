@@ -29,26 +29,25 @@ x-xss-protection: 0
   
 
   <div class="field">
-    <label for="user_email">Email</label><br />
-    <input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" />
+    <p><label for="user_email">Email</label></p>
+    <p><input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" /></p>
   </div>
 
 
   <div class="field">
-    <label for="user_password">Password</label> <i>(leave blank if you don't want to change it)</i><br />
-    <input autocomplete="new-password" type="password" name="user[password]" id="user_password" />
-      <br />
-      <em>6 characters minimum</em>
+    <p><label for="user_password">Password</label> <i>(leave blank if you don't want to change it)</i></p>
+    <p><input autocomplete="new-password" type="password" name="user[password]" id="user_password" /></p>
+      <p><em>6 characters minimum</em></p>
   </div>
 
   <div class="field">
-    <label for="user_password_confirmation">Password confirmation</label><br />
-    <input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" />
+    <p><label for="user_password_confirmation">Password confirmation</label></p>
+    <p><input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" /></p>
   </div>
 
   <div class="field">
-    <label for="user_current_password">Current password</label> <i>(we need your current password to confirm your changes)</i><br />
-    <input autocomplete="current-password" type="password" name="user[current_password]" id="user_current_password" />
+    <p><label for="user_current_password">Current password</label> <i>(we need your current password to confirm your changes)</i></p>
+    <p><input autocomplete="current-password" type="password" name="user[current_password]" id="user_current_password" /></p>
   </div>
 
   <div class="actions">

@@ -26,7 +26,7 @@ x-xss-protection: 0
     <h2>Edit User</h2>
 
 <form class="edit_user" id="edit_user" action="/users" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="put" autocomplete="off" />
-    <div id="error_explanation" data-turbo-cache="false">
+    <div id="error_explanation" data-turbo-temporary>
     <h2>
       1 error prohibited this user from being saved:
     </h2>
@@ -37,26 +37,25 @@ x-xss-protection: 0
 
 
   <div class="field">
-    <label for="user_email">Email</label><br />
-    <input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" />
+    <p><label for="user_email">Email</label></p>
+    <p><input autofocus="autofocus" autocomplete="email" type="email" value="user@example.com" name="user[email]" id="user_email" /></p>
   </div>
 
 
   <div class="field">
-    <label for="user_password">Password</label> <i>(leave blank if you don't want to change it)</i><br />
-    <input autocomplete="new-password" type="password" name="user[password]" id="user_password" />
-      <br />
-      <em>6 characters minimum</em>
+    <p><label for="user_password">Password</label> <i>(leave blank if you don't want to change it)</i></p>
+    <p><input autocomplete="new-password" type="password" name="user[password]" id="user_password" /></p>
+      <p><em>6 characters minimum</em></p>
   </div>
 
   <div class="field">
-    <label for="user_password_confirmation">Password confirmation</label><br />
-    <input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" />
+    <p><label for="user_password_confirmation">Password confirmation</label></p>
+    <p><input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" /></p>
   </div>
 
   <div class="field">
-    <div class="field_with_errors"><label for="user_current_password">Current password</label></div> <i>(we need your current password to confirm your changes)</i><br />
-    <div class="field_with_errors"><input autocomplete="current-password" type="password" name="user[current_password]" id="user_current_password" /></div>
+    <p><div class="field_with_errors"><label for="user_current_password">Current password</label></div> <i>(we need your current password to confirm your changes)</i></p>
+    <p><div class="field_with_errors"><input autocomplete="current-password" type="password" name="user[current_password]" id="user_current_password" /></div></p>
   </div>
 
   <div class="actions">

@@ -28,27 +28,26 @@ x-xss-protection: 0
   
 
   <div class="field">
-    <label for="user_email">Email</label><br />
-    <input autofocus="autofocus" autocomplete="email" type="email" value="" name="user[email]" id="user_email" />
+    <p><label for="user_email">Email</label></p>
+    <p><input autofocus="autofocus" autocomplete="email" type="email" value="" name="user[email]" id="user_email" /></p>
   </div>
 
   <div class="field">
-    <label for="user_password">Password</label>
-    <em>(6 characters minimum)</em>
-    <br />
-    <input autocomplete="new-password" type="password" name="user[password]" id="user_password" />
+    <p><label for="user_password">Password</label></p>
+      <p><em>(6 characters minimum)</em></p>
+    <p><input autocomplete="new-password" type="password" name="user[password]" id="user_password" /></p>
   </div>
 
   <div class="field">
-    <label for="user_password_confirmation">Password confirmation</label><br />
-    <input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" />
+    <p><label for="user_password_confirmation">Password confirmation</label></p>
+    <p><input autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" /></p>
   </div>
 
   <div class="actions">
     <input type="submit" name="commit" value="Sign up" data-disable-with="Sign up" />
   </div>
 </form>
-  <a href="/users/sign_in">Log in</a><br />
+  <p><a href="/users/sign_in">Log in</a></p>
 
 
 
