@@ -57,6 +57,24 @@ jobs:
         if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
         run: bin/rails zeitwerk:check
 
+      # config/application.rb や gem の require が、起動の途中で Rails の部品（ActiveRecord::Base など）を読み込んでいないかを
+      # a-nti_manner_kick_course で確かめる。見つけると疑わしい行を出して終了コード 1 で止まる。
+      # ほかの gem の initializer・config/initializers・ActionDispatch::Request は検出できない（docs/upgrade/PLAN.md の Step 1-b-1）。
+      # ANTI_MANNER があると起動を途中で終了コード 0 で終えるので、ジョブ全体ではなくこのステップだけに付ける
+      - name: 起動の途中の読み込み（test）
+        if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
+        env:
+          ANTI_MANNER: "1"
+          RAILS_ENV: test
+        run: bin/rails runner 1
+
+      - name: 起動の途中の読み込み（development）
+        if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
+        env:
+          ANTI_MANNER: "1"
+          RAILS_ENV: development
+        run: bin/rails runner 1
+
       - name: minitest
         if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
         run: bin/rails test
