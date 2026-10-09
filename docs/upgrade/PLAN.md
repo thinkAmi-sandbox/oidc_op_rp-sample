@@ -47,7 +47,7 @@
 | タグ `rails-6.1-prepared` | Ruby 3.1.7 / Rails 6.1.7.10、Step 0 完了時点。epic の PR [#20](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/20) のマージコミット |
 | epic | `epic/rails-8.1-upgrade`（`main` から作成。開始を示す空コミットあり） |
 | 作業ブランチ | `upgrade/<step>-<内容>`。epic から切り、PR の向き先は epic |
-| PR の単位 | Step 0 はサブステップ（0-a〜0-g。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR（Step 1 の後の周辺 gem はサブステップ 1-b の PR） |
+| PR の単位 | Step 0 はサブステップ（0-a〜0-g。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR（Step 1 の後のサブステップ 1-b は、1-b-1（起動の途中の読み込みの検出）と 1-b-2（周辺 gem）の 2 つの PR に分ける） |
 | 取り込み | 最後に epic → main をマージコミットで取り込む（squash しない） |
 | worktree | 作業用 worktree は epic を元にする |
 | main への外部 PR | 入った場合は epic に main を取り込む |
@@ -65,7 +65,7 @@
 | 0-f | 3.1 | 6.1 | 周辺 gem の更新 |
 | 0-g | 3.1 | 6.1 | CI（GitHub Actions）。仕上げから前倒し |
 | 1 | 3.1 | **7.0.x** | annotate 3.2.0、`app:update`、`load_defaults 7.0`、concurrent-ruby 1.3.7 |
-| 1-b | 3.1 | 7.0 | Rails 7.0 以上を必要とする周辺 gem（devise 5.x、doorkeeper 5.8 以上など） |
+| 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、Rails 7.0 以上を必要とする周辺 gem（1-b-2。devise 5.x、doorkeeper 5.8 以上など） |
 | 2 | **3.2** | 7.0 | Ruby のみ |
 | 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応） |
 | 4 | **3.3** | 7.1 | Ruby のみ |
@@ -353,9 +353,38 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | backtrace_silencers.rb | `BACKTRACE` 環境変数の扱いは railties 7.0.10 にない。7.0 の雛形からは消えたが、この initializer は残す（Step 3 で見直す） |
 | `app:update` | sprockets と test_unit の railtie を読み込んでいないので、Sprockets とテストの雛形は飛ばされる。`db/schema.rb` を `ActiveRecord::Schema[6.1].define` に書き換え、`active_storage:update` で Active Storage のマイグレーションを 3 本足す。7.0 の雛形から消えた `application_controller_renderer.rb`・`mime_types.rb`・`cookies_serializer.rb`・`wrap_parameters.rb`・`backtrace_silencers.rb` は消さない |
 
-### Step 1-b: Rails 7.0 を必要とする周辺 gem
+### Step 1-b: 起動の途中の読み込みの検出と、Rails 7.0 を必要とする周辺 gem
 
-Step 1 が epic に入ってから、調べて作業計画を出す。候補は Step 1 の「決めたこと」と 7 章。
+PR を 1-b-1（起動の途中の読み込みの検出）と 1-b-2（周辺 gem）に分ける。1-b-1 を先に epic に入れ、1-b-2 で gem を上げたときに、gem が起動の途中に Rails の部品を読み込むようになれば CI で分かるようにする（人間が判断。経緯は LOG.md の Step 1-b-1）。
+
+#### 1-b-1: 起動の途中の読み込みを CI で検出する
+
+Step 1 で、RP の `config/application.rb` の serializer の設定が起動の途中で `ActiveRecord::Base` を読み込み、`new_framework_defaults_7_0.rb` の設定が黙って無視された（[defaults/rails-7.0.md](defaults/rails-7.0.md) の「補足」）。これを Step ごとの手作業ではなく、CI で毎回検出する。
+
+- [ ] 3 アプリの Gemfile の先頭に a-nti_manner_kick_course 0.5.0 を足す（RS → RP → OP の順に、gem だけのコミット）
+- [ ] CI の `rails` ジョブに、`ANTI_MANNER=1 bin/rails runner 1` を test と development で流すステップを足す
+- [ ] わざと壊して、検出されることを確かめる（確かめた後で戻す）
+- [ ] 検出できる範囲と、手で確かめる範囲（`action_dispatch_request`）を 12 章・TIPS.md に書く
+- 着手時の作業計画で決めたこと（人間が承認）
+  - Gemfile: `ruby` の行の直後、`gem 'rails'` より前に `gem 'a-nti_manner_kick_course', groups: %i[development test]` と書く。`group :development, :test do ... end` のブロックにすると、既にある同じグループのブロックと重なり、RuboCop の `Bundler/DuplicatedGroup` の指摘になるため（`dotenv-rails` と同じ書き方）。版は Gemfile で固定せず、lock に任せる
+  - CI: `zeitwerk:check` の後、minitest の前に、test と development の 2 ステップを足す（OP の署名鍵を作るステップより後）。`ANTI_MANNER` と `RAILS_ENV` はステップの `env` にだけ付ける。`ANTI_MANNER` があると gem が `eager_load!` の前で起動を終了コード 0 で終えるので、ジョブ全体に付けると minitest などが何も検査せずに成功するため
+  - 壊すと落ちることは手元で確かめる（RS の `config/application.rb` で `ActiveRecord::Base` を参照、RP で Step 1 の前の serializer の設定に戻す、OP の initializer で `ActionController::Base` を参照）。検出できない範囲として、OP の initializer で `ActionDispatch::Request` を参照しても通ることも確かめる
+  - 外す時期: Rails 8.2 以上（今回の目標の外）。epic の間は残す（7 章）
+
+調べたこと（着手時の 2026-10-09）:
+
+| 項目 | 分かったこと |
+|---|---|
+| 版 | 0.5.0（2026-01-04）が最新。`.gem` は 8,704 バイト。依存は `activesupport >= 7.0.0`・`railties >= 7.0.0`。MIT |
+| gem 名と読み込み | gem 名は `a-nti_manner_kick_course`、lib は `a/nti_manner_kick_course.rb`。Bundler.require は名前の `-` を `/` にしたファイルを読む。Gemfile の順に require するので、先頭に置けば `require "rails/all"` の後、アプリのほかの gem より先に読まれる |
+| 動き | require された時点で、環境変数 `ANTI_MANNER` があれば、監視する部品の `ActiveSupport.on_load` にフックを仕込む。initializer `anti_manner`（`before: :eager_load!`）まで何も走らなければ「✅Congratulations!」を出して終了コード 0 で `exit` し、その前にフックが走れば、疑わしい行を出して終了コード 1 で止まる（`ANTI_MANNER_DEBUG=1` でスタックトレース全部）。環境変数がなければ Railtie を足すだけで何もしない。Rails 7.1 以下は `rails runner 1` で起動する（README） |
+| 監視する部品 | `action_controller`・`active_record`・`action_view`・`active_job`・`action_mailer` など 39 個。`action_dispatch_request` は含まない（`action_dispatch_response`・`action_dispatch_integration_test` は含む）。そのため、RP の activerecord-session_store と、RP・OP の development の web-console による `ActionDispatch::Request` の早い読み込み（[IMPROVEMENTS.md](../IMPROVEMENTS.md) の IMP-009）は検出できない |
+| Rails 8.2 の Load hook guard | rails/rails#56201（2026-02-11 に main へ）は当初 `action_dispatch_request` も監視したが、rails/rails#56901（2026-02-27）で外れた（production では routes を読むときに初期化の途中で読み込まれるため）。既定は警告だけ（`:log`）で、`eager_load` が true のときは見ない。railties の最新は 8.1.4 で、8.2 は出ていない |
+| RuboCop | `Bundler/DuplicatedGroup` は `group` のブロックを数え、`gem` の `groups:` は数えない。`Bundler/OrderedGems` は `-`・`_` を無視して並べ、コメントで区切る |
+
+#### 1-b-2: Rails 7.0 を必要とする周辺 gem
+
+1-b-1 が epic に入ってから、調べて作業計画を出す。候補は Step 1 の「決めたこと」と 7 章。
 
 ### Step 2〜9
 
@@ -417,6 +446,7 @@ Step 1 が epic に入ってから、調べて作業計画を出す。候補は 
 | activerecord-session_store | 2.0.0 | 0-f-1 で 2.1.0（済）→ Step 1-b | 2.2 以上は Rails 7.0 以上が必要。2.1.0 のまま Rails 7.0.10 で解決する（Step 1 の調査） |
 | bootsnap / jbuilder / omniauth-rails_csrf_protection | 1.7.7 / 2.11.2 / 1.0.0 | 0-f-1 で bootsnap 1.26.0・jbuilder 2.13.0（済）→ jbuilder 2.14 以上と omniauth-rails_csrf_protection 1.0.2 は Step 1-b、omniauth-rails_csrf_protection 2.x は Step 7 | jbuilder 2.14 以上は Rails 7.0 以上が必要。omniauth-rails_csrf_protection 2.0 の変化は Rails 8.1 だけが対象 |
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
+| a-nti_manner_kick_course | — | 1-b-1 で 0.5.0 を足す → Rails 8.2 以上で外すかを判断（今回の目標の外なので、epic の間は残す） | development・test だけ。Gemfile の先頭に置く。Rails 8.2 で入る Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない。README によると、Rails 7.2 以上は `rails runner 1` の代わりに `rails boot` で起動できる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
 | brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初 | brakeman 8 系は Ruby 3.1 では入らない |
 | simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初 | simplecov 1.x は Ruby 3.2 以上が必要（Step 2 の後に上げられる） |
@@ -490,7 +520,7 @@ oxlint / oxfmt の導入条件:
 | oauth2 2.x / faraday 2 / doorkeeper 系の更新で、アプリ間の通信が壊れる | 1 gem ずつ上げ、毎回 E2E を流す |
 | doorkeeper-openid_connect の JWT ライブラリ変更で ID トークンや JWKS が変わる（Next.js 製 RP にも影響しうる） | スナップショットの比較で ID トークンの項目と `alg`、JWKS の構造を比べる |
 | Rails 7.0 の `load_defaults` で Cookie の鍵生成方式が SHA256 に変わり、既存セッションが無効になる | サンプルなので許容し、ローテーション用のコードは入れない（Step 1 で人間が判断）。対象は OP のセッション Cookie だけ（RP のセッション Cookie は署名のない ID）。E2E は毎回新しいセッションで流す。Step 1 の手動確認で、OP だけが一度ログアウトした状態になることを確かめた（DEF-7.0-36） |
-| gem やアプリのコードが、フレームワークのクラス（`ActiveRecord::Base` など）を initializer より前に読み込み、`new_framework_defaults_*.rb` の設定が黙って無視される | 有効にする前後で、test と development の両方の値を `rails runner` で書き出して比べる。起動の途中に読み込まれる部品も確かめる（Step 1 で RP と web-console で起きた。docs/upgrade/defaults/rails-7.0.md の「補足」） |
+| gem やアプリのコードが、フレームワークのクラス（`ActiveRecord::Base` など）を initializer より前に読み込み、`new_framework_defaults_*.rb` の設定が黙って無視される | 有効にする前後で、test と development の両方の値を `rails runner` で書き出して比べる（Step 1 で RP と web-console で起きた。docs/upgrade/defaults/rails-7.0.md の「補足」）。1-b-1 で、起動の途中の読み込みを a-nti_manner_kick_course で検出する検査を CI に足す（test と development）。監視の一覧にない `action_dispatch_request`（RP の activerecord-session_store、RP・OP の development の web-console）は、引き続き TIPS.md の「設定の値と応答の比較」の方法で手で確かめる |
 | Rails 7.1 で RP の独自ストラテジーが Zeitwerk の読み込みに失敗する | Step 3 の案 B で対応。失敗したら案 A |
 | gem 更新でマイグレーションの追加が必要になる | gem 更新の手順で確認し、`db:drop db:setup` の完了条件で検出する |
 | 時間に依存するテストが不安定になる | minitest は `travel_to`、E2E は期限切れを待たずに revoke で確認 |
