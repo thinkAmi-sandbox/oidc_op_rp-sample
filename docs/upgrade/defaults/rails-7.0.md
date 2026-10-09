@@ -1,0 +1,297 @@
+# Rails 7.0 の既定値への追随
+
+- 版: Rails 6.1.7.10 → 7.0.10（Ruby 3.1.7）
+- Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: （PR 作成後に記入）
+- 記録のルールは [README.md](README.md)
+
+## 一覧
+
+| ID | 項目 | 種類 | 対象 | 扱い |
+|---|---|---|---|---|
+| DEF-7.0-01 | 生成するファイルの引用符が二重引用符になる | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-02 | RS の `config/application.rb` が `require "rails/all"` になる | `app:update` の雛形 | RS | 追随 |
+| DEF-7.0-03 | `# require "sprockets/railtie"` の行が消える | `app:update` の雛形 | RP・OP | 追随 |
+| DEF-7.0-04 | development の `config.server_timing = true` | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-05 | development の `config.file_watcher`（EventedFileUpdateChecker）が消える | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-06 | listen を Gemfile から外す | Gemfile の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-07 | test の `config.cache_classes = true` | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-08 | test の `config.eager_load = ENV["CI"].present?` | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-09 | production の `report_deprecations` と、DB の切り替えのコメント | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-10 | `filter_parameter_logging.rb` の先頭のコメント | `app:update` の雛形 | 3 アプリ | 追随（独自の部分は残す） |
+| DEF-7.0-11 | `content_security_policy.rb` のコメントの例 | `app:update` の雛形 | RP・OP | 追随 |
+| DEF-7.0-12 | `config/initializers/new_framework_defaults_7_0.rb` | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.0-13 | `db/schema.rb` の `ActiveRecord::Schema[6.1]` | `app:update` | RP・OP | 追随 |
+| DEF-7.0-14 | Active Storage のマイグレーション | `app:update`（`active_storage:update`） | 3 アプリ | 採用しない |
+| DEF-7.0-15 | `stylesheet_link_tag` の `<link>` の属性の並び | Rails のヘルパーの出力 | RP・OP | 追随 |
+| DEF-7.0-16 | `action_dispatch.cookies_serializer = :json` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-17 | `action_controller.wrap_parameters_by_default = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-18 | `active_support.remove_deprecated_time_with_zone_name = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-19 | `active_support.use_rfc4122_namespaced_uuids = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-20 | `action_mailer.smtp_timeout = 5` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-21 | `active_storage.video_preview_arguments` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-22 | `active_storage.variant_processor = :vips` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-23 | `active_storage.multiple_file_field_include_hidden = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-24 | `action_dispatch.return_only_request_media_type_on_content_type = false` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-25 | `active_record.automatic_scope_inversing = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+
+`load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
+
+## `app:update` の雛形
+
+### DEF-7.0-01: 生成するファイルの引用符が二重引用符になる
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: `bin/rails`・`bin/setup`・`config/boot.rb`・各環境のファイル・`inflections.rb`・`cors.rb`（RS）などの文字列が `'` から `"` になる
+- なぜ: Rails 7.0 で、生成するファイルの引用符を二重引用符にそろえた
+- 3 アプリへの影響: 文字列の書き方だけで、動作は同じ
+- 扱い: 追随
+- 出典: [rails/rails#41080](https://github.com/rails/rails/pull/41080)、[rails/rails#41733](https://github.com/rails/rails/pull/41733)。Rails ガイドに該当の節はない
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`（`apply rails app:update for Rails 7.0`）
+
+### DEF-7.0-02: RS の `config/application.rb` が `require "rails/all"` になる
+
+- 種類: `app:update` の雛形 / 対象: RS
+- 何が変わるか: フレームワークごとの `require` が `require "rails/all"` 1 行になる
+- なぜ: 6.1 では Sprockets も `rails/all` の一部だったので、Sprockets を外した RS は個別の require になっていた。7.0 で Sprockets が `rails/all` から外れ、`railties-7.0.10/lib/rails/generators/app_base.rb` の `include_all_railties?` から `:skip_sprockets` がなくなったので、RS は「すべてのフレームワークを使う」扱いになった
+- 3 アプリへの影響: `railties-7.0.10/lib/rails/all.rb` の一覧は、今の RS の require と同じフレームワーク（`active_model/railtie` は `active_record/railtie` が読み込む）。`bin/rails runner` で前後を比べ、railtie の顔ぶれとミドルウェアの並びは同じで、Active Job・Global ID・Action Cable の initializer が走る順番だけが変わった。minitest・E2E・応答の比較は同じ
+- 扱い: 追随
+- 出典: [rails/rails#43261](https://github.com/rails/rails/pull/43261)。Rails ガイドに該当の節はない（関連: [アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.3 Sprocketsへの依存がオプショナルになった」）
+- コミット: RS `e363c55`
+
+### DEF-7.0-03: `# require "sprockets/railtie"` の行が消える
+
+- 種類: `app:update` の雛形 / 対象: RP・OP
+- 何が変わるか: `config/application.rb` のコメントアウトされた `# require "sprockets/railtie"` の行がなくなる
+- なぜ: 7.0 で Sprockets が任意の依存になり、雛形のフレームワークの一覧から外れた
+- 3 アプリへの影響: コメントの行なので動作は同じ。3 アプリとも Sprockets を読み込んでいない（sprockets-rails を Gemfile に足さなかった理由は PLAN.md の Step 1）
+- 扱い: 追随
+- 出典: [rails/rails#43261](https://github.com/rails/rails/pull/43261)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.3 Sprocketsへの依存がオプショナルになった」、[7.0 リリースノート](https://railsguides.jp/v7.0/7_0_release_notes.html)「3.3 主な変更点」（Railties）
+- コミット: RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-04: development の `config.server_timing = true`
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: development でミドルウェア `ActionDispatch::ServerTiming` が積まれ（`railties-7.0.10/lib/rails/application/default_middleware_stack.rb`）、応答に `Server-Timing` ヘッダーが付く。リクエストの間の `ActiveSupport::Notifications` のイベント（`sql.active_record` など）の合計時間を、イベント名ごとに出す
+- なぜ: Rails 7.0 で Server Timing のミドルウェアが入り、新しいアプリでは development だけで有効にするようになった。開発中に、サーバー側の処理時間の内訳をブラウザの開発者ツールで見るため
+- 3 アプリへの影響: test 環境には出ないので、minitest と応答の比較は同じ。E2E と手動確認は development で動くのでヘッダーが付くが、E2E はヘッダーを見ていない
+- 扱い: 追随（当初は「アップグレードに必要ないので採用しない」案も検討したが、Rails の既定値には追随すると決めた。PLAN.md の 3 章の 2）
+- 出典: [rails/rails#36289](https://github.com/rails/rails/pull/36289)、[W3C Server Timing](https://www.w3.org/TR/server-timing/)。v7.0 版の設定ガイドには項目がないので、最新版の [Rails アプリケーションを設定する](https://railsguides.jp/configuring.html)「`config.server_timing`」
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-05: development の `config.file_watcher`（EventedFileUpdateChecker）が消える
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: `config.file_watcher = ActiveSupport::EventedFileUpdateChecker` の行がなくなり、development の変更の検知が既定の `ActiveSupport::FileUpdateChecker`（リクエストのたびにファイルの更新時刻を見る）になる
+- なぜ: Rails 7.0 は、listen を使うファイル監視を既定で設定しなくなった。PR の説明では、SSD の今のコンピューターでは、イベント駆動の監視による速さの差がほとんどないため
+- 3 アプリへの影響: `bin/rails runner` で `config.file_watcher` が `ActiveSupport::FileUpdateChecker` になったことを確かめた。RS で `app/controllers/apples_controller.rb` の更新時刻だけを変えると、再読み込みの検知が `false` → `true` になった。コードを変えると次のリクエストで反映される点は同じ。Step 0-b から出ていた finalizer の警告（`ThreadError: can't be called from trap context`）の原因の処理がなくなる
+- 扱い: 追随（listen は DEF-7.0-06 で外す）
+- 出典: [rails/rails#42985](https://github.com/rails/rails/pull/42985)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.2.20 `config.file_watcher`」。警告は LOG.md の Step 0-b「遭遇した問題」・Step 0-f-1「listen の finalizer の警告」、[guard/listen#565](https://github.com/guard/listen/issues/565)
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-06: listen を Gemfile から外す
+
+- 種類: Gemfile の雛形 / 対象: 3 アプリ
+- 何が変わるか: development グループの `gem 'listen', '~> 3.3'` を外す（RS は development グループごと）。lock から listen 3.10.1 と、その依存の rb-fsevent 0.11.0・rb-inotify 0.10.1・ffi 1.15.3 が消える。ほかの gem の版は変わらない
+- なぜ: DEF-7.0-05 で、listen を使う唯一の設定がなくなった（`git grep` で確認）。Rails 7.0 の Gemfile の雛形にも listen はない
+- 3 アプリへの影響: minitest・RuboCop・E2E は同じ。`Listen` 定数は読み込まれない。CI で ffi 1.15.3 をソースからビルドしていた（LOG.md の Step 0-g「CI の結果」）のがなくなる。無視リストに、外れる gem の advisory はない
+- 扱い: 追随
+- 出典: [rails/rails#42985](https://github.com/rails/rails/pull/42985)
+- コミット: RS `b50e055`、RP `93f3bfa`、OP `c740f47`（`remove listen`）
+
+### DEF-7.0-07: test の `config.cache_classes = true`
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: test.rb の `config.cache_classes` が `false` → `true` になり、`config.action_view.cache_template_loading = true` の行が消える（`cache_classes` が `true` なら同じ値になる）
+- なぜ: 6.1 の雛形は、Spring で同じプロセスを使い回すことを前提に `false` にしていた。Rails 7.0 で Spring が既定から外れたので `true` に戻った（雛形のコメントも「Spring を使うなら false にする」）
+- 3 アプリへの影響: テストの実行中はコードを読み直さない。Spring は Step 0-f-1 で外してあるので、雛形の前提と合う。minitest は同じ件数で通った
+- 扱い: 追随
+- 出典: [rails/rails#42997](https://github.com/rails/rails/pull/42997)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.2.6 `config.cache_classes`」、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.2 spring gem」
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-08: test の `config.eager_load = ENV["CI"].present?`
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: test.rb の `config.eager_load` が `false` → `ENV["CI"].present?` になる
+- なぜ: Rails 7.0 で、CI ではアプリのコードをすべて読み込んでからテストするようにした。手元では一部のテストだけを速く流し、CI では読み込みの漏れや副作用を見つけるため
+- 3 アプリへの影響: GitHub Actions は環境変数 `CI` を常に `true` にするので、CI の minitest は eager load ありになる。手元で `CI=1` を付けて 3 アプリの minitest を流し、同じ件数で通った
+- 扱い: 追随
+- 出典: [rails/rails#43508](https://github.com/rails/rails/pull/43508)、GitHub Docs の「[Variables reference](https://docs.github.com/en/actions/reference/workflows-and-actions/variables)」（既定の環境変数 `CI`）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.2.13 `config.eager_load`」（CI で有効にする理由はガイドにない）
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-09: production の `report_deprecations` と、DB の切り替えのコメント
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: production.rb の `deprecation = :notify`・`disallowed_deprecation = :log`・`disallowed_deprecation_warnings = []` が `report_deprecations = false` 1 行になる。DB の接続を切り替える設定のコメントの塊（`database_selector` など）が消える
+- なぜ: 前者は、本番で非推奨警告の処理そのものを止められる設定が 7.0 で入り、雛形がそれを使うようにした。後者は、DB・シャードの切り替えの設定が、新しいアプリでは `bin/rails g active_record:multi_db` で別の initializer に生成されるようになった
+- 3 アプリへの影響: production だけで、動作保証の対象外
+- 扱い: 追随（production.rb は雛形に追従するだけ）
+- 出典: [rails/rails#42913](https://github.com/rails/rails/pull/42913)、[rails/rails#43796](https://github.com/rails/rails/pull/43796)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.13 `config.active_support.report_deprecations`」、[複数のデータベース v7.0](https://railsguides.jp/v7.0/active_record_multiple_databases.html)「4 ロールの自動切り替えを有効にする」
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-10: `filter_parameter_logging.rb` の先頭のコメント
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: 先頭のコメントが、伏せる対象の書き方を `ActiveSupport::ParameterFilter` の文書へ案内する文言になる
+- なぜ: Rails 側で、雛形のコメントを書き直した
+- 3 アプリへの影響: コメントだけ。`app:update` で消えた、アプリが足した `:code` と日本語のコメント（Step 0-a）は戻した（定義の境目の 4・7）
+- 扱い: 雛形のコメントに追随し、独自の部分は残す
+- 出典: [rails/rails#44139](https://github.com/rails/rails/pull/44139)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.2.21 `config.filter_parameters`」
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-11: `content_security_policy.rb` のコメントの例
+
+- 種類: `app:update` の雛形 / 対象: RP・OP
+- 何が変わるか: コメントの例が、`Rails.application.configure` の中に書く形と、import map と Turbo に合う nonce の例になる
+- なぜ: Rails 7.0 の既定の JavaScript（import map と Turbo）に合う CSP の例に変えた
+- 3 アプリへの影響: すべてコメントで、CSP は今も設定していない
+- 扱い: 追随
+- 出典: [rails/rails#43227](https://github.com/rails/rails/pull/43227)、[rails/rails#42999](https://github.com/rails/rails/pull/42999)、[セキュリティガイド v7.0](https://railsguides.jp/v7.0/security.html)「9.1 Content Security Policyヘッダー」
+- コミット: RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-12: `config/initializers/new_framework_defaults_7_0.rb`
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: 新しい既定値をすべてコメントにした initializer が足される
+- なぜ: `app:update` は、新しい既定値を 1 つずつ有効にできるよう、このファイルを足す
+- 3 アプリへの影響: 足した時点ではすべてコメントで、動作は同じ
+- 扱い: 追随。グループごとに有効にし、最後に `load_defaults 7.0` にして消す
+- 出典: `railties-7.0.10/lib/rails/generators/rails/app/templates/config/initializers/new_framework_defaults_7_0.rb.tt`、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.4 アップデートタスク」「1.5 フレームワークのデフォルトを設定する」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.1.1 ターゲットバージョン7.0のデフォルト値」
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-13: `db/schema.rb` の `ActiveRecord::Schema[6.1]`
+
+- 種類: `app:update`（`railties-7.0.10/lib/rails/generators/rails/app/app_generator.rb` の `db_when_updating`）/ 対象: RP・OP（RS には schema.rb がない）
+- 何が変わるか: `ActiveRecord::Schema.define` が `ActiveRecord::Schema[6.1].define` になる
+- なぜ: 7.0 では、版のない `ActiveRecord::Schema.define` は 7.0 の規則で読み込まれ、精度を指定していない datetime の列が新しい DB では `precision: 6` で作られる。それを防ぐため、`app:update` がその schema.rb を書いた版（6.1）を付ける
+- 3 アプリへの影響: E2E の起動（`db:drop db:setup`）で作る DB の列の定義が、今と同じになる。手動確認用の DB には触れない。7.0 のまま `db:migrate` をすると `Schema[7.0]` に書き換わり、datetime の精度の差分が出る
+- 扱い: 追随
+- 出典: [rails/rails#44356](https://github.com/rails/rails/pull/44356)、[rails/rails#44286](https://github.com/rails/rails/pull/44286)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.15 Active RecordのスキーマダンプにRailsのバージョンが含まれるようになった」
+- コミット: RP `8ca0c8c`、OP `8be19a1`
+
+### DEF-7.0-14: Active Storage のマイグレーション
+
+- 種類: `app:update`（`update:active_storage`）/ 対象: 3 アプリ
+- 何が変わるか: `db/migrate/` に `*.active_storage.rb` が 3 本（`add_service_name_to_active_storage_blobs`・`create_active_storage_variant_records`・`remove_not_null_on_active_storage_blobs_checksum`）写される
+- なぜ: `app:update` は `update:active_storage` も流し、Active Storage を使うアプリ向けのマイグレーションを写す（`railties-7.0.10/lib/rails/tasks/framework.rake` の `update`、`activestorage-7.0.10/lib/tasks/activestorage.rake` の `update`）
+- 3 アプリへの影響: 3 アプリとも Active Storage を使っていない（テーブルもない）。採用すると未実行のマイグレーションになり、手動確認用の DB に `db:migrate` が要る
+- 扱い: 採用しない（定義の境目の 5「使っていない機能を動かし始めるもの」）。写されたファイルは消した
+- 出典: [アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.4 アップデートタスク」
+- コミット: なし（`app:update` のコミットに含めなかった）
+
+## Rails のヘルパーの出力
+
+### DEF-7.0-15: `stylesheet_link_tag` の `<link>` の属性の並び
+
+- 種類: Rails のヘルパーの出力 / 対象: RP・OP
+- 何が変わるか: `<link rel="stylesheet" media="..." href="..." />` が `<link rel="stylesheet" href="..." media="..." />` になる。RP のレイアウト（`media: 'all'` を明示）と、OP の doorkeeper のレイアウト（既定の `media="screen"`）の両方
+- なぜ: Rails 7.0 で、`stylesheet_link_tag` が既定で `media="screen"` を付けないこともできるようになり（`config.action_view.apply_stylesheet_media_default`。Step 1 のグループ 7 で有効にする）、`tag_options` の最初のハッシュから `media` がなくなった。`media` は後から入るので `href` の後になる。6.1 は最初のハッシュの 2 番目に `"media" => "screen"` があり、渡した `media:` はその位置の値を上書きしていた（`actionview-6.1.7.10` と `actionview-7.0.10` の `lib/action_view/helpers/asset_tag_helper.rb` の `stylesheet_link_tag`）
+- 3 アプリへの影響: 属性の値は同じで、並びだけが違う。ブラウザの解釈は同じ。Rails 7.0.10 にしたコミットで起き、応答の前後比較で見つけた
+- 扱い: 追随
+- 出典: [rails/rails#41215](https://github.com/rails/rails/pull/41215)、[rails/rails#41472](https://github.com/rails/rails/pull/41472)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.11.19 `config.action_view.apply_stylesheet_media_default`」（並びが変わることそのものはガイドにない）
+- コミット: RP `a6e2bdf`、OP `8715abf`（`update rails to 7.0.10`）
+
+## `load_defaults`（`new_framework_defaults_7_0.rb`）
+
+グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
+
+RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`initialize!` より前に `ActiveRecord::Base` と `ActionDispatch::Request` を読み込む。そのため、`new_framework_defaults_7_0.rb` に書いた設定のうち、`on_load(:active_record)`・`on_load(:action_dispatch_request)` で入るもの（DEF-7.0-24・25）は RP では効かず、`load_defaults 7.0` にしたときに効く。
+
+### DEF-7.0-16: `action_dispatch.cookies_serializer = :json`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: RP・OP は既に `:json`（`config/initializers/cookies_serializer.rb`）で変わらない。RS は未設定（Marshal）→ `:json`
+- なぜ: 新しいアプリの既定を、initializer のファイルではなく `load_defaults` で持つようにした。JSON は Marshal より安全
+- 3 アプリへの影響: RS は API 専用で、Cookie のミドルウェアがない（`bin/rails middleware`）
+- 扱い: 追随。`cookies_serializer.rb` は `load_defaults 7.0` にするときに消す
+- 出典: [rails/rails#42538](https://github.com/rails/rails/pull/42538)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.10.1 `config.action_dispatch.cookies_serializer`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-17: `action_controller.wrap_parameters_by_default = true`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: 設定値が `false` → `true`。JSON の params を包む設定（`ActionController::Base._wrapper_options`・`ActionController::API._wrapper_options`）は前後とも `format: [:json]` で同じ
+- なぜ: 新しいアプリで `wrap_parameters.rb` を生成しないよう、同じ処理を既定値にした
+- 3 アプリへの影響: 3 アプリの `config/initializers/wrap_parameters.rb` と同じ処理なので変わらない
+- 扱い: 追随。`wrap_parameters.rb` は `load_defaults 7.0` にするときに消す
+- 出典: [rails/rails#43237](https://github.com/rails/rails/pull/43237)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.9.19 `config.action_controller.wrap_parameters_by_default`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-18: `active_support.remove_deprecated_time_with_zone_name = true`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: `ActiveSupport::TimeWithZone.name` の上書き（`"Time"` を返す）がなくなり、Ruby 本来の名前を返す
+- なぜ: 6.1 で非推奨にした古い上書きを外す。7.1 では既定でなくなる
+- 3 アプリへの影響: アプリと gem で `TimeWithZone.name` を呼ぶところはない。呼ぶと test 環境の `deprecation = :raise` で例外になる（値を書き出すスクリプトで確かめた）ので、呼ばれればテストで気づける
+- 扱い: 追随
+- 出典: [rails/rails#41938](https://github.com/rails/rails/pull/41938)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.14 `config.active_support.remove_deprecated_time_with_zone_name`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-19: `active_support.use_rfc4122_namespaced_uuids = true`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: `Digest::UUID.use_rfc4122_namespaced_uuids` が `false` → `true`
+- なぜ: 文字列で名前空間を渡したときの UUID v3・v5 を RFC 4122 どおりにする
+- 3 アプリへの影響: `Digest::UUID.uuid_v3`・`uuid_v5` の呼び出しはない。fixtures の id は Rails の定数の名前空間を使うので影響しない
+- 扱い: 追随
+- 出典: [rails/rails#37682](https://github.com/rails/rails/pull/37682)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.16 `config.active_support.use_rfc4122_namespaced_uuids`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-20: `action_mailer.smtp_timeout = 5`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: `ActionMailer::Base.smtp_settings` に `open_timeout: 5`・`read_timeout: 5` が入る
+- なぜ: SMTP サーバーが応答しないときに、既定でいつまでも待たないようにする
+- 3 アプリへの影響: メールを送るところはない（OP の devise もメールのモジュールを使っていない）
+- 扱い: 追随
+- 出典: コミット [rails/rails@52db7f2](https://github.com/rails/rails/commit/52db7f2ef3)（issue [rails/rails#42089](https://github.com/rails/rails/issues/42089)）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.13.4 `config.action_mailer.smtp_timeout`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-21: `active_storage.video_preview_arguments`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: 動画のプレビューを作るときの ffmpeg の引数が、最初のフレームを使うものから、場面の切り替わりを見てフレームを選ぶものになる
+- なぜ: 黒いことが多い最初のフレームより、内容の分かるプレビューにするため
+- 3 アプリへの影響: Active Storage を使っていない
+- 扱い: 追随
+- 出典: [rails/rails#42471](https://github.com/rails/rails/pull/42471)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.13 ActiveStorageの動画プレビュー画像生成」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.17.21 `config.active_storage.video_preview_arguments`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-22: `active_storage.variant_processor = :vips`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: `ActiveStorage.variant_processor` が `:mini_magick` → `:vips`
+- なぜ: libvips のほうが速く、メモリも少ない
+- 3 アプリへの影響: 画像の変換（variant）を作るところがないので、ruby-vips も要らない
+- 扱い: 追随
+- 出典: [rails/rails#42744](https://github.com/rails/rails/pull/42744)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.14 Active Storageのデフォルトのバリアントプロセッサが `:vips`に変更」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.17.1 `config.active_storage.variant_processor`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-23: `active_storage.multiple_file_field_include_hidden = true`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: `ActionView::Helpers::FormHelper.multiple_file_field_include_hidden` が `false` → `true`。`file_field` に `multiple: true` を付けると hidden field も出す
+- なぜ: `has_many_attached` で、空のまま送ったときに「すべて外す」を伝えられるようにする
+- 3 アプリへの影響: `file_field` を使う画面はない。値は `on_load(:action_view)` の中で入る（`activestorage-7.0.10/lib/active_storage/engine.rb` の `action_view.configuration`）
+- 扱い: 追随
+- 出典: [rails/rails#43511](https://github.com/rails/rails/pull/43511)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.17.22 `config.active_storage.multiple_file_field_include_hidden`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-24: `action_dispatch.return_only_request_media_type_on_content_type = false`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: `ActionDispatch::Request#content_type` が、メディアタイプだけでなく、Content-Type ヘッダーの値（charset など）をそのまま返す。RS・OP は `true` → `false`。RP は変わらない（この節の冒頭）
+- なぜ: Rack や他のフレームワークと同じく、ヘッダーの値をそのまま返すようにする
+- 3 アプリへの影響: アプリと主な gem（devise・doorkeeper・omniauth・activerecord-session_store）に `request.content_type` の呼び出しはない。doorkeeper は `media_type` を使う
+- 扱い: 追随
+- 出典: コミット [rails/rails@8405513](https://github.com/rails/rails/commit/8405513071)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.9 `ActionDispatch::Request#content_type`が Content-Typeヘッダーをそのまま返すようになった」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.10.19 `config.action_dispatch.return_only_request_media_type_on_content_type`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-25: `active_record.automatic_scope_inversing = true`
+
+- 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
+- 何が変わるか: scope 付きの関連にも `inverse_of` を自動で推定する。RS・OP は `false` → `true`。RP は変わらない（この節の冒頭）
+- なぜ: scope 付きの関連でも、同じレコードを二重に読まないようにする
+- 3 アプリへの影響: 推定された `inverse_of` は、3 アプリのモデル（OP の doorkeeper のモデルを含む）で前後とも同じ。doorkeeper の scope 付きの関連は `foreign_key:` を指定していて、推定の対象外（`doorkeeper-5.7.1/lib/doorkeeper/orm/active_record/mixins/application.rb`）
+- 扱い: 追随
+- 出典: [rails/rails#43358](https://github.com/rails/rails/pull/43358)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.30 `config.active_record.automatic_scope_inversing`」
+- コミット: （コミット後に記入）
