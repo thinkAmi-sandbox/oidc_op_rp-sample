@@ -22,6 +22,7 @@
 | RuboCop | `mise exec -- bundle exec rubocop` | `no offenses detected` |
 | minitest | `mise exec -- bin/rails test` | 0 failures。RP の出力の `Authentication failure!` は想定どおり（ID トークンの検証失敗のテスト） |
 | minitest（CI と同じ eager load あり） | `CI=1 mise exec -- bin/rails test` | 上と同じ件数で 0 failures。Step 1（Rails 7.0 の雛形）から、test 環境は `ENV["CI"]` があると eager load する（DEF-7.0-08） |
+| 応答のスナップショット（Step 1-b-2） | minitest に含まれる。作り直すときは `UPDATE_SNAPSHOTS=1 mise exec -- bin/rails test`（ファイルを指定して絞れる）の後に `git diff -- test/snapshots` | 差分がない。差分が出たら下の「応答のスナップショット」 |
 | Zeitwerk | `mise exec -- bin/rails zeitwerk:check` | `All is good!` |
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
 | 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」 |
@@ -62,7 +63,16 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - 起動の途中の読み込みは、Step 1-b-1 から a-nti_manner_kick_course で検出する（上の「確認のコマンド」。CI でも流す）。見つけると `on_load(:active_record)` などの名前と疑わしい行を出して終了コード 1 で止まる。疑わしい行が gem の中を指すときは、`ANTI_MANNER_DEBUG=1` でスタックトレース全部を出し、アプリの行を探す（Step 1 の RP の serializer の設定は `activerecord-session_store-2.1.0/lib/active_record/session_store/session.rb` を指し、全部を出すと `config/application.rb` の行が出た）
   - 検出できるのは、`config/application.rb`、`Bundler.require` で gem を require するとき、`config/environments/*.rb`、Rails 自身の initializer まで。gem の検査は Rails の各フレームワークの initializer の直後で終わるので、ほかの gem の initializer（web-console など）と `config/initializers/*.rb` は検出できない。監視の一覧に `action_dispatch_request` もない。これらで設定が効かなくなっていないかは、上の値の比較（有効にする前後で、test と development の値を書き出す）で確かめる。上の `@loaded` の確かめ方は `config/initializers` を読む直前の時点を見るので、`config/initializers` の中での読み込みは見えない。どこで読み込まれたかは `on_load { puts caller }` で探す
   - `ANTI_MANNER` を付けたまま、ほかのコマンド（`bin/rails test` など）を流さない。gem が起動の途中で終了コード 0 で終えるので、何も検査せずに成功したように見える
-- 応答の前後比較は、使い捨ての統合テスト（scratchpad に置き、`bin/rails test <パス>` で流す）で、ステータス・ヘッダー・本文を書き出して `diff` する。トークン・CSRF のトークン・Cookie の値・`X-Request-Id`・`X-Runtime` などは伏せる。ETag も比べるときは、同じ設定で 2 回書き出して、毎回変わるもの（本文にトークンを含む応答）を先に見分けておく
+- 応答の前後比較は、Step 1-b-2 から各アプリの minitest の応答のスナップショット（下の「応答のスナップショット」）で行う。使い捨ての統合テストは要らない。test 環境では出ない development だけのヘッダー（`Server-Timing`、rack-mini-profiler・web-console のもの）と CSRF のトークンは、Rails を上げる Step で development のアプリの応答を `curl` で見る（Step 1 と同じ）
+
+## 応答のスナップショット（Step 1-b-2）
+
+- 各アプリの `test/integration/response_snapshot*_test.rb` が、応答のステータス・ヘッダー・本文を `test/snapshots/responses/<名前>.txt` と比べる。伏せる処理は `test/support/response_snapshot_helper.rb`（3 アプリで同じ内容。直したら 3 つとも同じにし、`diff` で確かめる）
+- 伏せるのは、実行ごとに変わる値だけ。ヘッダーの `X-Request-Id`・`X-Runtime`、本文から決まる `ETag`・`Content-Length`（値だけ。ヘッダーがあるかどうかは比べる）、Cookie の値、クエリと hidden field の `code`・`state`・`nonce`・`code_challenge`、JSON の `access_token`・`refresh_token`・`id_token` と JWKS の `n`・`kid`。名前で決め、文字列の形では伏せない。OP のトークン系のテストは `travel_to` で時刻を固定し、`created_at`・`iat`・`exp` も比べる
+- 知らない値が毎回変わるようになると、伏せずに落ちる。そのときは伏せる名前を足す前に、その値が本当に毎回変わるもの（トークンなど）かを確かめる。伏せる名前を足すと、その値の変化は見えなくなる
+- 落ちたら、まず差分を読み、変化の理由（Rails・gem の版、設定）を確かめる。PLAN.md の 3 章の 2 の A なら、項目ごとに解説して人間の返事をもらってから `UPDATE_SNAPSHOTS=1 mise exec -- bin/rails test` で作り直し、変化を起こしたコミットにスナップショットも入れる。B なら作り直さずに止まって確かめる
+- ファイルがないときは失敗する（`UPDATE_SNAPSHOTS` を付けたときだけ作る。CI では作らない）。テストを消したり名前を変えたりしたときは、使われなくなったファイルを手で消す
+- スナップショットは公開物。作り直したら `scripts/check-public-safety --files <ファイル>` を流し、トークンや JWT の形の値（`grep -E 'eyJ|[A-Za-z0-9_-]{32,}'`）が残っていないことを見る
 
 ## 手動確認用の環境
 
