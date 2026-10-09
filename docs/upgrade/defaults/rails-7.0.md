@@ -39,6 +39,7 @@
 | DEF-7.0-29 | `active_support.hash_digest_class = OpenSSL::Digest::SHA256` | `load_defaults`（グループ 3） | 3 アプリ | 追随 |
 | DEF-7.0-30 | `active_support.disable_to_s_conversion = true` | `load_defaults`（グループ 3。`config/application.rb`） | 3 アプリ | 追随 |
 | DEF-7.0-31 | `active_support.cache_format_version = 7.0` | `load_defaults`（グループ 3。`config/application.rb`） | 3 アプリ | 追随 |
+| DEF-7.0-32 | `action_controller.raise_on_open_redirects = true` | `load_defaults`（グループ 4） | 3 アプリ | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -198,7 +199,7 @@
 
 ## `load_defaults`（`new_framework_defaults_7_0.rb`）
 
-グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。グループ 3 は、SQL や内部の処理だけが変わるもの。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
+グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。グループ 3 は、SQL や内部の処理だけが変わるもの。グループ 4 は、今のリダイレクトが対象にならないもの。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
 
 RP では、グループ 1・2 を有効にした時点で、一部の設定（DEF-7.0-24・25・27）が効かなかった。原因と対応は、すぐ下の「補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）」。
 
@@ -379,4 +380,17 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: `Rails.cache` を使っていない。development は `tmp/caching-dev.txt` がないので `:null_store`、test も `:null_store` で、保存されたキャッシュはない
 - 扱い: 追随（6.1 に戻す予定はない）。`load_defaults 7.0` にするときに `config/application.rb` から消す
 - 出典: [rails/rails#42025](https://github.com/rails/rails/pull/42025)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.12 `ActiveSupport::Cache`の新しいシリアライズフォーマット」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.9 `config.active_support.cache_format_version`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-32: `action_controller.raise_on_open_redirects = true`
+
+- 種類: `load_defaults`（グループ 4）/ 対象: 3 アプリ
+- 何が変わるか: `redirect_to`・`redirect_back_or_to` で、リクエストと違うホストへリダイレクトしようとすると、`allow_other_host: true` を付けない限り `ActionController::Redirecting::UnsafeRedirectError` にする。3 アプリとも `ActionController::Base.raise_on_open_redirects` が `false` → `true`
+- なぜ: 利用者の入力をそのまま `redirect_to` に渡して外部のサイトへ誘導される「オープンリダイレクト」を、既定で防ぐため。外部へ送りたいときは `allow_other_host: true` で意図を明示する
+- 3 アプリへの影響: 判定はホスト名だけで、ポートは見ない（`localhost:3780` から `localhost:3781` は同じホスト扱い。`actionpack-7.0.10/lib/action_controller/metal/redirecting.rb` の `_url_host_allowed?`）
+  - OP: 認可の後に RP へ戻す doorkeeper のリダイレクトは `allow_other_host: true` を渡している（`doorkeeper-5.7.1/app/controllers/doorkeeper/authorizations_controller.rb`）。OP 独自の `redirect_to new_user_session_url`（`config/initializers/doorkeeper_openid_connect.rb`）は同じホスト。test 環境のホスト `www.example.com` から `localhost:3781` へのリダイレクトを確かめるテスト（同意・拒否）が通った
+  - RP: `redirect_to` は `root_path`・`introspection_path` だけ。OP へのリダイレクトは omniauth が Rack の 302 で返すので対象外
+  - RS: リダイレクトしない
+- 扱い: 追随
+- 出典: コミット [rails/rails@5e93cff](https://github.com/rails/rails/commit/5e93cff835)（PR を経ずに入ったコミット）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.9.17 `config.action_controller.raise_on_open_redirects`」、[セキュリティガイド v7.0](https://railsguides.jp/v7.0/security.html)「4.1 リダイレクト」（オープンリダイレクトの危険。この設定そのものの説明はない）
 - コミット: （コミット後に記入）
