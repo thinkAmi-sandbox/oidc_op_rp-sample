@@ -47,6 +47,9 @@
 | DEF-7.0-36 | `active_support.key_generator_hash_digest_class = OpenSSL::Digest::SHA256` | `load_defaults`（グループ 8） | 3 アプリ | 追随 |
 | DEF-7.0-37 | 7.0 の雛形から消えた initializer を消す | `app:update` の雛形（手で消す） | 3 アプリ | 追随 |
 | DEF-7.0-38 | セッションの JSON で `<` `>` `&` を escape しなくなる | 周辺 gem（activerecord-session_store 2.2.0） | RP | 追随 |
+| DEF-7.0-39 | devise のビューで、フォームの要素を `<br />` で区切らず `<p>` で包む | 周辺 gem（devise 5.0.4） | OP | 追随 |
+| DEF-7.0-40 | devise のエラーメッセージの部分の `data-turbo-cache="false"` が `data-turbo-temporary` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
+| DEF-7.0-41 | ログイン失敗の flash の文言が `Invalid email or password.` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -480,3 +483,33 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 扱い: 追随。テストの期待値を新しい形にした
 - 出典: activerecord-session_store の CHANGELOG（2.2.0「Drop dependency on `multi_json`」）、コミット [rails/activerecord-session_store@536716a](https://github.com/rails/activerecord-session_store/commit/536716a98a)（[rails/activerecord-session_store#213](https://github.com/rails/activerecord-session_store/pull/213) を元にした）、`activerecord-session_store-2.2.0/lib/active_record/session_store.rb` の `JsonSerializer`、`activesupport-7.0.10/lib/active_support/json/encoding.rb`、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.3 `config.active_support.escape_html_entities_in_json`」「3.2.36 `config.session_store`」（session_store の serializer そのものの説明はガイドにない）
 - コミット: RP（`update activerecord-session_store to 2.2.0`）
+
+### DEF-7.0-39: devise のビューで、フォームの要素を `<br />` で区切らず `<p>` で包む
+
+- 種類: 周辺 gem（devise 4.9.4 → 5.0.4）/ 対象: OP
+- 何が変わるか: devise の gem のビュー（sessions/new、registrations/new・edit、shared/_links）で、`<label>…</label><br />` が `<p><label>…</label></p>` に、入力欄とリンクも `<p>…</p>` になる。エラーのときは `<p><div class="field_with_errors">…</div></p>` になる（`<p>` の中に `<div>` は置けないので、ブラウザは `<p>` をそこで閉じる）。ステータス・ヘッダー・画面の文字・フォームの送り先と項目は同じ
+- なぜ: devise 5.0.0.rc の breaking change で、フォームの要素の区切りを `<br>` から `<p>` に変えた
+- 3 アプリへの影響: OP は devise のビューを上書きしていないので、gem のビューがそのまま出る。応答のスナップショットは 6 件（`users_sign_in`・`users_sign_in_failure`・`users_sign_up`・`users_sign_up_failure`・`users_edit`・`users_update_failure`）で、HTML の形だけが変わった。E2E のログイン（ラベルで入力欄を探す）は通った
+- 扱い: 追随（PLAN.md の 3 章の 2 の境目の 2）
+- 出典: devise の CHANGELOG（5.0.0.rc の breaking changes）、[heartcombo/devise#5494](https://github.com/heartcombo/devise/pull/5494)。devise は Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: OP（`update devise to 5.0.4`）
+
+### DEF-7.0-40: devise のエラーメッセージの部分の `data-turbo-cache="false"` が `data-turbo-temporary` になる
+
+- 種類: 周辺 gem（devise 4.9.4 → 5.0.4）/ 対象: OP
+- 何が変わるか: `devise/shared/_error_messages` の `<div id="error_explanation">` の属性が `data-turbo-cache="false"` から `data-turbo-temporary` になる
+- なぜ: Turbo 7.3.0 で `data-turbo-cache="false"` が非推奨になり、代わりの `data-turbo-temporary` に替えた（devise 5.0.0.rc の breaking change）
+- 3 アプリへの影響: OP は Turbo を使っていない（turbo-rails も JavaScript もない）ので、どちらの属性も働かない。応答のスナップショットは `users_sign_up_failure`・`users_update_failure` の 2 件が変わった
+- 扱い: 追随
+- 出典: devise の CHANGELOG（5.0.0.rc の breaking changes）、[Turbo v7.3.0 のリリースノート](https://github.com/hotwired/turbo/releases/tag/v7.3.0)。Rails ガイドに該当の節はない
+- コミット: OP（`update devise to 5.0.4`）
+
+### DEF-7.0-41: ログイン失敗の flash の文言が `Invalid email or password.` になる
+
+- 種類: 周辺 gem（devise 4.9.4 → 5.0.4）/ 対象: OP
+- 何が変わるか: 誤ったパスワードでログインしたときの `flash[:alert]` が `Invalid Email or password.` → `Invalid email or password.`。`devise-5.0.4/lib/devise/failure_app.rb` の `i18n_message` が、認証のキーの名前（`Email`）の先頭を小文字にしてから文言（`devise.failure.invalid` の `%{authentication_keys}`）に埋め、文がキーで始まるときだけ先頭を大文字に戻す
+- なぜ: 文の途中に大文字の `Email` が入る文法の誤りを直した（devise 5.0.0.rc の bug fix）
+- 3 アプリへの影響: OP のレイアウトは flash を出さないので、画面の文字は変わらず、応答のスナップショットにも出ない。OP の `config/locales/devise.en.yml` は gem の `en.yml` と同じで、4.9.4 と 5.0.4 で差がない。`user_sign_in_test.rb` の期待値を直した
+- 扱い: 追随
+- 出典: devise の CHANGELOG（5.0.0.rc の bug fixes）、[heartcombo/devise#4834](https://github.com/heartcombo/devise/pull/4834)。Rails ガイドに該当の節はない
+- コミット: OP（`update devise to 5.0.4`）
