@@ -196,7 +196,26 @@
 
 グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
 
-RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`initialize!` より前に `ActiveRecord::Base` と `ActionDispatch::Request` を読み込む。そのため、`new_framework_defaults_7_0.rb` に書いた設定のうち、`on_load(:active_record)`・`on_load(:action_dispatch_request)` で入るものと、`activerecord-7.0.10/lib/active_record/railtie.rb` の `active_record.set_configs` が `ActiveRecord` に写すもの（DEF-7.0-24・25・27）は RP では効かず、`load_defaults 7.0` にしたときに効く。
+RP では、グループ 1・2 を有効にした時点で、一部の設定（DEF-7.0-24・25・27）が効かなかった。原因と対応は、すぐ下の「補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）」。
+
+### 補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）
+
+既定値への追随の項目ではないが、`new_framework_defaults_*.rb` の設定が効くかどうかに関わるので、ここに残す。
+
+- **起きたこと**: RP だけ、`new_framework_defaults_7_0.rb` で有効にした `return_only_request_media_type_on_content_type`（DEF-7.0-24）・`automatic_scope_inversing`（DEF-7.0-25）・`verify_foreign_keys_for_fixtures`（DEF-7.0-27）・`partial_inserts`（グループ 3）の値が変わらなかった。`disable_to_s_conversion`（グループ 3）は、一時的に `load_defaults 7.0` にしても効かなかった
+- **原因**: 起動の途中（`initialize!` より前）に、フレームワークのクラスが読み込まれていた。Rails は、各フレームワークの設定を `ActiveSupport.on_load` のフックや railtie の initializer で写す。クラスが既に読み込まれていると、`config/initializers` を読む前に写し終えるので、`new_framework_defaults_*.rb` の設定が黙って無視される。`disable_to_s_conversion` は、`initialize!` の最初に環境変数 `RAILS_DISABLE_DEPRECATED_TO_S_CONVERSION` を立て（`railties-7.0.10/lib/rails/application/bootstrap.rb`）、その後で読み込まれる core_ext に古い `to_s(:形式)` を読ませない仕組みなので、core_ext が先に読まれていると `load_defaults 7.0` でも効かない
+  - `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`ActiveRecord::Base` と Active Support の core_ext を読み込んでいた。activerecord-session_store の README が「`config/application.rb` の末尾に」書く例を載せていて、RP はそれに沿っていた
+  - activerecord-session_store 自身が、`Bundler.require` の時点で `ActionDispatch::Request` を読み込む（`activerecord-session_store-2.1.0/lib/action_dispatch/session/active_record_store.rb` の `require 'action_dispatch/middleware/session/abstract_store'`。2.3.0 でも同じ）
+- **確かめ方**: `config/application.rb` を読み終えた時点と、`config/initializers` を読む直前（`before: :load_config_initializers` の initializer）で、`ActiveSupport` が読み込み済みとして記録している部品を書き出した。対応の前の RP は `active_record` と `action_dispatch_request` が読み込み済みで、RS・OP は `before_configuration`・`before_initialize`・`i18n` だけ
+- **対応**: serializer の設定を `config/initializers/session_store.rb` に移し、`ActiveSupport.on_load(:active_record)` の中で設定するようにした（RP `77c26df`）。セッションは前と同じく JSON で保存される（`{"value":{...}}` の形を、test 環境の DB と E2E 用の DB で確かめた）。これで `ActiveRecord::Base` は起動の途中で読み込まれなくなり、DEF-7.0-25・27 は RP でもこのコミットから効く
+- **残ること**: `ActionDispatch::Request` は gem が読み込むので、RP では DEF-7.0-24 が `load_defaults 7.0` にしたときに効く（`load_defaults` は `config/application.rb` の中で値を決めるので、フックがすぐ走っても新しい値が写る）。gem を直すのは epic の範囲外
+- **同じ問題の報告**
+  - Rails: [rails/rails#31285](https://github.com/rails/rails/issues/31285)（gem が `on_load` の外で `ActiveRecord::Base` を参照すると、`new_framework_defaults.rb` が効かない）、[rails/rails#46277](https://github.com/rails/rails/issues/46277)（`config/application.rb` で `ActiveRecord::Base` を参照すると、initializer の `verify_foreign_keys_for_fixtures` が効かない）、[rails/rails#50133](https://github.com/rails/rails/issues/50133)（同じ原因の issue のまとめ）
+  - Rails の対策: [rails/rails#56201](https://github.com/rails/rails/pull/56201)「Load hook guard」（2026-02-11 に main へ。早い読み込みを警告・例外にする仕組み）。8.1.4 までのリリースには含まれていない（GitHub の比較で確かめた）
+  - activerecord-session_store: [README](https://github.com/rails/activerecord-session_store#configuration)（`config/application.rb` の末尾に書く例）、[rails/activerecord-session_store#142](https://github.com/rails/activerecord-session_store/issues/142)（`ActiveSupport.on_load(:active_record)` の中で `serializer = :json` を設定する例）、[rails/activerecord-session_store#143](https://github.com/rails/activerecord-session_store/pull/143)（gem が `ActiveRecord::Base` を早く読み込まないようにした変更の続き）
+  - ブログ: Arkency「[I do not blindly trust setting things in new_framework_defaults initializers anymore](https://blog.arkency.com/i-do-not-blindly-trust-setting-things-in-new-framework-defaults-initializers-anymore/)」（2025-06-10。Rails 7.1 で、gem が `ActiveRecord::Base` を早く読み込んだため `new_framework_defaults_7_1.rb` の設定が効かなかった例）
+  - Rails ガイド: v7.0 版には該当の節がないので、最新版の [Rails アプリケーションを設定する](https://railsguides.jp/configuring.html)「6 読み込みフック」（`ActiveRecord::Base` などを不注意に読み込むと、Rails との暗黙の取り決めに違反する）
+- **後の Step への申し送り**: `new_framework_defaults_*.rb` を有効にするたびに、上の確かめ方で、起動の途中に読み込まれる部品が増えていないかを見る。gem を上げたときも同じ
 
 ### DEF-7.0-16: `action_dispatch.cookies_serializer = :json`
 
@@ -281,7 +300,7 @@ RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session
 ### DEF-7.0-24: `action_dispatch.return_only_request_media_type_on_content_type = false`
 
 - 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
-- 何が変わるか: `ActionDispatch::Request#content_type` が、メディアタイプだけでなく、Content-Type ヘッダーの値（charset など）をそのまま返す。RS・OP は `true` → `false`。RP は変わらない（この節の冒頭）
+- 何が変わるか: `ActionDispatch::Request#content_type` が、メディアタイプだけでなく、Content-Type ヘッダーの値（charset など）をそのまま返す。RS・OP は `true` → `false`。RP は `load_defaults 7.0` にしたときに変わる（一時的に `load_defaults 7.0` にして確かめた。下の「補足」）
 - なぜ: Rack や他のフレームワークと同じく、ヘッダーの値をそのまま返すようにする
 - 3 アプリへの影響: アプリと主な gem（devise・doorkeeper・omniauth・activerecord-session_store）に `request.content_type` の呼び出しはない。doorkeeper は `media_type` を使う
 - 扱い: 追随
@@ -291,7 +310,7 @@ RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session
 ### DEF-7.0-25: `active_record.automatic_scope_inversing = true`
 
 - 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
-- 何が変わるか: scope 付きの関連にも `inverse_of` を自動で推定する。RS・OP は `false` → `true`。RP は変わらない（この節の冒頭）
+- 何が変わるか: scope 付きの関連にも `inverse_of` を自動で推定する。RS・OP は `false` → `true`。RP はグループ 1 の時点では変わらず、`77c26df` から `true`（下の「補足」）
 - なぜ: scope 付きの関連でも、同じレコードを二重に読まないようにする
 - 3 アプリへの影響: 推定された `inverse_of` は、3 アプリのモデル（OP の doorkeeper のモデルを含む）で前後とも同じ。doorkeeper の scope 付きの関連は `foreign_key:` を指定していて、推定の対象外（`doorkeeper-5.7.1/lib/doorkeeper/orm/active_record/mixins/application.rb`）
 - 扱い: 追随
@@ -311,7 +330,7 @@ RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session
 ### DEF-7.0-27: `active_record.verify_foreign_keys_for_fixtures = true`
 
 - 種類: `load_defaults`（グループ 2）/ 対象: 3 アプリ
-- 何が変わるか: fixtures を入れた後に、外部キーの制約に違反していないかを確かめ、違反があればテストを失敗させる。RS・OP は `ActiveRecord.verify_foreign_keys_for_fixtures` が `false` → `true`。RP は変わらない（この節の冒頭）
+- 何が変わるか: fixtures を入れた後に、外部キーの制約に違反していないかを確かめ、違反があればテストを失敗させる。RS・OP は `ActiveRecord.verify_foreign_keys_for_fixtures` が `false` → `true`。RP はグループ 2 の時点では変わらず、`77c26df` から `true`（下の「補足」）
 - なぜ: SQLite・PostgreSQL などは、fixtures を入れる間は外部キーの検査を止めているので、壊れた fixtures でもテストが動いてしまう。入れた後に確かめて、早く気づけるようにする
 - 3 アプリへの影響: fixtures があるのは OP だけ（`oauth_applications.yml`・`users.yml`）で、違反はなく、テストは通った。RP には fixtures がない
 - 扱い: 追随
