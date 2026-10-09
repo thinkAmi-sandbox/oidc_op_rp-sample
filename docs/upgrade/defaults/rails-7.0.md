@@ -168,7 +168,7 @@
 - 3 アプリへの影響: 足した時点ではすべてコメントで、動作は同じ
 - 扱い: 追随。グループごとに有効にし、`load_defaults 7.0` にするコミットで消した。その前後で、test・development の両方の値を書き出して比べ、違ったのは DEF-7.0-24 だけ（下の「補足」）
 - 出典: `railties-7.0.10/lib/rails/generators/rails/app/templates/config/initializers/new_framework_defaults_7_0.rb.tt`、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.4 アップデートタスク」「1.5 フレームワークのデフォルトを設定する」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.1.1 ターゲットバージョン7.0のデフォルト値」
-- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
+- コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`（足した）、RS `fd3eb40`、RP `b1f3552`、OP `400ed9c`（消した）
 
 ### DEF-7.0-13: `db/schema.rb` の `ActiveRecord::Schema[6.1]`
 
@@ -237,7 +237,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: RS は API 専用で、Cookie のミドルウェアがない（`bin/rails middleware`）
 - 扱い: 追随。`cookies_serializer.rb` は `load_defaults 7.0` にするときに消す
 - 出典: [rails/rails#42538](https://github.com/rails/rails/pull/42538)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.10.1 `config.action_dispatch.cookies_serializer`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-17: `action_controller.wrap_parameters_by_default = true`
 
@@ -247,7 +247,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: 3 アプリの `config/initializers/wrap_parameters.rb` と同じ処理なので変わらない
 - 扱い: 追随。`wrap_parameters.rb` は `load_defaults 7.0` にするときに消す
 - 出典: [rails/rails#43237](https://github.com/rails/rails/pull/43237)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.9.19 `config.action_controller.wrap_parameters_by_default`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-18: `active_support.remove_deprecated_time_with_zone_name = true`
 
@@ -257,7 +257,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: アプリと gem で `TimeWithZone.name` を呼ぶところはない。呼ぶと test 環境の `deprecation = :raise` で例外になる（値を書き出すスクリプトで確かめた）ので、呼ばれればテストで気づける
 - 扱い: 追随
 - 出典: [rails/rails#41938](https://github.com/rails/rails/pull/41938)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.14 `config.active_support.remove_deprecated_time_with_zone_name`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-19: `active_support.use_rfc4122_namespaced_uuids = true`
 
@@ -267,7 +267,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: `Digest::UUID.uuid_v3`・`uuid_v5` の呼び出しはない。fixtures の id は Rails の定数の名前空間を使うので影響しない
 - 扱い: 追随
 - 出典: [rails/rails#37682](https://github.com/rails/rails/pull/37682)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.16 `config.active_support.use_rfc4122_namespaced_uuids`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-20: `action_mailer.smtp_timeout = 5`
 
@@ -277,7 +277,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: メールを送るところはない（OP の devise もメールのモジュールを使っていない）
 - 扱い: 追随
 - 出典: コミット [rails/rails@52db7f2](https://github.com/rails/rails/commit/52db7f2ef3)（issue [rails/rails#42089](https://github.com/rails/rails/issues/42089)）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.13.4 `config.action_mailer.smtp_timeout`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-21: `active_storage.video_preview_arguments`
 
@@ -287,7 +287,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: Active Storage を使っていない
 - 扱い: 追随
 - 出典: [rails/rails#42471](https://github.com/rails/rails/pull/42471)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.13 ActiveStorageの動画プレビュー画像生成」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.17.21 `config.active_storage.video_preview_arguments`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-22: `active_storage.variant_processor = :vips`
 
@@ -297,7 +297,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: 画像の変換（variant）を作るところがないので、ruby-vips も要らない
 - 扱い: 追随
 - 出典: [rails/rails#42744](https://github.com/rails/rails/pull/42744)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.14 Active Storageのデフォルトのバリアントプロセッサが `:vips`に変更」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.17.1 `config.active_storage.variant_processor`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-23: `active_storage.multiple_file_field_include_hidden = true`
 
@@ -307,7 +307,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: `file_field` を使う画面はない。値は `on_load(:action_view)` の中で入る（`activestorage-7.0.10/lib/active_storage/engine.rb` の `action_view.configuration`）
 - 扱い: 追随
 - 出典: [rails/rails#43511](https://github.com/rails/rails/pull/43511)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.17.22 `config.active_storage.multiple_file_field_include_hidden`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-24: `action_dispatch.return_only_request_media_type_on_content_type = false`
 
@@ -317,7 +317,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: アプリと主な gem（devise・doorkeeper・omniauth・activerecord-session_store）に `request.content_type` の呼び出しはない。doorkeeper は `media_type` を使う
 - 扱い: 追随
 - 出典: コミット [rails/rails@8405513](https://github.com/rails/rails/commit/8405513071)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.9 `ActionDispatch::Request#content_type`が Content-Typeヘッダーをそのまま返すようになった」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.10.19 `config.action_dispatch.return_only_request_media_type_on_content_type`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-25: `active_record.automatic_scope_inversing = true`
 
@@ -327,7 +327,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: 推定された `inverse_of` は、3 アプリのモデル（OP の doorkeeper のモデルを含む）で前後とも同じ。doorkeeper の scope 付きの関連は `foreign_key:` を指定していて、推定の対象外（`doorkeeper-5.7.1/lib/doorkeeper/orm/active_record/mixins/application.rb`）
 - 扱い: 追随
 - 出典: [rails/rails#43358](https://github.com/rails/rails/pull/43358)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.30 `config.active_record.automatic_scope_inversing`」
-- コミット: （コミット後に記入）
+- コミット: RS `a4d2680`、RP `c543572`、OP `835022c`（`enable the first group of Rails 7.0 defaults`）
 
 ### DEF-7.0-26: `active_support.executor_around_test_case = true`
 
@@ -337,7 +337,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: テストのときだけで、development・production は変わらない。同じテストの中で 2 回読んだ値がキャッシュされることがあるが、今のテストは、リクエストの前後で件数などを読む書き方（RP の `assert_difference 'OpUser.count'`、OP の `Doorkeeper::AccessGrant.last` など）も含めて、すべて同じ結果で通った（書き込みのたびにキャッシュが消える）。新しくテストを書くときは、このキャッシュがある前提になる
 - 扱い: 追随
 - 出典: [rails/rails#43550](https://github.com/rails/rails/pull/43550)、`activesupport-7.0.10/lib/active_support/railtie.rb` の `on_load(:active_support_test_case)`、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.17 `config.active_support.executor_around_test_case`」
-- コミット: （コミット後に記入）
+- コミット: RS `2612b17`、RP `bd49785`、OP `6927691`（`enable the second group of Rails 7.0 defaults`）
 
 ### DEF-7.0-27: `active_record.verify_foreign_keys_for_fixtures = true`
 
@@ -347,7 +347,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: fixtures があるのは OP だけ（`oauth_applications.yml`・`users.yml`）で、違反はなく、テストは通った。RP には fixtures がない
 - 扱い: 追随
 - 出典: [rails/rails#42674](https://github.com/rails/rails/pull/42674)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.35 `config.active_record.verify_foreign_keys_for_fixtures`」
-- コミット: （コミット後に記入）
+- コミット: RS `2612b17`、RP `bd49785`、OP `6927691`（`enable the second group of Rails 7.0 defaults`）
 
 ### DEF-7.0-28: `active_record.partial_inserts = false`
 
@@ -357,7 +357,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: OP は doorkeeper の 3 つのテーブルで INSERT の列が増えた（例: `oauth_access_tokens` に `refresh_token`・`revoked_at`・`previous_refresh_token`）。test 環境でレコードを作って読み直し、保存された値が前後で同じことを確かめた（`confidential: true`・`previous_refresh_token: ""` などは、DB の既定値と同じ値が入る）。RP の `op_users`・`sessions` はもともと全部の列を渡しているので、SQL も値も同じ。RS はテーブルがない
 - 扱い: 追随
 - 出典: [rails/rails#42769](https://github.com/rails/rails/pull/42769)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.16 `config.active_record.partial_inserts`」
-- コミット: （コミット後に記入）
+- コミット: RS `b972865`、RP `31e2989`、OP `f0c25af`（`enable the third group of Rails 7.0 defaults`）
 
 ### DEF-7.0-29: `active_support.hash_digest_class = OpenSSL::Digest::SHA256`
 
@@ -367,7 +367,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: `ActiveSupport::Digest` を使うのは、Rails 自身の `fresh_when`・`stale?` の ETag、ビューのフラグメントキャッシュの digest、`relation.cache_key`、キャッシュストアだけで、3 アプリはどれも使っていない（lock の gem にも使うものはない）。応答の ETag は `Rack::ETag` が SHA256 で計算するもの（`rack-2.2.24/lib/rack/etag.rb`）。ETag を伏せずに応答を書き出して前後を比べ、変わったのは同じ設定でも毎回変わる 4 つ（CSRF のトークンなどを本文に含む OP の応答）だけだった
 - 扱い: 追随
 - 出典: [rails/rails#41043](https://github.com/rails/rails/pull/41043)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.11 `ActiveSupport::Digest`で用いられるメッセージダイジェストクラスがSHA256に変更」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.6 `config.active_support.hash_digest_class`」
-- コミット: （コミット後に記入）
+- コミット: RS `b972865`、RP `31e2989`、OP `f0c25af`（`enable the third group of Rails 7.0 defaults`）
 
 ### DEF-7.0-30: `active_support.disable_to_s_conversion = true`
 
@@ -377,7 +377,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: アプリ・テスト・lock の gem に `to_s(:形式)` の呼び出しはなく、Rails 7.0.10 にした後の development のログに非推奨の警告もない。RP は `77c26df`（上の「補足」）の後なので効く
 - 扱い: 追随。`load_defaults 7.0` にするときに `config/application.rb` から消す
 - 出典: [rails/rails#43772](https://github.com/rails/rails/pull/43772)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.18 `config.active_support.disable_to_s_conversion`」
-- コミット: （コミット後に記入）
+- コミット: RS `b972865`、RP `31e2989`、OP `f0c25af`（`enable the third group of Rails 7.0 defaults`）
 
 ### DEF-7.0-31: `active_support.cache_format_version = 7.0`
 
@@ -387,7 +387,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: `Rails.cache` を使っていない。development は `tmp/caching-dev.txt` がないので `:null_store`、test も `:null_store` で、保存されたキャッシュはない
 - 扱い: 追随（6.1 に戻す予定はない）。`load_defaults 7.0` にするときに `config/application.rb` から消す
 - 出典: [rails/rails#42025](https://github.com/rails/rails/pull/42025)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.12 `ActiveSupport::Cache`の新しいシリアライズフォーマット」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.9 `config.active_support.cache_format_version`」
-- コミット: （コミット後に記入）
+- コミット: RS `b972865`、RP `31e2989`、OP `f0c25af`（`enable the third group of Rails 7.0 defaults`）
 
 ### DEF-7.0-32: `action_controller.raise_on_open_redirects = true`
 
@@ -400,7 +400,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
   - RS: リダイレクトしない
 - 扱い: 追随
 - 出典: コミット [rails/rails@5e93cff](https://github.com/rails/rails/commit/5e93cff835)（PR を経ずに入ったコミット）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.9.17 `config.action_controller.raise_on_open_redirects`」、[セキュリティガイド v7.0](https://railsguides.jp/v7.0/security.html)「4.1 リダイレクト」（オープンリダイレクトの危険。この設定そのものの説明はない）
-- コミット: （コミット後に記入）
+- コミット: RS `83426df`、RP `fbc91e1`、OP `8198aa6`（`enable the fourth group of Rails 7.0 defaults`）
 
 ### DEF-7.0-33: `action_dispatch.default_headers`（`X-XSS-Protection: 0`）
 
@@ -410,7 +410,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: 今のブラウザはこのヘッダーを見ないので、画面と動作は同じ。テスト・E2E はこのヘッダーを確かめていない
 - 扱い: 追随
 - 出典: [rails/rails#41769](https://github.com/rails/rails/pull/41769)、[OWASP Secure Headers Project](https://owasp.org/www-project-secure-headers/#x-xss-protection)、[セキュリティガイド v7.0](https://railsguides.jp/v7.0/security.html)「9 HTTPセキュリティヘッダー」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.10.2 `config.action_dispatch.default_headers`」
-- コミット: （コミット後に記入）
+- コミット: RS `1785749`、RP `f5290f4`、OP `b18be91`（`enable the fifth group of Rails 7.0 defaults`）
 
 ### DEF-7.0-34: `action_view.button_to_generates_button_tag = true`
 
@@ -420,7 +420,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: アプリのコードに `button_to` はなく、出るのは devise の gem のビュー（`devise-4.9.4/app/views/devise/registrations/edit.html.erb`）だけ。ボタンの文字・送る先・確認の属性が同じなので、「挙動を変えない」の定義の境目の 2（PLAN.md の 3 章）にあたる。テスト・E2E はこのページを開かない
 - 扱い: 追随
 - 出典: [rails/rails#40747](https://github.com/rails/rails/pull/40747)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.11.18 `config.action_view.button_to_generates_button_tag`」（[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.1 `ActionView::Helpers::UrlHelper#button_to`の振る舞いが変更された」は、保存済みのレコードを渡したときの HTTP メソッドの推論の話で、この設定とは別の変更）
-- コミット: （コミット後に記入）
+- コミット: RS `e036bcf`、RP `edceae8`、OP `dd225e5`（`enable the sixth group of Rails 7.0 defaults`）
 
 ### DEF-7.0-35: `action_view.apply_stylesheet_media_default = false`
 
@@ -430,7 +430,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: RP のレイアウトは `media: 'all'` を明示しているので変わらない。OP の CSS のファイルは `public/` になく、Sprockets も読み込んでいないので、前後とも 404 で見た目は変わらない。応答の `Link` ヘッダー（preload）も変わらない
 - 扱い: 追随
 - 出典: [rails/rails#41215](https://github.com/rails/rails/pull/41215)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.11.19 `config.action_view.apply_stylesheet_media_default`」
-- コミット: （コミット後に記入）
+- コミット: RS `6a00816`、RP `b78b02d`、OP `0b2c88e`（`enable the seventh group of Rails 7.0 defaults`）
 
 ### DEF-7.0-36: `active_support.key_generator_hash_digest_class = OpenSSL::Digest::SHA256`
 
@@ -445,7 +445,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
   - 手動確認（ブラウザペイン）: この設定なしで RP からログインし、3 アプリを止めてこの設定を有効にして起動し直した。RP のログインは続き、RP の「Re Login」で OP のログイン画面が出た（OP のセッションが切れた）。もう一度ログインした後、RP のログインと introspection 用 RP の流れ（RS が 200・401・revoke の後に 401、introspect が `active: true` → `active: false`）は Step 0-f-3 と同じだった
 - 扱い: 追随。移行用のコード（Cookie のローテーション）は書かない（PLAN.md の 3 章の 2 の境目の 6、12 章）
 - 出典: [rails/rails#40770](https://github.com/rails/rails/pull/40770)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.10 キージェネレータのメッセージダイジェストクラスがSHA256に変更」（ローテーションのコードの例がある）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.7 `config.active_support.key_generator_hash_digest_class`」
-- コミット: （コミット後に記入）
+- コミット: RS `ea9793d`、RP `f2d1ed4`、OP `bb815c8`（`enable the eighth group of Rails 7.0 defaults`）
 
 ## `load_defaults 7.0`
 
@@ -462,4 +462,4 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: 値の比較で、`cookies_serializer` と `ActionController::Base._wrapper_options`・`ActionController::API._wrapper_options` は前後で同じ。応答も同じ
 - 扱い: 追随。`backtrace_silencers.rb` は残す（`BACKTRACE` 環境変数の扱いは railties 7.0.10 になく、このファイルだけが担う。Step 3 で見直す）
 - 出典: [rails/rails#42538](https://github.com/rails/rails/pull/42538)、[rails/rails#43237](https://github.com/rails/rails/pull/43237)（`mime_types.rb`・`wrap_parameters.rb`・`backtrace_silencers.rb` を雛形から外した）、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.5 フレームワークのデフォルトを設定する」
-- コミット: （コミット後に記入）
+- コミット: RS `fd3eb40`、RP `b1f3552`、OP `400ed9c`（`switch to load_defaults 7.0`）
