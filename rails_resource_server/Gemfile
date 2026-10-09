@@ -39,10 +39,6 @@ group :development, :test do
   gem 'rubocop-rails', '2.38.0', require: false
 end
 
-group :development do
-  gem 'listen', '~> 3.3'
-end
-
 group :test do
   # カバレッジの計測と、外部への HTTP 通信の遮断・差し替え
   gem 'simplecov', require: false
