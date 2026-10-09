@@ -2,7 +2,7 @@
 
 - 版: Rails 6.1.7.10 → 7.0.10（Ruby 3.1.7）
 - Step: 1（ブランチ `upgrade/step1-rails70`）/ PR: [#21](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/21)
-- 周辺 gem: Step 1-b-3（ブランチ `upgrade/step1b-rails70-gems`）。DEF-7.0-38 から。下の「周辺 gem（Step 1-b-3）」
+- 周辺 gem: Step 1-b-3（1-b-3-1 はブランチ `upgrade/step1b-rails70-gems`、1-b-3-2 はブランチ `upgrade/step1b-doorkeeper`）。DEF-7.0-38 から。下の「周辺 gem（Step 1-b-3）」
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
@@ -524,6 +524,6 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
   - 未ログインで保護されたページ（doorkeeper の認可エンドポイントを含む）に来たときの FailureApp のリダイレクトは、responder を通らないので 302 のまま
 - なぜ: devise 4.9.0 で、responders 3.1 の設定を使い、失敗の応答とリダイレクトのステータスを変えられるようになった。既存のアプリとの互換のため gem の既定値は 200・302 のままで、新しいアプリの雛形に 422・303 を書くようになった（Hotwire/Turbo が期待する形。CHANGELOG は、将来の版で既定値が変わるかもしれないとしている）。OP の initializer は devise 4.8 の雛形で、この 2 行がなかった。gem の initializer の雛形にも追随すると人間が決めた（LOG.md の Step 1-b-3）
 - 3 アプリへの影響: ブラウザと OP の間の応答だけで、OP・RP・RS の間のやり取りは変わらない。303 でも 302 でも、ブラウザは POST・DELETE の後にリダイレクト先を GET で開くので、画面遷移は同じ（認可の途中のログインも、303 で `/oauth/authorize?...` に戻る）。422 の画面は本文が同じ。応答のスナップショット 7 件（`users_sign_in_failure`・`users_sign_up_failure`・`users_update_failure`・`users_sign_in_success`・`users_sign_up_success`・`users_update_success`・`users_sign_out`）が変わり、`user_sign_in_test.rb` のログイン失敗の期待値を 422 に直した。E2E のログイン・ログアウトは通った
-- 扱い: 追随
+- 扱い: 追随。`:unprocessable_entity` は Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`）ので、Rack を 3.1 以上にする Step で雛形に合わせ直す（PLAN.md 7 章の devise の行）
 - 出典: `devise-4.9.4/CHANGELOG.md` の 4.9.0「Add support for Hotwire + Turbo」、[heartcombo/devise#5548](https://github.com/heartcombo/devise/pull/5548)、`devise-5.0.4/lib/generators/templates/devise.rb` の「Hotwire/Turbo configuration」、[Rails をはじめよう v7.0](https://railsguides.jp/v7.0/getting_started.html)「7.3 記事を1件作成する」（保存に失敗したら `status: :unprocessable_entity` で表示し直す）「7.5 記事を削除する」（`status: :see_other` でリダイレクトする）、[レイアウトとレンダリング v7.0](https://railsguides.jp/v7.0/layouts_and_rendering.html)「2.2.13.4 `:status` オプション」「2.3.1 リダイレクトのステータスコードを変更する」
 - コミット: OP（`follow the devise 5.0.4 initializer template`）

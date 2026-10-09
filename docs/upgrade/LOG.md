@@ -1538,7 +1538,7 @@ devise を上げ、initializer を雛形に合わせた後に、`.claude/launch.
 - RP の「Re Login」で OP のログイン画面が出た。誤ったパスワードで 2 回ログインし、どちらもログイン画面に戻った（メッセージは出ない。下）。サーバーのログには、warden の 401 と、描き直したログイン画面の 200 が出る（FailureApp がログを書いた後でステータスを 422 に置き換える。`devise-5.0.4/lib/devise/failure_app.rb` の `recall`）。ブラウザとは別のセッションの `curl` で、ダミーの誤ったパスワードでのログインが 422 で返ることを確かめた
 - 正しいパスワードでログインすると、303 See Other で認可エンドポイントに戻り、同意画面を省いて（my_op のアプリにこのユーザーのトークンがあるため。Step 0-f-3 の条件）RP に戻り、「ログインしました」「Logged in as …」が出た
 - OP のレイアウト（`app/views/layouts/application.html.erb`）は flash を描かないので、ログイン失敗のメッセージは出ない。タグ `rails-6.1` から変わっていない元からの挙動で、IMP-010 に記録した
-- 手動確認用の環境: 作業の開始時に、9 ファイルのハッシュが Step 1-b-2 の後と同じことと、件数が Step 1 の手動確認の後と同じことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 12 → 13 件、`oauth_access_tokens` が 31 → 32 件、RP の development DB は `sessions` が 10 件のまま（既にある行を更新）で、どちらもハッシュが変わった。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt` は変わっていない。以降の基準は手動確認の後のハッシュ
+- 手動確認用の環境: 作業の開始時に控えた 9 ファイルのハッシュが、手動確認の直前まで変わっていないことと、件数が Step 1 の手動確認の後と同じことを確かめた（Step 1-b-2 の後のハッシュの値は記録がないので比べていない）。手動確認で、OP の development DB は `oauth_access_grants` が 12 → 13 件、`oauth_access_tokens` が 31 → 32 件、RP の development DB は `sessions` が 10 件のまま（既にある行を更新）で、どちらもハッシュが変わった。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt` は変わっていない。以降の基準は手動確認の後のハッシュ
 
 ### 遭遇した問題
 
@@ -1554,4 +1554,18 @@ devise を上げ、initializer を雛形に合わせた後に、`.claude/launch.
 - RuboCop: 3 アプリとも `no offenses detected`。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test（`CI=1` 付きも）・development で `✅Congratulations!`。bundler-audit: `No vulnerabilities found`。無視リストを空にした bundler-audit で、無視リストの ID はすべて今も報告される（devise の 2 件は消した）。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`。`bin/rails runner` は 3 アプリとも 7.0.10
 - 応答のスナップショットの変化は、DEF-7.0-39・40（devise のビュー）と DEF-7.0-42（devise の responder）だけ。どれも解説して返事をもらってから作り直した
 - 手動確認用の環境: 作業の最後に、9 ファイルのハッシュが手動確認の後と同じだった
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `scripts/check-apps` の無視リストの検査が、bundle-audit 自体の失敗を見ておらず、advisory のデータベースがないときなどに、無視リストの全 ID を「解消済み」と出す | 出力に結果の行（`Vulnerabilities found!`・`No vulnerabilities found`）がなければ、bundle-audit の失敗として扱うようにした。存在しない場所の advisory のデータベースを指す一時的なコピーで流し、「結果を読めなかった」で失敗することを確かめた（このとき bundle-audit がその場所へデータベースを取りに行こうとしたが、書き込めずに始まる前に失敗した。ダウンロードされたものはない） |
+| 上の「手動確認」に「ハッシュが Step 1-b-2 の後と同じ」と書いたが、比べたのは作業の開始時に控えた値だけ | 確かめた範囲に書き直した |
+| `--no-e2e` と `--e2e-only` を一緒に渡すと、何も流さず、bash 3.2 で unbound variable のエラーになる | 引数の誤り（終了コード 2）にした |
+| `devise.rb` の `:unprocessable_entity` は、Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`） | 申し送った。Rack を 3.1 以上にする Step で、雛形に合わせ直す（PLAN.md 7 章の devise の行、DEF-7.0-42） |
+| defaults/rails-7.0.md の冒頭が、周辺 gem の記録の場所として 1-b-3-1 のブランチだけを指している | 1-b-3-1・1-b-3-2 のブランチを書き分けた |
+| `scripts/check-apps` と CI に、同じ検査のコマンドが 2 か所ある | 申し送った。CI から `check-apps` を呼ぶかどうかは、スキルを作る PR で決める（PLAN.md 13 章の 4） |
+| RP の CSRF のテストが、プロセス全体の設定 `allow_forgery_protection` を書き換えている | 今は並列化していないので、テストをスレッドで並列化するときに見直すと、テストのコメントに書いた |
+
+コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通ることを確かめた。
 
