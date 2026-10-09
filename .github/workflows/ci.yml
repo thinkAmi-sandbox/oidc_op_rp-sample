@@ -53,6 +53,17 @@ jobs:
         if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
         run: bundle exec rubocop
 
+      # 応答のスナップショットの伏せる処理は、3 アプリで同じ内容のファイルにしている（docs/upgrade/TIPS.md）。
+      # 1 アプリだけ直して伏せ方がずれないよう、ほかのアプリのものと比べる
+      - name: 応答のスナップショットのヘルパーが 3 アプリで同じか
+        if: ${{ !cancelled() }}
+        run: |
+          status=0
+          for other in ../rails_*/test/support/response_snapshot_helper.rb; do
+            diff -u "$other" test/support/response_snapshot_helper.rb || status=1
+          done
+          exit "$status"
+
       - name: zeitwerk:check
         if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
         run: bin/rails zeitwerk:check
