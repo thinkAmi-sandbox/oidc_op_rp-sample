@@ -1,0 +1,108 @@
+# frozen_string_literal: true
+
+# 応答（ステータス・ヘッダー・本文）を、実行ごとに変わる値だけを伏せて、test/snapshots/responses/ のファイルと比べる。
+# Rails や gem を上げたときの応答の変化を、スナップショットの差分として見るためのもの（docs/upgrade/PLAN.md の Step 1-b-2）。
+# 伏せる値は、ヘッダー名・クエリのパラメーター名・hidden field の名前・JSON のキーで決め、文字列の形では伏せない。
+# 知らない値が毎回変わるようになったときは、伏せずに落ちて気づけるようにするため。
+# 3 アプリで同じ内容のファイルにしている。作り直すときは UPDATE_SNAPSHOTS=1 を付けて流す（docs/upgrade/TIPS.md）
+module ResponseSnapshotHelper
+  SNAPSHOT_DIR = Rails.root.join('test/snapshots/responses')
+
+  # 値を比べないヘッダー（あるかどうかは比べる）。X-Request-Id・X-Runtime は毎回変わり、ETag・Content-Length は本文から決まる
+  MASKED_HEADERS = {
+    'content-length' => '<CONTENT_LENGTH>', 'etag' => '<ETAG>',
+    'x-request-id' => '<REQUEST_ID>', 'x-runtime' => '<RUNTIME>'
+  }.freeze
+
+  # URL のクエリと hidden field で、毎回作られる値（doorkeeper の認可コード、omniauth の state・nonce・PKCE）
+  MASKED_PARAMS = {
+    'code' => '<AUTH_CODE>', 'state' => '<STATE>', 'nonce' => '<NONCE>', 'code_challenge' => '<CODE_CHALLENGE>'
+  }.freeze
+
+  # JSON のキー。トークンは毎回作られ、JWKS の n・kid は署名鍵（手元と CI で違う）から決まる。
+  # E2E のスナップショット（e2e/support/baseline.ts）と同じく、元の値の型を残す（例: <ACCESS_TOKEN:string>）
+  MASKED_JSON_KEYS = {
+    'access_token' => '<ACCESS_TOKEN>', 'refresh_token' => '<REFRESH_TOKEN>', 'id_token' => '<ID_TOKEN>',
+    'n' => '<MODULUS>', 'kid' => '<KID>'
+  }.freeze
+
+  PARAM_NAMES = MASKED_PARAMS.keys.sort_by { |name| -name.size }.map { |name| Regexp.escape(name) }.join('|')
+  # ?code=... / &code=... / HTML の &amp;code=...
+  QUERY_PARAM = /(?<=[?&;])(#{PARAM_NAMES})=[^&#"'\s<]*/
+  HIDDEN_FIELD = /(<input type="hidden" name="(#{PARAM_NAMES})"[^>]*? value=")[^"]*/
+
+  def assert_response_snapshot(name)
+    path = SNAPSHOT_DIR.join("#{name}.txt")
+    actual = response_snapshot
+    write_snapshot(path, actual) if ENV['UPDATE_SNAPSHOTS']
+
+    assert_path_exists path, "スナップショット #{path.relative_path_from(Rails.root)} がない。" \
+                             '作るときは UPDATE_SNAPSHOTS=1 を付けて流す'
+    assert_equal File.read(path, encoding: 'UTF-8'), actual,
+                 '応答がスナップショットと違う。変わった理由を確かめ、意図したものなら UPDATE_SNAPSHOTS=1 で作り直す'
+  end
+
+  private
+
+  def write_snapshot(path, content)
+    FileUtils.mkdir_p(path.dirname)
+    File.write(path, content, encoding: 'UTF-8')
+  end
+
+  def response_snapshot
+    lines = ["HTTP #{response.status}"]
+    snapshot_headers.each { |key, value| lines << "#{key}: #{value}" }
+    "#{lines.join("\n")}\n\n#{snapshot_body}\n"
+  end
+
+  # 名前を小文字にして並べる（HTTP のヘッダー名は大文字小文字を区別しない）。Set-Cookie は 1 つずつ別の行にする
+  def snapshot_headers
+    response.headers.to_h.flat_map do |key, value|
+      name = key.downcase
+      value.to_s.split("\n").map { |line| [name, mask_header(name, line)] }
+    end.sort
+  end
+
+  def mask_header(name, value)
+    return MASKED_HEADERS[name] if MASKED_HEADERS.key?(name)
+    return value.sub(/\A([^=;]+)=[^;]*/, '\1=<COOKIE>') if name == 'set-cookie'
+    return mask_params(value) if name == 'location'
+
+    value
+  end
+
+  def snapshot_body
+    body = response.body.to_s.dup.force_encoding('UTF-8')
+    return JSON.pretty_generate(mask_json(JSON.parse(body))) if response.media_type == 'application/json'
+
+    mask_params(body.gsub(HIDDEN_FIELD) { "#{Regexp.last_match(1)}#{MASKED_PARAMS[Regexp.last_match(2)]}" })
+  end
+
+  def mask_params(text)
+    text.gsub(QUERY_PARAM) { "#{Regexp.last_match(1)}=#{MASKED_PARAMS[Regexp.last_match(1)]}" }
+  end
+
+  def mask_json(value)
+    case value
+    when Hash
+      value.to_h do |key, child|
+        [key, MASKED_JSON_KEYS.key?(key) ? typed(MASKED_JSON_KEYS[key], child) : mask_json(child)]
+      end
+    when Array then value.map { |child| mask_json(child) }
+    else value
+    end
+  end
+
+  # <ACCESS_TOKEN> を <ACCESS_TOKEN:string> のように、元の値の JSON の型を付けた形にする
+  def typed(placeholder, value)
+    type = case value
+           when String then 'string'
+           when Integer, Float then 'number'
+           when true, false then 'boolean'
+           when nil then 'null'
+           when Array then 'array'
+           else 'object'
+           end
+    placeholder.sub(/>\z/, ":#{type}>")
+  end
+end

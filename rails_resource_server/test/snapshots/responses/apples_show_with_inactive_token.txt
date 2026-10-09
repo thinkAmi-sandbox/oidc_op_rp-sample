@@ -1,0 +1,14 @@
+HTTP 401
+cache-control: no-cache
+content-length: <CONTENT_LENGTH>
+content-type: text/plain; charset=utf-8
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+ 
