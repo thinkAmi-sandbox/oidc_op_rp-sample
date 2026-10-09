@@ -19,7 +19,8 @@ class MyOpLoginTest < ActionDispatch::IntegrationTest
   end
 
   # test 環境では allow_forgery_protection が false なので、このテストの中だけ有効にする。
-  # トークンの確認は omniauth-rails_csrf_protection（OmniAuth の request_validation_phase）が行う
+  # トークンの確認は omniauth-rails_csrf_protection（OmniAuth の request_validation_phase）が行う。
+  # この設定はプロセス全体に効くので、テストをスレッドで並列化するときは見直す（今は並列化していない）
   test 'CSRF のトークンのないログインの POST は、OP へリダイレクトせず /auth/failure へリダイレクトする' do
     original = ActionController::Base.allow_forgery_protection
     ActionController::Base.allow_forgery_protection = true
