@@ -44,6 +44,7 @@
 | DEF-7.0-34 | `action_view.button_to_generates_button_tag = true` | `load_defaults`（グループ 6） | 3 アプリ | 追随 |
 | DEF-7.0-35 | `action_view.apply_stylesheet_media_default = false` | `load_defaults`（グループ 7） | 3 アプリ | 追随 |
 | DEF-7.0-36 | `active_support.key_generator_hash_digest_class = OpenSSL::Digest::SHA256` | `load_defaults`（グループ 8） | 3 アプリ | 追随 |
+| DEF-7.0-37 | 7.0 の雛形から消えた initializer を消す | `app:update` の雛形（手で消す） | 3 アプリ | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -165,7 +166,7 @@
 - 何が変わるか: 新しい既定値をすべてコメントにした initializer が足される
 - なぜ: `app:update` は、新しい既定値を 1 つずつ有効にできるよう、このファイルを足す
 - 3 アプリへの影響: 足した時点ではすべてコメントで、動作は同じ
-- 扱い: 追随。グループごとに有効にし、最後に `load_defaults 7.0` にして消す
+- 扱い: 追随。グループごとに有効にし、`load_defaults 7.0` にするコミットで消した。その前後で、test・development の両方の値を書き出して比べ、違ったのは DEF-7.0-24 だけ（下の「補足」）
 - 出典: `railties-7.0.10/lib/rails/generators/rails/app/templates/config/initializers/new_framework_defaults_7_0.rb.tt`、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.4 アップデートタスク」「1.5 フレームワークのデフォルトを設定する」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.1.1 ターゲットバージョン7.0のデフォルト値」
 - コミット: RS `e363c55`、RP `8ca0c8c`、OP `8be19a1`
 
@@ -215,16 +216,18 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - **原因**: 起動の途中（`initialize!` より前）に、フレームワークのクラスが読み込まれていた。Rails は、各フレームワークの設定を `ActiveSupport.on_load` のフックや railtie の initializer で写す。クラスが既に読み込まれていると、`config/initializers` を読む前に写し終えるので、`new_framework_defaults_*.rb` の設定が黙って無視される。`disable_to_s_conversion` は、`initialize!` の最初に環境変数 `RAILS_DISABLE_DEPRECATED_TO_S_CONVERSION` を立て（`railties-7.0.10/lib/rails/application/bootstrap.rb`）、その後で読み込まれる core_ext に古い `to_s(:形式)` を読ませない仕組みなので、core_ext が先に読まれていると `load_defaults 7.0` でも効かない
   - `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`ActiveRecord::Base` と Active Support の core_ext を読み込んでいた。activerecord-session_store の README が「`config/application.rb` の末尾に」書く例を載せていて、RP はそれに沿っていた
   - activerecord-session_store 自身が、`Bundler.require` の時点で `ActionDispatch::Request` を読み込む（`activerecord-session_store-2.1.0/lib/action_dispatch/session/active_record_store.rb` の `require 'action_dispatch/middleware/session/abstract_store'`。2.3.0 でも同じ）
-- **確かめ方**: `config/application.rb` を読み終えた時点と、`config/initializers` を読む直前（`before: :load_config_initializers` の initializer）で、`ActiveSupport` が読み込み済みとして記録している部品を書き出した。対応の前の RP は `active_record` と `action_dispatch_request` が読み込み済みで、RS・OP は `before_configuration`・`before_initialize`・`i18n` だけ
+- **確かめ方**: `config/application.rb` を読み終えた時点と、`config/initializers` を読む直前（`before: :load_config_initializers` の initializer）で、`ActiveSupport` が読み込み済みとして記録している部品を書き出した。対応の前の RP は `active_record` と `action_dispatch_request` が読み込み済みで、RS・OP は `before_configuration`・`before_initialize`・`i18n` だけ（ここまでは test 環境で確かめた。development は「残ること」）
 - **対応**: serializer の設定を `config/initializers/session_store.rb` に移し、`ActiveSupport.on_load(:active_record)` の中で設定するようにした（RP `77c26df`）。セッションは前と同じく JSON で保存される（`{"value":{...}}` の形を、test 環境の DB と E2E 用の DB で確かめた）。これで `ActiveRecord::Base` は起動の途中で読み込まれなくなり、DEF-7.0-25・27 は RP でもこのコミットから効く
-- **残ること**: `ActionDispatch::Request` は gem が読み込むので、RP では DEF-7.0-24 が `load_defaults 7.0` にしたときに効く（`load_defaults` は `config/application.rb` の中で値を決めるので、フックがすぐ走っても新しい値が写る）。gem を直すのは epic の範囲外
+- **残ること**: `ActionDispatch::Request` は、対応の後も次の 2 つが `config/initializers` より前に読み込む。そのため DEF-7.0-24 は、RP（test・development）と OP（development）では、`load_defaults 7.0` にしたときに効いた（`load_defaults` は `config/application.rb` の中で値を決めるので、フックがすぐ走っても新しい値が写る。前後の値の比較で確かめた）。gem を直すのは epic の範囲外
+  - activerecord-session_store（RP、test・development）: `Bundler.require` の時点（上の「原因」）
+  - web-console 4.2.1（OP・RP、development だけ）: initializer の `web_console.permissions` が `WebConsole::Request`（`ActionDispatch::Request` の子クラス）を読み込む（`web-console-4.2.1/lib/web_console/railtie.rb`）。4.3.0 でも同じ書き方。グループ 1 では test 環境の値だけを確かめていて、`load_defaults 7.0` の前後で development の値も比べたときに見つけた
 - **同じ問題の報告**
   - Rails: [rails/rails#31285](https://github.com/rails/rails/issues/31285)（gem が `on_load` の外で `ActiveRecord::Base` を参照すると、`new_framework_defaults.rb` が効かない）、[rails/rails#46277](https://github.com/rails/rails/issues/46277)（`config/application.rb` で `ActiveRecord::Base` を参照すると、initializer の `verify_foreign_keys_for_fixtures` が効かない）、[rails/rails#50133](https://github.com/rails/rails/issues/50133)（同じ原因の issue のまとめ）
   - Rails の対策: [rails/rails#56201](https://github.com/rails/rails/pull/56201)「Load hook guard」（2026-02-11 に main へ。早い読み込みを警告・例外にする仕組み）。8.1.4 までのリリースには含まれていない（GitHub の比較で確かめた）
   - activerecord-session_store: [README](https://github.com/rails/activerecord-session_store#configuration)（`config/application.rb` の末尾に書く例）、[rails/activerecord-session_store#142](https://github.com/rails/activerecord-session_store/issues/142)（`ActiveSupport.on_load(:active_record)` の中で `serializer = :json` を設定する例）、[rails/activerecord-session_store#143](https://github.com/rails/activerecord-session_store/pull/143)（gem が `ActiveRecord::Base` を早く読み込まないようにした変更の続き）
   - ブログ: Arkency「[I do not blindly trust setting things in new_framework_defaults initializers anymore](https://blog.arkency.com/i-do-not-blindly-trust-setting-things-in-new-framework-defaults-initializers-anymore/)」（2025-06-10。Rails 7.1 で、gem が `ActiveRecord::Base` を早く読み込んだため `new_framework_defaults_7_1.rb` の設定が効かなかった例）
   - Rails ガイド: v7.0 版には該当の節がないので、最新版の [Rails アプリケーションを設定する](https://railsguides.jp/configuring.html)「6 読み込みフック」（`ActiveRecord::Base` などを不注意に読み込むと、Rails との暗黙の取り決めに違反する）
-- **後の Step への申し送り**: `new_framework_defaults_*.rb` を有効にするたびに、上の確かめ方で、起動の途中に読み込まれる部品が増えていないかを見る。gem を上げたときも同じ
+- **後の Step への申し送り**: `new_framework_defaults_*.rb` を有効にするたびに、上の確かめ方で、起動の途中に読み込まれる部品が増えていないかを、test と development の両方で見る（development だけで使う gem がある）。gem を上げたときも同じ
 
 ### DEF-7.0-16: `action_dispatch.cookies_serializer = :json`
 
@@ -309,7 +312,7 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 ### DEF-7.0-24: `action_dispatch.return_only_request_media_type_on_content_type = false`
 
 - 種類: `load_defaults`（グループ 1）/ 対象: 3 アプリ
-- 何が変わるか: `ActionDispatch::Request#content_type` が、メディアタイプだけでなく、Content-Type ヘッダーの値（charset など）をそのまま返す。RS・OP は `true` → `false`。RP は `load_defaults 7.0` にしたときに変わる（一時的に `load_defaults 7.0` にして確かめた。下の「補足」）
+- 何が変わるか: `ActionDispatch::Request#content_type` が、メディアタイプだけでなく、Content-Type ヘッダーの値（charset など）をそのまま返す。RS（test・development）と OP（test）は `true` → `false`。RP（test・development）と OP（development）は、`load_defaults 7.0` にしたときに `false` になった（下の「補足」）
 - なぜ: Rack や他のフレームワークと同じく、ヘッダーの値をそのまま返すようにする
 - 3 アプリへの影響: アプリと主な gem（devise・doorkeeper・omniauth・activerecord-session_store）に `request.content_type` の呼び出しはない。doorkeeper は `media_type` を使う
 - 扱い: 追随
@@ -442,4 +445,21 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
   - 手動確認（ブラウザペイン）: この設定なしで RP からログインし、3 アプリを止めてこの設定を有効にして起動し直した。RP のログインは続き、RP の「Re Login」で OP のログイン画面が出た（OP のセッションが切れた）。もう一度ログインした後、RP のログインと introspection 用 RP の流れ（RS が 200・401・revoke の後に 401、introspect が `active: true` → `active: false`）は Step 0-f-3 と同じだった
 - 扱い: 追随。移行用のコード（Cookie のローテーション）は書かない（PLAN.md の 3 章の 2 の境目の 6、12 章）
 - 出典: [rails/rails#40770](https://github.com/rails/rails/pull/40770)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.10 キージェネレータのメッセージダイジェストクラスがSHA256に変更」（ローテーションのコードの例がある）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.7 `config.active_support.key_generator_hash_digest_class`」
+- コミット: （コミット後に記入）
+
+## `load_defaults 7.0`
+
+`load_defaults` を 6.1 → 7.0 にし、`new_framework_defaults_7_0.rb`（DEF-7.0-12）と、`config/application.rb` に書いた `cache_format_version`・`disable_to_s_conversion` の 2 行を消した。前後で test・development の値を書き出して比べ、違ったのは DEF-7.0-24（RP と OP の development）だけだった。test 環境の応答、INSERT の SQL と保存される値も同じ。
+
+### DEF-7.0-37: 7.0 の雛形から消えた initializer を消す
+
+- 種類: `app:update` の雛形（`app:update` は既存のファイルを消さないので、手で消す）/ 対象: 3 アプリ
+- 何が変わるか: 次のファイルを消す
+  - `config/initializers/application_controller_renderer.rb`・`config/initializers/mime_types.rb`（3 アプリ）: 中身はコメントだけ
+  - `config/initializers/cookies_serializer.rb`（RP・OP）: `:json` で、`load_defaults 7.0` と同じ値（DEF-7.0-16）
+  - `config/initializers/wrap_parameters.rb`（3 アプリ）: `wrap_parameters format: [:json]` で、`load_defaults 7.0` の `wrap_parameters_by_default` と同じ処理（DEF-7.0-17）
+- なぜ: Rails 7.0 は、新しいアプリに生成する initializer を減らした（中身がコメントだけのもの、既定値で置き換えられるもの）
+- 3 アプリへの影響: 値の比較で、`cookies_serializer` と `ActionController::Base._wrapper_options`・`ActionController::API._wrapper_options` は前後で同じ。応答も同じ
+- 扱い: 追随。`backtrace_silencers.rb` は残す（`BACKTRACE` 環境変数の扱いは railties 7.0.10 になく、このファイルだけが担う。Step 3 で見直す）
+- 出典: [rails/rails#42538](https://github.com/rails/rails/pull/42538)、[rails/rails#43237](https://github.com/rails/rails/pull/43237)（`mime_types.rb`・`wrap_parameters.rb`・`backtrace_silencers.rb` を雛形から外した）、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「1.5 フレームワークのデフォルトを設定する」
 - コミット: （コミット後に記入）
