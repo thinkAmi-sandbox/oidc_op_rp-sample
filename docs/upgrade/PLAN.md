@@ -361,14 +361,15 @@ PR を 1-b-1（起動の途中の読み込みの検出）と 1-b-2（周辺 gem�
 
 Step 1 で、RP の `config/application.rb` の serializer の設定が起動の途中で `ActiveRecord::Base` を読み込み、`new_framework_defaults_7_0.rb` の設定が黙って無視された（[defaults/rails-7.0.md](defaults/rails-7.0.md) の「補足」）。これを Step ごとの手作業ではなく、CI で毎回検出する。
 
-- [ ] 3 アプリの Gemfile の先頭に a-nti_manner_kick_course 0.5.0 を足す（RS → RP → OP の順に、gem だけのコミット）
-- [ ] CI の `rails` ジョブに、`ANTI_MANNER=1 bin/rails runner 1` を test と development で流すステップを足す
-- [ ] わざと壊して、検出されることを確かめる（確かめた後で戻す）
-- [ ] 検出できる範囲と、手で確かめる範囲（`action_dispatch_request`）を 12 章・TIPS.md に書く
+- [x] 3 アプリの Gemfile の先頭に a-nti_manner_kick_course 0.5.0 を足す（RS → RP → OP の順に、gem だけのコミット）
+- [x] CI の `rails` ジョブに、`ANTI_MANNER=1 bin/rails runner 1` を test と development で流すステップを足す
+- [x] わざと壊して、検出されることを確かめる（確かめた後で戻した）
+- [x] 検出できる範囲と、手で確かめる範囲（ほかの gem の initializer、`config/initializers`、`action_dispatch_request`）を 12 章・TIPS.md に書く
 - 着手時の作業計画で決めたこと（人間が承認）
   - Gemfile: `ruby` の行の直後、`gem 'rails'` より前に `gem 'a-nti_manner_kick_course', groups: %i[development test]` と書く。`group :development, :test do ... end` のブロックにすると、既にある同じグループのブロックと重なり、RuboCop の `Bundler/DuplicatedGroup` の指摘になるため（`dotenv-rails` と同じ書き方）。版は Gemfile で固定せず、lock に任せる
   - CI: `zeitwerk:check` の後、minitest の前に、test と development の 2 ステップを足す（OP の署名鍵を作るステップより後）。`ANTI_MANNER` と `RAILS_ENV` はステップの `env` にだけ付ける。`ANTI_MANNER` があると gem が `eager_load!` の前で起動を終了コード 0 で終えるので、ジョブ全体に付けると minitest などが何も検査せずに成功するため
   - 壊すと落ちることは手元で確かめる（RS の `config/application.rb` で `ActiveRecord::Base` を参照、RP で Step 1 の前の serializer の設定に戻す、OP の initializer で `ActionController::Base` を参照）。検出できない範囲として、OP の initializer で `ActionDispatch::Request` を参照しても通ることも確かめる
+  - 着手後に決めたこと: OP の initializer で `ActionController::Base` を参照しても検出されなかった（下の「検出できる範囲」）。gem はこのまま使い、検出できない範囲は手で確かめる（人間が判断。自前の検査を足す案は採らなかった。経緯は LOG.md の Step 1-b-1）
   - 外す時期: Rails 8.2 以上（今回の目標の外）。epic の間は残す（7 章）
 
 調べたこと（着手時の 2026-10-09）:
@@ -377,9 +378,10 @@ Step 1 で、RP の `config/application.rb` の serializer の設定が起動の
 |---|---|
 | 版 | 0.5.0（2026-01-04）が最新。`.gem` は 8,704 バイト。依存は `activesupport >= 7.0.0`・`railties >= 7.0.0`。MIT |
 | gem 名と読み込み | gem 名は `a-nti_manner_kick_course`、lib は `a/nti_manner_kick_course.rb`。Bundler.require は名前の `-` を `/` にしたファイルを読む。Gemfile の順に require するので、先頭に置けば `require "rails/all"` の後、アプリのほかの gem より先に読まれる |
-| 動き | require された時点で、環境変数 `ANTI_MANNER` があれば、監視する部品の `ActiveSupport.on_load` にフックを仕込む。initializer `anti_manner`（`before: :eager_load!`）まで何も走らなければ「✅Congratulations!」を出して終了コード 0 で `exit` し、その前にフックが走れば、疑わしい行を出して終了コード 1 で止まる（`ANTI_MANNER_DEBUG=1` でスタックトレース全部）。環境変数がなければ Railtie を足すだけで何もしない。Rails 7.1 以下は `rails runner 1` で起動する（README） |
+| 動き | require された時点で、環境変数 `ANTI_MANNER` があれば、監視する部品の `ActiveSupport.on_load` にフックを仕込む。initializer `anti_manner`（`before: :eager_load!`。走る位置は下の「検出できる範囲」）まで何も走らなければ「✅Congratulations!」を出して終了コード 0 で `exit` し、その前にフックが走れば、疑わしい行を出して終了コード 1 で止まる（`ANTI_MANNER_DEBUG=1` でスタックトレース全部）。環境変数がなければ Railtie を足すだけで何もしない。Rails 7.1 以下は `rails runner 1` で起動する（README） |
 | 監視する部品 | `action_controller`・`active_record`・`action_view`・`active_job`・`action_mailer` など 39 個。`action_dispatch_request` は含まない（`action_dispatch_response`・`action_dispatch_integration_test` は含む）。そのため、RP の activerecord-session_store と、RP・OP の development の web-console による `ActionDispatch::Request` の早い読み込み（[IMPROVEMENTS.md](../IMPROVEMENTS.md) の IMP-009）は検出できない |
 | Rails 8.2 の Load hook guard | rails/rails#56201（2026-02-11 に main へ）は当初 `action_dispatch_request` も監視したが、rails/rails#56901（2026-02-27）で外れた（production では routes を読むときに初期化の途中で読み込まれるため）。既定は警告だけ（`:log`）で、`eager_load` が true のときは見ない。railties の最新は 8.1.4 で、8.2 は出ていない |
+| 検出できる範囲（作業の途中で分かった） | initializer `anti_manner` には `before: :eager_load!` しか指定がないので、Railtie の読み込みの順（Gemfile の先頭）の位置、つまり Rails の各フレームワークの initializer の直後で検査を終える。OP の test では 217 個中 103 番目で、アプリの `load_config_initializers` は 150 番目、`eager_load!` は 211 番目。検出できるのは `config/application.rb`、`Bundler.require` で gem を require するとき、`config/environments/*.rb`、Rails 自身の initializer。ほかの gem の initializer（web-console・devise・doorkeeper など）と `config/initializers/*.rb` は検出できない。Gemfile の末尾に置いても、アプリの `config/initializers` より前に終える点は変わらず、ほかの gem の require を見られなくなる |
 | RuboCop | `Bundler/DuplicatedGroup` は `group` のブロックを数え、`gem` の `groups:` は数えない。`Bundler/OrderedGems` は `-`・`_` を無視して並べ、コメントで区切る |
 
 #### 1-b-2: Rails 7.0 を必要とする周辺 gem
@@ -520,7 +522,7 @@ oxlint / oxfmt の導入条件:
 | oauth2 2.x / faraday 2 / doorkeeper 系の更新で、アプリ間の通信が壊れる | 1 gem ずつ上げ、毎回 E2E を流す |
 | doorkeeper-openid_connect の JWT ライブラリ変更で ID トークンや JWKS が変わる（Next.js 製 RP にも影響しうる） | スナップショットの比較で ID トークンの項目と `alg`、JWKS の構造を比べる |
 | Rails 7.0 の `load_defaults` で Cookie の鍵生成方式が SHA256 に変わり、既存セッションが無効になる | サンプルなので許容し、ローテーション用のコードは入れない（Step 1 で人間が判断）。対象は OP のセッション Cookie だけ（RP のセッション Cookie は署名のない ID）。E2E は毎回新しいセッションで流す。Step 1 の手動確認で、OP だけが一度ログアウトした状態になることを確かめた（DEF-7.0-36） |
-| gem やアプリのコードが、フレームワークのクラス（`ActiveRecord::Base` など）を initializer より前に読み込み、`new_framework_defaults_*.rb` の設定が黙って無視される | 有効にする前後で、test と development の両方の値を `rails runner` で書き出して比べる（Step 1 で RP と web-console で起きた。docs/upgrade/defaults/rails-7.0.md の「補足」）。1-b-1 で、起動の途中の読み込みを a-nti_manner_kick_course で検出する検査を CI に足す（test と development）。監視の一覧にない `action_dispatch_request`（RP の activerecord-session_store、RP・OP の development の web-console）は、引き続き TIPS.md の「設定の値と応答の比較」の方法で手で確かめる |
+| gem やアプリのコードが、フレームワークのクラス（`ActiveRecord::Base` など）を initializer より前に読み込み、`new_framework_defaults_*.rb` の設定が黙って無視される | 有効にする前後で、test と development の両方の値を `rails runner` で書き出して比べる（Step 1 で RP と web-console で起きた。docs/upgrade/defaults/rails-7.0.md の「補足」）。1-b-1 から、`config/application.rb` と gem の require による読み込みは、CI で a-nti_manner_kick_course が test と development の両方で検出する。ほかの gem の initializer、`config/initializers`、監視の一覧にない `action_dispatch_request`（RP の activerecord-session_store、RP・OP の development の web-console）は検出できないので、引き続き TIPS.md の「設定の値と応答の比較」の方法で手で確かめる |
 | Rails 7.1 で RP の独自ストラテジーが Zeitwerk の読み込みに失敗する | Step 3 の案 B で対応。失敗したら案 A |
 | gem 更新でマイグレーションの追加が必要になる | gem 更新の手順で確認し、`db:drop db:setup` の完了条件で検出する |
 | 時間に依存するテストが不安定になる | minitest は `travel_to`、E2E は期限切れを待たずに revoke で確認 |

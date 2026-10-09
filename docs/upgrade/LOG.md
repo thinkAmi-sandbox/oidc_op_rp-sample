@@ -1309,3 +1309,53 @@ PR #21 の最後の実行（head は `docs: record the code review of step 1` �
 | TIPS.md の「確認のコマンド」に、CI と同じ条件（eager load あり）の minitest がない | `CI=1 mise exec -- bin/rails test` の行を足した |
 | フレームワークの早い読み込みを、Step ごとの手作業で確かめる申し送りだけにしている | 対応しない（epic の範囲を超える）。CI で検出する案を、下の IMP-009 に含めた |
 | gem（activerecord-session_store・web-console）の早い読み込みを「epic の範囲外」として見送ったが、IMPROVEMENTS.md に足す案を出していない（CLAUDE.md） | 人間の承認を得て、docs/IMPROVEMENTS.md に IMP-009 として足した |
+
+## Step 1-b-1: 起動の途中の読み込みを CI で検出する（2026-10-09）
+
+- ブランチ / PR: `upgrade/step1b-anti-manner` / （PR 作成後に記入）
+- バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。a-nti_manner_kick_course 0.5.0 を 3 アプリの development・test に足した
+
+### 作業計画で決めたこと
+
+Step 1 の後に、人間が「gem やアプリのコードが起動の途中で Rails の部品を読み込み、`new_framework_defaults_*.rb` の設定が黙って無視される」のを CI で毎回検出すると決め、a-nti_manner_kick_course を選んだ（参考: TechRacho「Rails: new_framework_defaultsの設定が反映されるタイミングを無邪気に信じてはいけない（翻訳）」、willnet さんのブログとスライド「What's a well-behaved Rails extension gem?」）。着手時に PLAN.md 8 章の手順で調べ、作業計画を出して承認を得た。調べたことは PLAN.md の Step 1-b-1 の節に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| PR の単位 | Step 1-b を 1-b-1（この作業）と 1-b-2（周辺 gem）に分ける | 検出を先に epic に入れておけば、1-b-2 で上げる gem が起動の途中で部品を読み込むようになったときに CI で分かる |
+| Gemfile | 先頭（`ruby` の行の直後）に `gem 'a-nti_manner_kick_course', groups: %i[development test]` | README のとおり、ほかの gem より先に読ませる。`group` のブロックにすると、既にある development・test のブロックと重なって `Bundler/DuplicatedGroup` の指摘になる |
+| CI | `rails` ジョブの `zeitwerk:check` の後に、test と development の 2 ステップ。`ANTI_MANNER` と `RAILS_ENV` はステップの `env` にだけ付ける | development だけの gem（web-console など）もあるので両方で流す。`ANTI_MANNER` があると gem が起動の途中で終了コード 0 で終えるので、ジョブ全体に付けると minitest などが何も検査せずに成功する |
+| 外す時期 | Rails 8.2 以上（今回の目標の外）。epic の間は残す | Rails 8.2 の Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない |
+
+### 作業計画からの変更点
+
+- Step 1 の後の事前の調べでは「Rails 8.2 の Load hook guard の一覧にも `action_dispatch_request` はない」としていた。着手時に確かめると、rails/rails#56201 のマージの時点では一覧にあり、rails/rails#56901（2026-02-27）で外れていた。今の main の一覧にないことは同じ
+- 計画の「壊すと落ちることの確かめ方」の 3（OP の initializer で `ActionController::Base` を参照）が、検出されずに終了コード 0 で通った。gem の initializer `anti_manner` は `before: :eager_load!` しか指定がないので、Railtie の読み込みの順の位置、つまり Rails の各フレームワークの initializer の直後で検査を終える（OP の test では 217 個中 103 番目。アプリの `load_config_initializers` は 150 番目、`eager_load!` は 211 番目）。そのため、ほかの gem の initializer（web-console・devise・doorkeeper など）と `config/initializers/*.rb` は検出できない。Gemfile の末尾に置いても、アプリの `config/initializers` より前に終える点は変わらない
+  - 人間に、①gem をこのまま使い、検出できない範囲は手で確かめる、②gem に加えて自前の検査（`after: :load_config_initializers` の initializer で確かめるスクリプト）を CI に足す、③自前の検査だけにする、を示し、①に決まった。Step 1 で起きた型（`config/application.rb` と gem の require）は検出でき、自前のコードを持たずに済むため
+  - 検出できない範囲を、PLAN.md（Step 1-b-1 の「検出できる範囲」、12 章）・TIPS.md・defaults/rails-7.0.md の「補足」の申し送り・docs/IMPROVEMENTS.md の IMP-009 に書いた（IMP-009 の変更は作業計画で人間が承認）
+- TIPS.md の「設定の値と応答の比較」で、`ActiveSupport.instance_variable_get(:@loaded)` の `@loaded` が抜けていたので直した
+
+### gem ごとの対応
+
+| gem | バージョン | アプリ | 対応 |
+|---|---|---|---|
+| a-nti_manner_kick_course | なし → 0.5.0 | 3 アプリ（development・test） | lock に増えたのは、この gem と依存 2 行（`activesupport >= 7.0.0`・`railties >= 7.0.0`）と DEPENDENCIES の 1 行だけ。ダウンロードした `.gem` の SHA-256 が rubygems.org の値と同じことを確かめた |
+
+### 壊したときの確認
+
+手元で一時的にコードを変えて `ANTI_MANNER=1 bin/rails runner 1` を流し、確かめた後で戻した（`git diff` が空なことを確かめた）。development は `DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けた。
+
+| アプリ | 一時的な変更 | 結果 |
+|---|---|---|
+| RS | `config/application.rb` の `Bundler.require` の次の行に `ActiveRecord::Base` | test・development とも終了コード 1。`on_load(:active_record)` と、疑わしい行として `config/application.rb:8` が出た |
+| RP | `config/application.rb` の末尾に、Step 1 の `77c26df` で移す前の `ActiveRecord::SessionStore::Session.serializer = :json` | test・development とも終了コード 1、`on_load(:active_record)`。疑わしい行は gem の中（`activerecord-session_store-2.1.0/lib/active_record/session_store/session.rb:7`）を指し、`ANTI_MANNER_DEBUG=1` でスタックトレース全部を出すと `config/application.rb:40` の行があった |
+| OP | `config/initializers/` に `ActionController::Base` だけを書いた一時ファイル | test・development とも終了コード 0（検出できない。上の「作業計画からの変更点」） |
+| OP | 同じ置き方で `ActionDispatch::Request` | test・development とも終了コード 0（監視の一覧にない） |
+
+### 確認結果
+
+- `ANTI_MANNER=1 bin/rails runner 1`: 3 アプリとも test（`CI=1` 付きも）・development で `✅Congratulations!`、終了コード 0
+- minitest: RS 8 runs・RP 20 runs・OP 25 runs、0 failures。`CI=1`（eager load あり）でも同じ件数で通る。gem を足したアプリのコミットの前に毎回流した
+- E2E: 同じく毎回流して 10 passed。スナップショットの差分なし
+- RuboCop: 3 アプリとも `no offenses detected`（Gemfile も対象）。bundler-audit: `No vulnerabilities found`。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`。`zeitwerk:check` は `All is good!`
+- `.github/workflows/ci.yml` は YAML として読め、`rails` ジョブのステップの順番と `env` が計画どおりなことを確かめた。CI での結果は PR を作った後に書く
+- 手動確認用の環境: 作業の前と後で、9 ファイル（3 アプリの development DB、OP の署名鍵、RP・RS の `.env`、3 アプリの `tmp/development_secret.txt`）のハッシュが、Step 1 の手動確認の後と同じだった
