@@ -1,0 +1,18 @@
+HTTP 400
+cache-control: no-store
+content-length: <CONTENT_LENGTH>
+content-type: application/json; charset=utf-8
+referrer-policy: strict-origin-when-cross-origin
+www-authenticate: Bearer realm="Doorkeeper", error="invalid_request", error_description="The request is missing a required parameter, includes an unsupported parameter value, or is otherwise malformed."
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+{
+  "error": "invalid_request",
+  "error_description": "The request is missing a required parameter, includes an unsupported parameter value, or is otherwise malformed."
+}

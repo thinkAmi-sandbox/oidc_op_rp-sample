@@ -54,6 +54,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 - アプリ内のテストは minitest（RSpec は導入しない）。外部通信は WebMock で差し替える
 - テストは「現在の挙動を記録する」ためのもの。仕様は変えない。落ちたらまずアプリ側の変化を疑う
 - 1 テスト 1 振る舞い。準備・実行・確認の順に書く。時間に依存するテストは `travel_to` で固定し、`sleep` は使わない
+- 各アプリの応答（ステータス・ヘッダー・本文）は、`test/snapshots/responses/` のスナップショットと比べる（Step 1-b-2）。変わったら理由を確かめ、PLAN.md の 3 章の 2 の A（Rails の既定値への追随）なら解説してから `UPDATE_SNAPSHOTS=1 bin/rails test` で作り直し、変化を起こしたコミットに入れる。B（業務的な挙動）なら作り直さずに人間に確かめる
 - 3 アプリ通しの E2E はリポジトリ直下の `e2e/`（Playwright）。E2E が通ることを各 Step の完了条件にする。実行方法は `e2e/README.md`
 
 ## 公開物への記載ルール

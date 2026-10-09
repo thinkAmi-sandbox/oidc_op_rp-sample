@@ -1,4 +1,6 @@
 # rails_open_id_provider/db/seeds.rb と同じ 3 つのアプリ。secret はテストを流すたびに作る
+# created_at は seeds と同じ順に 1 秒ずつずらして固定する。doorkeeper の一覧画面（/oauth/applications）は
+# created_at の順に並べるので、同じ時刻だと並びが DB 任せになり、応答のスナップショットが安定しない
 _fixture:
   model_class: Doorkeeper::Application
 
@@ -9,6 +11,7 @@ my_op:
   redirect_uri: http://localhost:3781/auth/my_op/callback
   scopes: openid
   confidential: true
+  created_at: 2026-01-01 00:00:00
 
 introspection:
   name: RP (introspection)
@@ -17,6 +20,7 @@ introspection:
   redirect_uri: http://localhost:3781/auth/introspection/callback
   scopes: openid introspection
   confidential: true
+  created_at: 2026-01-01 00:00:01
 
 resource_server:
   name: Resource Server
@@ -25,3 +29,4 @@ resource_server:
   redirect_uri: urn:ietf:wg:oauth:2.0:oob
   scopes: introspection
   confidential: true
+  created_at: 2026-01-01 00:00:02

@@ -1,0 +1,8 @@
+HTTP 302
+cache-control: no-cache
+content-length: <CONTENT_LENGTH>
+location: /auth/failure?message=JWT%3A%3AVerificationError&strategy=my_op
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+
+302 Moved

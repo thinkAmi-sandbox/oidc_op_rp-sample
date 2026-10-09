@@ -1,0 +1,122 @@
+HTTP 200
+cache-control: max-age=0, private, must-revalidate
+content-length: <CONTENT_LENGTH>
+content-type: text/html; charset=utf-8
+etag: <ETAG>
+link: </stylesheets/doorkeeper/admin/application.css>; rel=preload; as=style; nopush
+referrer-policy: strict-origin-when-cross-origin
+set-cookie: _rails_open_id_provider_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doorkeeper</title>
+  <link rel="stylesheet" href="/stylesheets/doorkeeper/admin/application.css" />
+  
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-5">
+  <a class="navbar-brand" href="/oauth/applications">OAuth2 Provider</a>
+
+  <div class="collapse navbar-collapse">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item active">
+        <a class="nav-link" href="/oauth/applications">Applications</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<div class="doorkeeper-admin container">
+
+  <div class="border-bottom mb-4">
+  <h1>Your applications</h1>
+</div>
+
+<p><a class="btn btn-success" href="/oauth/applications/new">New Application</a></p>
+
+<table class="table table-striped">
+  <thead>
+  <tr>
+    <th>Name</th>
+    <th>Callback URL</th>
+    <th>Confidential?</th>
+    <th>Actions</th>
+    <th></th>
+  </tr>
+  </thead>
+  <tbody>
+    <tr id="application_607634479">
+      <td class="align-middle">
+        <a href="/oauth/applications/607634479">RP (my_op)</a>
+      </td>
+      <td class="align-middle">
+        <p>http://localhost:3781/auth/my_op/callback</p>
+      </td>
+      <td class="align-middle">
+        Yes
+      </td>
+      <td class="align-middle">
+        <a class="btn btn-link" href="/oauth/applications/607634479/edit">Edit</a>
+      </td>
+      <td class="align-middle">
+        <form action="/oauth/applications/607634479" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+  <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
+</form>
+      </td>
+    </tr>
+    <tr id="application_465844991">
+      <td class="align-middle">
+        <a href="/oauth/applications/465844991">RP (introspection)</a>
+      </td>
+      <td class="align-middle">
+        <p>http://localhost:3781/auth/introspection/callback</p>
+      </td>
+      <td class="align-middle">
+        Yes
+      </td>
+      <td class="align-middle">
+        <a class="btn btn-link" href="/oauth/applications/465844991/edit">Edit</a>
+      </td>
+      <td class="align-middle">
+        <form action="/oauth/applications/465844991" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+  <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
+</form>
+      </td>
+    </tr>
+    <tr id="application_311508750">
+      <td class="align-middle">
+        <a href="/oauth/applications/311508750">Resource Server</a>
+      </td>
+      <td class="align-middle">
+        <p>urn:ietf:wg:oauth:2.0:oob</p>
+      </td>
+      <td class="align-middle">
+        Yes
+      </td>
+      <td class="align-middle">
+        <a class="btn btn-link" href="/oauth/applications/311508750/edit">Edit</a>
+      </td>
+      <td class="align-middle">
+        <form action="/oauth/applications/311508750" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+  <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
+</form>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+</div>
+</body>
+</html>
+

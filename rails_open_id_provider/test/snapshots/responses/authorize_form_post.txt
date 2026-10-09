@@ -1,0 +1,47 @@
+HTTP 200
+cache-control: max-age=0, private, must-revalidate
+content-length: <CONTENT_LENGTH>
+content-type: text/html; charset=utf-8
+etag: <ETAG>
+link: </stylesheets/doorkeeper/application.css>; rel=preload; as=style; nopush
+referrer-policy: strict-origin-when-cross-origin
+set-cookie: _rails_open_id_provider_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OAuth authorization required</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="/stylesheets/doorkeeper/application.css" />
+  
+</head>
+<body>
+<div id="container">
+
+  <header class="page-header">
+  <h1>Submit this form</h1>
+</header>
+
+<form name="redirect_form" action="http://localhost:3781/auth/my_op/callback" accept-charset="UTF-8" method="post">
+    <input type="hidden" name="code" id="code" value="<AUTH_CODE>" autocomplete="off" />
+</form>
+<script>
+  window.onload = function () {
+    document.forms['redirect_form'].submit();
+  };
+</script>
+
+</div>
+</body>
+</html>
+
