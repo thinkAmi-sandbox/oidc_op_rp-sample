@@ -1,4 +1,4 @@
-HTTP 302
+HTTP 303
 cache-control: no-cache
 content-length: <CONTENT_LENGTH>
 content-type: text/html; charset=utf-8

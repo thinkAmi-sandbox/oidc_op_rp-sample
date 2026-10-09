@@ -1,8 +1,7 @@
-HTTP 200
-cache-control: max-age=0, private, must-revalidate
+HTTP 422
+cache-control: no-cache
 content-length: <CONTENT_LENGTH>
 content-type: text/html; charset=utf-8
-etag: <ETAG>
 referrer-policy: strict-origin-when-cross-origin
 set-cookie: _rails_open_id_provider_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
 x-content-type-options: nosniff

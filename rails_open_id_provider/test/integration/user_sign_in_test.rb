@@ -13,7 +13,7 @@ class UserSignInTest < ActionDispatch::IntegrationTest
   test '誤ったパスワードではログインできず、ログイン画面にメッセージが出る' do
     post user_session_path, params: { user: { email: users(:user).email, password: SecureRandom.hex(8) } }
 
-    assert_response :ok
+    assert_response :unprocessable_entity
     assert_equal 'Invalid email or password.', flash[:alert]
   end
 
