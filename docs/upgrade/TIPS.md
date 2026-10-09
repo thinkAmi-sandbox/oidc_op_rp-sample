@@ -21,6 +21,7 @@
 |---|---|---|
 | RuboCop | `mise exec -- bundle exec rubocop` | `no offenses detected` |
 | minitest | `mise exec -- bin/rails test` | 0 failures。RP の出力の `Authentication failure!` は想定どおり（ID トークンの検証失敗のテスト） |
+| minitest（CI と同じ eager load あり） | `CI=1 mise exec -- bin/rails test` | 上と同じ件数で 0 failures。Step 1（Rails 7.0 の雛形）から、test 環境は `ENV["CI"]` があると eager load する（DEF-7.0-08） |
 | Zeitwerk | `mise exec -- bin/rails zeitwerk:check` | `All is good!` |
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
 | bundler-audit | `mise exec -- bundle exec bundle-audit check` | `No vulnerabilities found`（無視リスト込み） |
@@ -47,9 +48,17 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す。違いは、O
   - コピーの前後を `diff` で比べるときは、行頭の記号が `< ` / `> ` の 2 文字になるので、`grep -E '^[<>]     [a-z]'`（空白 5 つ）で gem の行を拾う。`git diff` 用の `^[-+]    [a-z]`（空白 4 つ）では何も拾えず、変化がないように見える
 - lock にない gem を足すときは `bundle lock --update <gem>` が使えない（`Could not find gem`）。Gemfile に足して `bundle lock`（入れるときは `bundle install`）を実行する。版の制約がないと最新のメジャー版が入るので、一時固定する（Step 0-f-3 の jwt）
 - advisory が今の版でも対象かは、`ignore: []` だけの YAML を作り、`bundle-audit check --config <ファイル>` に渡すと分かる
+- Rails のマイナーを上げるときは、Gemfile の rails を変えて `bundle lock` するだけで、`--conservative` を付けても周辺の gem（jwt・devise・doorkeeper-openid_connect など）まで動く。lock のコピーで、旧 lock の gem をすべて Gemfile に `= 版` で固定し、Rails の構成 gem だけを外して解決させると、どうしても動く gem が分かる（Step 1。解決できない gem は Bundler のエラーに名前が出るので、その gem だけ固定を外して繰り返す）。その lock をアプリに持ち込み、Gemfile を戻して `bundle lock` すれば、過去の一時固定と同じ結果になる
 - gem の依存と Ruby の要件は、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json` で確かめられる。`.gem` のサイズは `https://rubygems.org/downloads/<gem>-<版>.gem` への HEAD リクエストの `content-length`
 - Gemfile に gem を足す・動かすときは Bundler/OrderedGems に気をつける。RuboCop はコメントを区切りとして扱い（`TreatCommentsAsGroupSeparators`）、自動修正はコメントと gem の対応を崩すことがある（LOG.md の Step 0-e「Gemfile」）
 - 理由付きの `rubocop:disable` が残っている（RS `apples_controller.rb`、RP `introspections_controller.rb`・`my_op.rb`、OP の annotate の rake）。そのコードを書き換えたら、disable が要らなくなっていないか確かめる（`Lint/RedundantCopDisableDirective`）
+
+## 設定の値と応答の比較（Rails を上げる Step）
+
+- `new_framework_defaults_*.rb` の設定は、有効にする前後で `rails runner` から実際の値を書き出して比べる。設定ファイルの値ではなく、クラスに入った値（`ActiveRecord::Base.partial_inserts` など）を読む。`on_load` の中で値が入る設定があるので、読む前に `ActionView::Base`・`ActionController::Base`・`ActionDispatch::Request`・`ActiveRecord::Base` などを読み込んでおく。test と development の両方で比べる（development だけで使う gem が、起動の途中にクラスを読み込むことがある。Step 1 の web-console）
+- 非推奨のメソッドの値を読むと、test 環境の `deprecation = :raise` で例外になる。`ActiveSupport::Deprecation.silence { ... }` で包む
+- 起動の途中に読み込まれた部品は、`require "./config/application"` の後と、`Rails.application.initializer("probe", before: :load_config_initializers) { ... }` を足して `Rails.application.initialize!` した後に、`ActiveSupport.instance_variable_get(:)` で値のある名前を見ると分かる。誰が読み込んだかは、`ActiveSupport.on_load(:active_record) { puts caller }` を先に仕込むと分かる（Step 1）
+- 応答の前後比較は、使い捨ての統合テスト（scratchpad に置き、`bin/rails test <パス>` で流す）で、ステータス・ヘッダー・本文を書き出して `diff` する。トークン・CSRF のトークン・Cookie の値・`X-Request-Id`・`X-Runtime` などは伏せる。ETag も比べるときは、同じ設定で 2 回書き出して、毎回変わるもの（本文にトークンを含む応答）を先に見分けておく
 
 ## 手動確認用の環境
 
@@ -69,3 +78,8 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す。違いは、O
 
 - 確かめたことだけを書く。推測や、前後を比べていない「変わらない」は書かない（Step 0-f-1 のコードレビュー）
 - サブエージェントの調査の結果は、自分で確かめてから書く。確かめていないものは、確かめていないと書く
+
+## コミット
+
+- `git rm` で消したファイルはステージされたままになる。ほかのファイルをパスで `git add` してコミットしても、ステージ済みの削除が一緒に入る（Step 1 で docs のコミットに入ってしまい、push 前に作り直した）。ファイルを消すときは、作業ツリーで消して、コミットするときにパスでステージする
+- アプリごとにコミットするときは、ほかのアプリの変更を `git stash push -u -- <ディレクトリ>` で退避し、そのアプリの変更だけで minitest と E2E を流してからコミットする

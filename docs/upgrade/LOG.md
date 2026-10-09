@@ -1112,7 +1112,7 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 
 ## Step 0-g: CI（GitHub Actions）（2026-10-08）
 
-- ブランチ / PR: `upgrade/step0g-ci` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step0g-ci` / [#20](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/20)
 - バージョン: 変更なし（Ruby 3.1.7 / Rails 6.1.7.10）
 
 ### 前倒しの判断
@@ -1213,3 +1213,91 @@ PR #20 の最初の実行（head は `docs: record step 0-g and update the upgra
 
 - 作業計画からの変更点: `main` は対象にしなかった（人間の判断）。`main` にはまだ `.github/workflows/ci.yml` がないので、`main` から切ったブランチの PR では CI が動かず、`ci-result` を必須にすると待ちのままになるため。epic を `main` に取り込んだ後（仕上げ）に、`main` をルールセットの対象に足す
 - 設定の後、PR #20 で `ci-result` が必須のチェックとして扱われ（`gh pr checks 20 --required`）、通っていることを確かめた
+
+## Step 1: Rails 7.0（2026-10-08〜2026-10-09）
+
+- ブランチ / PR: `upgrade/step1-rails70` / （PR 作成後に記入）
+- バージョン: Ruby 3.1.7（変更なし）/ Rails 6.1.7.10 → 7.0.10
+- 追随した Rails の既定値は、項目ごとに [defaults/rails-7.0.md](defaults/rails-7.0.md) に記録した（DEF-7.0-01〜37）。このログには、判断の経緯と、項目に収まらないことを書く
+
+### 作業計画で決めたこと
+
+着手時に PLAN.md 8 章の手順で調べ（サブエージェント 3 つ: `new_framework_defaults_7_0.rb` の影響、アップグレードガイドと `app:update`、annotate）、作業計画を出して承認を得た。調べたことは PLAN.md の Step 1 の節に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 上げる先 | 7.0.10 | 7.0 系の最新で、activesupport が `require "logger"` する修正（rails/rails#54264）が入り、concurrent-ruby を 1.3.5 以上にできる。代わりに activesupport が benchmark・securerandom・drb・mutex_m を依存に足したので、drb・mutex_m は Ruby 3.1.7 の default gem と同じ版、benchmark・securerandom は要件を満たす最小の版（どちらも 0.3.0）に一時固定した |
+| sprockets-rails | Gemfile に足さない（当初の計画から変更） | 3 アプリとも `sprockets/railtie` を読み込んでいない。足すと `Bundler.require` で `sprockets-rails-3.2.2/lib/sprockets/rails.rb` が `sprockets/railtie` を読み込み、アセットパイプラインが有効になる |
+| annotate | 3.2.0 に上げる（当初は「3.2.0 には上げない」） | 3.1.1 は `activerecord < 7.0` で、Rails 7.0 にできない。OP の注釈に関わる差分はない。annotaterb の 4.23 以上は CI で Ruby 3.3 以上だけを試すので、置き換えは Step 5 のまま |
+| Rails 7.0 を必要とする周辺 gem | サブステップ 1-b（別の PR） | Rails と一緒に上げないと解決しない gem は annotate だけだった |
+| concurrent-ruby | Step 1 の最後に上げる | advisory 3 件（CVE-2026-54904〜54906）の修正。Rails 7.0.10 なら起動する |
+| `app:update` の差分 | アプリ独自の設定は戻し、雛形の変化には追随する。Active Storage のマイグレーションは採用しない | DEF-7.0-01〜14 |
+| コミットと PR | 段階ごと・アプリごと（RS → RP → OP）、PR は 1 つ | PLAN.md 4 章 |
+
+### 「挙動を変えない」の定義
+
+`app:update` の差分を確かめていたとき、`server_timing = true`（DEF-7.0-04）を採用するかで、「挙動を変えない」の範囲を人間と決め直した。決めた定義は PLAN.md の 3 章の 2 と CLAUDE.md に書いた。
+
+- Rails の既定値・雛形の変化（A）には追随する。追随しないと、版を上げるたびに古い既定値のままで問題がないかを確かめ続けることになり、セキュリティや性能の改善も取り込めない
+- 各システムの業務的な挙動（B。画面の文字、URL・ルーティング、画面遷移、OP・RP・RS の間のやり取り、DB に入るデータ）は変えない。変えるときだけ「意図的な仕様変更」にする
+- 知らないうちに追随されると認識がずれるので、A はコミットの前に項目ごとに「何が変わるか・なぜ・影響・提案」を出典（Rails の PR と、上げる先の版の日本語版 Rails ガイド）付きで解説し、返事をもらってからコミットする。振り返りやすいよう、Rails の版ごとのファイル（`docs/upgrade/defaults/`）に ID を振って残す
+- Step 0 の判断は見直さない
+
+この定義で、計画のときに「意図的な仕様変更」としていた `X-XSS-Protection`・`button_to`・`<link>` の `media`（DEF-7.0-33〜35）は、Rails の既定値への追随として扱った。Step 1 に「意図的な仕様変更」はない。
+
+### 作業計画からの変更点
+
+- drb 2.1.0 の依存として ruby2_keywords 0.0.5 が lock に入った（Ruby 3.1.7 の default gem と同じ版。計画のダウンロードの一覧になかったので、入れる前に人間が承認した）。default gem と同じ版の drb・mutex_m・ruby2_keywords は、`bundle install` でダウンロードされず、Ruby 3.1.7 の default gem がそのまま使われた
+- `app:update` の後、listen を Gemfile から外した（DEF-7.0-06）
+- RP の session_store の serializer の設定を、`config/application.rb` から `config/initializers/session_store.rb` の `ActiveSupport.on_load(:active_record)` に移した（RP `77c26df`）。下の「遭遇した問題」の 2
+- ブラウザでの手動確認は、計画の「`load_defaults 7.0` の後に 1 回」から、Cookie の鍵の算出方式（グループ 8）の前後を比べられる時点に移した。`load_defaults 7.0` の後は、値の比較と自動の検査だけにした（人間が承認）
+- concurrent-ruby は、計画の 1.3.7 ではなく 1.3.8（1.3 系の最新。1.3.7 からの変更は小さな改善 2 つ）にした（人間が承認）
+- 追随した既定値の記録の置き場所として `docs/upgrade/defaults/` を作った（README.md と rails-7.0.md）
+
+### gem ごとの対応
+
+| gem | バージョン | アプリ | 対応 |
+|---|---|---|---|
+| annotate | 3.1.1 → 3.2.0 | RP・OP | Rails 6.1 のうちに上げた。E2E 用の DB で `annotate_models`（OP）・`annotate --models`（RP）を前後で流し、モデルと fixtures の注釈が同じことを確かめた（書き換わったファイルは戻した）。自動実行のフックはどちらも migrate・rollback 系だけ |
+| rails 一式 | 6.1.7.10 → 7.0.10 | 3 アプリ | 上の一時固定。zeitwerk 2.4.2 → 2.6.18。sprockets・sprockets-rails が lock から外れた |
+| benchmark・securerandom・drb・mutex_m・ruby2_keywords | なし → 0.3.0・0.3.0・2.1.0・0.1.1・0.0.5 | 3 アプリ | activesupport 7.0.10 と drb の依存 |
+| listen（と rb-fsevent・rb-inotify・ffi） | 3.10.1 → 削除 | 3 アプリ | DEF-7.0-06 |
+| concurrent-ruby | 1.1.9 → 1.3.8 | 3 アプリ | advisory 3 件を無視リストから消した |
+
+- lock の解決は、lock のコピーで旧 lock の gem をすべて固定し、Rails の構成 gem だけを外して解決させ、その lock をアプリに持ち込む方法で行った（TIPS.md「gem の更新」）。何も固定しないと、`--conservative` を付けても jwt 3.3.0・devise 5.0.4・doorkeeper-openid_connect 1.10.1 などに動く
+- lock に入れた default gem（json 2.6.1・bigdecimal 3.1.1・logger 1.5.0・base64 0.1.1、RP の cgi 0.3.7）は動いていない
+
+### 遭遇した問題
+
+1. `rails runner` で値を書き出すスクリプトが、値を読む前に `ActionView::Base` を読み込んでいなかったので、`on_load(:action_view)` の中で入る `multiple_file_field_include_hidden` が変わっていないように見えた。関係するクラスを先に読み込むようにして測り直した（TIPS.md）。同じスクリプトが非推奨の `TimeWithZone.name` を呼び、test 環境の `:raise` で止まったこともあった
+2. RP だけ、`new_framework_defaults_7_0.rb` の一部の設定が効かなかった。`config/application.rb` の末尾の serializer の設定が、起動の途中で `ActiveRecord::Base` を読み込んでいたため（rails/rails#46277 と同じ）。一時的に `load_defaults 7.0` にして試すと、`disable_to_s_conversion` は `load_defaults 7.0` でも効かないことが分かった。ruby-jp の Scrapbox・Rails の issue・ブログを調べ、activerecord-session_store#142 の書き方（initializer の `ActiveSupport.on_load(:active_record)`）に移した（人間が判断）。詳しくは defaults/rails-7.0.md の「補足」
+3. `load_defaults 7.0` の前後で development の値も比べると、OP の development でも `ActionDispatch::Request` が initializer より前に読み込まれていた（web-console 4.2.1 の initializer）。グループ 1 では test 環境の値しか比べていなかった。設定（DEF-7.0-24）を使うコードはないので挙動は変わらない。以降は test と development の両方で比べる（PLAN.md 12 章、TIPS.md）
+4. `load_defaults 7.0` の docs のコミットに、`git rm` でステージ済みだった initializer の削除が入ってしまった。push の前に、作業ツリーはそのままでコミットだけを取り消し（`git reset HEAD~1`）、docs のファイルだけでコミットし直した（TIPS.md「コミット」）
+
+### 手動確認
+
+グループ 8（DEF-7.0-36）を有効にする前後で、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（ログインと同意は人間が操作）。
+
+- グループ 8 なしで RP からログイン → 3 アプリを止め、グループ 8 を有効にして起動し直す → RP のログインは続き、RP の「Re Login」で OP のログイン画面が出た（OP のセッション Cookie が読めなくなった）。もう一度ログインした後、RP のログインと introspection 用 RP の流れ（RS が 200・401・revoke の後に 401、introspect が `active: true`（`exp - iat = 600`）→ `active: false` が 2 回）は Step 0-f-3 と同じだった
+- サーバーの出力に、エラー・`warn`・`DEPRECATION` はなく、Step 0-b から出ていた listen の finalizer の警告も出なかった。development の応答に `X-XSS-Protection: 0` と `Server-Timing` が付くことを `curl` で確かめた
+- 手動確認用の環境: 作業の開始時に、件数が Step 0-f-3 の手動確認の後と同じことと、ハッシュが変わっていないことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 9 → 12 件、`oauth_access_tokens` が 25 → 31 件（my_op 2・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 8 → 10 件に増え、どちらもハッシュが変わった。RS の DB・署名鍵・`.env`・各アプリの `tmp/development_secret.txt` は変わっていない。以降の基準は手動確認の後のハッシュ
+
+### 確認結果
+
+- minitest: RS 8 runs・RP 19 runs（コードレビューでテストを足した後は 20 runs）・OP 25 runs、0 failures（非推奨警告は `:raise`）。アプリやテストのコードのコミットの前に毎回流した。`CI=1`（eager load あり）でも同じ件数で通る
+- E2E: 同じく毎回流して 10 passed。スナップショットの差分なし
+- RuboCop（`TargetRailsVersion: 7.0`）: 3 アプリとも `no offenses detected`。bundler-audit: 3 アプリとも `No vulnerabilities found`（無視リストから CVE-2024-54133 と concurrent-ruby の 3 件を消した）。brakeman: 3 アプリとも `Security Warnings: 0`、`Ignored Warnings: 2`
+- 3 アプリとも `bin/rails c` で Rails 7.0.10・`load_defaults 7.0`、`bin/rails s` は E2E と launch.json で起動、`zeitwerk:check` は `All is good!`
+- 応答の前後比較（使い捨ての統合テスト）: Rails 7.0.10 にしたとき、`app:update` の後、各グループの後に、RS 2・RP 5・OP 20 の応答を書き出して比べた。変わったのは DEF-7.0-15・33〜35 の項目だけ
+- `log/development.log` に非推奨警告はない
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| RP のセッションを JSON で保存することを確かめるテストがなく、serializer の設定を `on_load` に移した変更（`77c26df`）が手動の確認だけで守られている | RP の `test/integration/sessions_test.rb` に「セッションは sessions テーブルに JSON で保存する」を足した。serializer を `:marshal` にしたときと、設定を消したときに `JSON::ParserError` で落ちることを確かめた。RP は 19 runs → 20 runs |
+| PLAN.md の Step 1 の「調べたこと」の RP の行が「`load_defaults 7.0` で効く見込み」のままで、後で分かったことと食い違う | 行の末尾に、`disable_to_s_conversion` は `load_defaults 7.0` でも効かないと分かり、`77c26df` で移したことと、defaults/rails-7.0.md の「補足」への参照を足した |
+| DEF-7.0-15 に「グループ 7 で有効にする」と未来形が残っている | 「グループ 7 で有効にした。DEF-7.0-35」に直した |
+| TIPS.md の「確認のコマンド」に、CI と同じ条件（eager load あり）の minitest がない | `CI=1 mise exec -- bin/rails test` の行を足した |
+| フレームワークの早い読み込みを、Step ごとの手作業で確かめる申し送りだけにしている | 対応しない（epic の範囲を超える）。CI で検出する案を、下の IMP-009 に含めた |
+| gem（activerecord-session_store・web-console）の早い読み込みを「epic の範囲外」として見送ったが、IMPROVEMENTS.md に足す案を出していない（CLAUDE.md） | 人間の承認を得て、docs/IMPROVEMENTS.md に IMP-009 として足した |
