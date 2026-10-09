@@ -27,7 +27,7 @@
    - **A. Rails の既定値・雛形の変化**: 追随する。例: `load_defaults` の各設定、`app:update` の雛形、Rails の既定の応答ヘッダー、Rails のヘルパーが出すタグの形。追随しないと、版を上げるたびに古い既定値のままで問題がないかを確かめ続けることになり、セキュリティや性能の改善も取り込めない
    - **B. 各システムの業務的な挙動**: 変えない。例: 画面に描画される文字、アプリが持つ URL・ルーティング、画面遷移とリダイレクト先、OP・RP・RS の間のやり取り（認可要求・トークン要求・ID トークン・userinfo・introspect）、DB に入るデータ。変えるときは「意図的な仕様変更」として本計画に明記し、LOG.md に記録する
    - 境目の扱い
-     1. Rails 以外の gem の既定値の変化も、原則は A と同じく追随する。ただし OP・RP・RS の間のやり取りが変わるもの（oauth2 の `auth_scheme` のように、相手が受け付けなくなりうるもの）は B として扱い、その都度人間に確かめる。既存のやり取りの方法が不適切で、ライブラリに追随したほうがよい場合もあるため
+     1. Rails 以外の gem の既定値の変化も、原則は A と同じく追随する。ただし OP・RP・RS の間のやり取りが変わるもの（oauth2 の `auth_scheme` のように、相手が受け付けなくなりうるもの）は B として扱い、その都度人間に確かめる。既存のやり取りの方法が不適切で、ライブラリに追随したほうがよい場合もあるため。gem の generator の雛形（initializer、ロケール、アプリが上書きしているビュー）にも、`app:update` の雛形と同じく追随する（Step 1-b-3 で人間が決めた。gem の今後の版に追随しやすくするため）
      2. 描画される文字・遷移・送信内容が同じなら、Rails が出すタグの形が変わっても A（`button_to` の `<button>` など）
      3. A による追随が起きたら、コミットの前に、項目ごとに「何が変わるか・なぜ起きたか・今回のアプリへの影響・提案」を解説し、人間の返事をもらってからコミットする。出典として、Rails の PR・CHANGELOG・gem のソースに加え、日本語版の Rails ガイドに該当の節があればページと見出しを示す。ガイドは上げる先の版のページ（例: `https://railsguides.jp/v7.0/`）を使い、その版になければ最新版のページを使って、そう明記する。同じ内容を `docs/upgrade/defaults/`（Rails の版ごとのファイル）に ID を振って記録し、LOG.md とコミットメッセージからは ID で指す。記録は、返事をもらった後、設定のコミットより前の docs のコミットで足す（設定のコミットのメッセージから、既にある ID を指せるようにするため）。「意図的な仕様変更」は B を変えるときだけに使う
      4. アプリが意図して書いた設定（理由のコメントがある、業務に関わる）は残す。昔の雛形の値が残っているだけの設定は、新しい雛形に合わせる。迷うものはその都度人間に確かめる
@@ -47,7 +47,7 @@
 | タグ `rails-6.1-prepared` | Ruby 3.1.7 / Rails 6.1.7.10、Step 0 完了時点。epic の PR [#20](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/20) のマージコミット |
 | epic | `epic/rails-8.1-upgrade`（`main` から作成。開始を示す空コミットあり） |
 | 作業ブランチ | `upgrade/<step>-<内容>`。epic から切り、PR の向き先は epic |
-| PR の単位 | Step 0 はサブステップ（0-a〜0-g。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR（Step 1 の後のサブステップ 1-b は、1-b-1（起動の途中の読み込みの検出）・1-b-2（応答のスナップショットのテスト）・1-b-3（周辺 gem）の 3 つの PR に分ける） |
+| PR の単位 | Step 0 はサブステップ（0-a〜0-g。0-d は 0-d-1・0-d-2・0-d-3、0-f は 0-f-1・0-f-2・0-f-3 に分ける）ごと。0-f の gem 更新は、各 PR の中で gem ごとにコミット。Step 1 以降は 1 Step = 1 PR（Step 1 の後のサブステップ 1-b は、1-b-1（起動の途中の読み込みの検出）・1-b-2（応答のスナップショットのテスト）・1-b-3（周辺 gem）に分け、1-b-3 はさらに 1-b-3-1（RP の gem・jbuilder・devise）と 1-b-3-2（doorkeeper 系）の 2 つの PR に分ける） |
 | 取り込み | 最後に epic → main をマージコミットで取り込む（squash しない） |
 | worktree | 作業用 worktree は epic を元にする |
 | main への外部 PR | 入った場合は epic に main を取り込む |
@@ -65,7 +65,7 @@
 | 0-f | 3.1 | 6.1 | 周辺 gem の更新 |
 | 0-g | 3.1 | 6.1 | CI（GitHub Actions）。仕上げから前倒し |
 | 1 | 3.1 | **7.0.x** | annotate 3.2.0、`app:update`、`load_defaults 7.0`、concurrent-ruby 1.3.7 |
-| 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、3 アプリの応答のスナップショットのテスト（1-b-2）、Rails 7.0 以上を必要とする周辺 gem（1-b-3。devise 5.x、doorkeeper 5.8 以上など） |
+| 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、3 アプリの応答のスナップショットのテスト（1-b-2）、Rails 7.0 以上を必要とする周辺 gem（1-b-3-1: jbuilder・activerecord-session_store・omniauth-rails_csrf_protection・devise 5.x、1-b-3-2: doorkeeper 5.9・doorkeeper-openid_connect 1.10） |
 | 2 | **3.2** | 7.0 | Ruby のみ |
 | スキル化 | 3.2 | 7.0 | `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（13 章） |
 | 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応） |
@@ -419,7 +419,55 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 
 #### 1-b-3: Rails 7.0 を必要とする周辺 gem
 
-1-b-2 が epic に入ってから、調べて作業計画を出す。候補は Step 1 の「決めたこと」と 7 章。
+1-b-2 が epic に入ってから調べ、作業計画を出して承認を得た（2026-10-09）。PR を 1-b-3-1（RP の gem・jbuilder・devise）と 1-b-3-2（doorkeeper 系）に分ける。経緯と作業の記録は LOG.md の Step 1-b-3-1。gem の既定値・雛形への追随は [defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 1-b-3）」（DEF-7.0-38 から）。
+
+1-b-3-1（ブランチ `upgrade/step1b-rails70-gems`）:
+
+- [x] PLAN.md 13 章（スキル化の計画）を、Step 1 の振り返りに合わせて見直す（人間が承認）
+- [x] `scripts/check-apps`（3 アプリの検査と E2E をまとめて流す。13 章の 4）
+- [x] 先にテストを足す（RP: セッションの JSON の escape、CSRF のトークンのないログインの POST。OP: ユーザー登録・編集の失敗と成功の応答のスナップショット 4 つ、登録でユーザーが増えること、パスワードを変えた後もログインしたままなこと）
+- [x] jbuilder 2.13.0 → 2.15.1（RP → OP）
+- [x] activerecord-session_store 2.1.0 → 2.2.0（RP。DEF-7.0-38）
+- [x] omniauth-rails_csrf_protection 1.0.0 → 1.0.2（RP。一時固定）
+- [x] devise 4.9.4 → 5.0.4（OP。DEF-7.0-39〜41）。無視リストから advisory 2 件を消した
+- [x] OP の `config/initializers/devise.rb` を devise 5.0.4 の雛形に合わせる（DEF-7.0-42。失敗の応答が 422、リダイレクトが 303）
+- [x] ブラウザで手動確認（devise を上げた後に 1 回）
+
+1-b-3-2（ブランチ `upgrade/step1b-doorkeeper`。1-b-3-1 が epic に入ってから始める）:
+
+- [ ] 先にテストを足す（Webfinger の応答のスナップショット、トークン要求で Basic と本文の両方に secret を入れたとき、userinfo を Bearer ヘッダーと `access_token` 引数の両方で呼んだとき）
+- [ ] doorkeeper-openid_connect 1.8.9 → 1.8.11（一時固定。ostruct は 0.5.2 に一時固定）→ doorkeeper 5.7.1 → 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（どの段も 1 gem だけを動かす）
+- [ ] OP・RP・RS の間のやり取りが変わるもの（下の表）は B として段ごとに止まって確かめ、設定で戻せないものは「意図的な仕様変更」にする
+- [ ] doorkeeper・doorkeeper-openid_connect の initializer を、上げた版の雛形に合わせる（コメントだけの差）
+- [ ] doorkeeper のロケールと、上書きしているビューを 5.9.9 の雛形に合わせる（IMP-008。nonce の hidden field は残す）
+- [ ] `response_mode=form_post` で拒否したときに OP のビューが落ちるか（調査での推測）を確かめる
+- [ ] ブラウザで手動確認（doorkeeper 5.9.9 の後に、introspection の流れまで 1 回）
+
+着手時の作業計画で決めたこと（人間が承認）:
+
+- 上げる先は、Ruby 3.1.7・Rails 7.0.10 で使える最新の版（0-f と同じ方針）
+- omniauth-rails_csrf_protection は、Gemfile に版の制約がないと 2.0.1 に解決されるので、1.0.2 に一時固定する（2.x は Step 7。7 章）
+- doorkeeper は、GHSA-h5m9-42h9-vcq6（revoke の認可の不備。`< 5.9.1`）を直すため 5.9.x まで上げる。この advisory は ruby-advisory-db にないので、bundler-audit は検出しない
+- doorkeeper-openid_connect は 1.9.0（CVE-2026-44476）を飛ばして 1.10.1 にする。1.10.2 以上は Ruby 3.2 以上が必要（Step 2 の後）
+- activerecord-session_store 2.2.0 で DB に入る JSON の文字列が変わる（読み戻す値は同じ）のは、3 章の 2 の A として扱う（DEF-7.0-38）
+- gem の generator の雛形（initializer、ロケール、上書きしているビュー）にも追随する（3 章の 2 の境目の 1。作業計画への返事で人間が決めた）。doorkeeper のロケールとビューを合わせるため、IMP-008 を 1-b-3-2 で行う
+- 手動確認は、1-b-3-1 で devise を上げた後に 1 回、1-b-3-2 で doorkeeper 5.9.9 の後に 1 回
+
+調べたこと（着手時の 2026-10-09。サブエージェント 3 つで調べ、要点は自分で確かめた）:
+
+| 対象 | 分かったこと |
+|---|---|
+| 版 | jbuilder 2.15.1（2026-05-26。2.14 以上は Rails 7.0 以上）、activerecord-session_store 2.2.0（2.3.0 は Rails 7.1 以上）、omniauth-rails_csrf_protection 1.0.2（2024-05-10）、devise 5.0.4（2026-05-08。`railties >= 7.0`）、doorkeeper 5.8.2（2025-04-04）・5.9.9（2026-09-24）、doorkeeper-openid_connect 1.8.11（`doorkeeper < 5.9`、`ostruct >= 0.5`）・1.10.1（`doorkeeper < 6.0`、Ruby 3.1 で使える最新）。doorkeeper 5.9.1 は `rails db:seed` で NameError（5.9.2 で修正）、5.9.7 は解析できない本文で ParseError（5.9.9 で修正）、5.9.4・5.9.8 は公開されていない |
+| lock の解決 | `bundle lock --update <gem> --conservative --print` で、jbuilder・devise・omniauth-rails_csrf_protection はその gem だけが動き、activerecord-session_store は multi_json 1.15.0 が lock から消える。doorkeeper-openid_connect を固定せずに上げると 1.10.1 になり、doorkeeper 5.7.1 のままでは discovery が壊れる。doorkeeper だけを上げても、1.8.9 が `< 5.8` なので動かない。lock の default gem（json・bigdecimal・logger・base64・cgi）と jwt 2.10.3 は、どの試行でも動かない |
+| ostruct | doorkeeper-openid_connect 1.8.11 以上の依存。Ruby 3.1.7 の default gem は 0.5.2。固定しないと 0.6.3 が入る |
+| devise 5 | 応答のステータスの既定値は 200・302 のまま（新しいアプリの雛形だけが 422・303）。ビューの `<br>` が `<p>` に、`_error_messages` の `data-turbo-cache` が `data-turbo-temporary` に、ログイン失敗の文言が `Invalid email or password.` になる。OP が使っていない機能の変更（`Devise.secret_key` の求め方、削除された API、ログインしていないときの HTML 以外のログアウトの 401）は影響しない。responders・warden・bcrypt は動かない |
+| activerecord-session_store 2.2.0 | `JsonSerializer` が `MultiJson` から Ruby 標準の `JSON` になり、Active Support の JSON の encoder を通らない（`<>&` を escape しない）。serializer の設定の方法、テーブル、`ActionDispatch::Request` を `Bundler.require` の時点で読み込むこと（IMP-009）は変わらない |
+| jbuilder 2.15 | Railtie が `on_load(:action_controller_api)` を使う。OP では doorkeeper の `ActionController::API` のコントローラーで走るが、応答は変わらない。RP・OP に `.jbuilder` のテンプレートはない |
+| omniauth-rails_csrf_protection 1.0.2 | TokenVerifier のスレッドの競合の修正だけ。トークンの確かめ方は同じ |
+| doorkeeper 5.8〜5.9.9 | トークン応答に `Pragma: no-cache` が戻る（5.8.0 #1712）。認証のない introspect の `error_description` が `request_not_authorized` の文言になる（5.8.0 #1715）。クライアント認証を 2 つ同時に使う要求・Basic と `client_id` が別のクライアントを指す要求・トークンを 2 つの方法で渡す要求を拒む（5.9.5〜5.9.7）。拒否のときに client・redirect_uri を検証し、script スキームの redirect_uri を拒む（5.9.9）。`pkce_code_challenge_methods` などの新しい設定は既定値で今と同じ。必須のマイグレーションはない（public クライアント用の任意のものは採用しない）。5.9.1（#1784）でロケールの項目名の末尾のコロンを文言に移し、ビューの `:` を消した |
+| doorkeeper-openid_connect 1.10 | userinfo の JSON のキーの並びが、独自の claim の後に `sub` になる（#273。`sub` を上書きさせないため）。Webfinger の `href` が `root_url`（末尾に `/`）から `issuer` になる（#250）。`prompt=select_account` がエラーになり（#279）、`prompt=none` と `max_age` の扱いが変わる（#275）。RP はどちらも送らない |
+| 上書きしているビュー | 5.9.9 でも、コントローラーがインスタンス変数（`@pre_auth`・`@authorize_response`）を入れるので、今のビューで動く |
+| テストで守られていない挙動（1-b-3-2 で先に足す） | Webfinger、クライアント認証の 2 重、トークンの 2 重の渡し方 |
 
 ### Step 2〜9
 
@@ -469,8 +517,8 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（済。同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
 | faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（済。oauth2 の後。RP は Gemfile に明記） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
 | faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Ruby を上げる各 Step で見直す | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない |
-| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 5.8 以上・1.8.10 以上は Step 1-b → doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 と jwt 3.3.0 になり、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
-| devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ Step 1-b で 5.x | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認） |
+| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9 → doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
+| devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ 1-b-3-1 で 5.0.4（済。advisory 2 件を解消。initializer を雛形に合わせた） | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認） |
 | dotenv-rails | 2.7.6 | 0-f-1 で 3.2.0（済） | 読むファイルの順番と、既にある環境変数を上書きしないことは 2.x と同じ。3.x はテストのたびに ENV を戻し、Rails のログに変数名を出す |
 | puma | 5.4 | 0-d-3 で 5.6.9（済）→ 0-f-1 で 6.6.1（済）→ 7.2.1 以上 | 7 系に上げる時期は後の Step で判断。5.5.0 以降（6.6.1 も）は PROXY protocol v1 の advisory 2 件（CVE-2026-47736 / 47737）の対象で、修正版は 7.2.1 / 8.0.2 だけ。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない（無視リストに入れた） |
 | spring | 2.1.1 | 0-f-1 で削除（済） | Rails 7 から標準で入らない。`bin/spring`・`config/spring.rb` も消し、`bin/rails`・`bin/rake` を Rails 7.0 の雛形の形にした |
@@ -478,8 +526,8 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 | sprockets-rails | 3.2.2（間接） | Step 1 で lock から外れた（済。Gemfile には足さない） | Rails 7.0 から rails gem の依存から外れる。3 アプリとも `sprockets/railtie` を読み込んでいない。Gemfile に足すと `Bundler.require` で `sprockets/railtie` が読み込まれ、アセットパイプラインが有効になるので足さない（Step 1） |
 | sqlite3 | 1.4.2 | 0-a で 1.7.3（済。clang 17 で 1.4 系がビルドできないため 0-f から前倒し）→ Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
 | annotate | 3.1.1 | Step 1 で 3.2.0（済）→ Step 5 で annotaterb に置換 | 3.1.1 は `activerecord < 7.0` で、Rails 7.0 にするには 3.2.0 が要る。3.2.0 も `activerecord < 8.0` で、Rails 8 に対応しない（0-f で gemspec を確認）。当初は「注釈の出力が変わるので 3.2.0 には上げない」としたが、Step 1 の調査で、OP の注釈に関わる差分はないと分かった。annotaterb の 4.23 以上は CI で Ruby 3.3 以上だけを試すので、置き換えは Step 5 のまま |
-| activerecord-session_store | 2.0.0 | 0-f-1 で 2.1.0（済）→ Step 1-b | 2.2 以上は Rails 7.0 以上が必要。2.1.0 のまま Rails 7.0.10 で解決する（Step 1 の調査） |
-| bootsnap / jbuilder / omniauth-rails_csrf_protection | 1.7.7 / 2.11.2 / 1.0.0 | 0-f-1 で bootsnap 1.26.0・jbuilder 2.13.0（済）→ jbuilder 2.14 以上と omniauth-rails_csrf_protection 1.0.2 は Step 1-b、omniauth-rails_csrf_protection 2.x は Step 7 | jbuilder 2.14 以上は Rails 7.0 以上が必要。omniauth-rails_csrf_protection 2.0 の変化は Rails 8.1 だけが対象 |
+| activerecord-session_store | 2.0.0 | 0-f-1 で 2.1.0（済）→ 1-b-3-1 で 2.2.0（済。multi_json が lock から外れた）→ 2.3 以上は Step 3（Rails 7.1）の後 | 2.2 以上は Rails 7.0 以上が必要。2.1.0 のまま Rails 7.0.10 で解決する（Step 1 の調査） |
+| bootsnap / jbuilder / omniauth-rails_csrf_protection | 1.7.7 / 2.11.2 / 1.0.0 | 0-f-1 で bootsnap 1.26.0・jbuilder 2.13.0（済）→ 1-b-3-1 で jbuilder 2.15.1・omniauth-rails_csrf_protection 1.0.2（済。後者は一時固定で入れた）、omniauth-rails_csrf_protection 2.x は Step 7 | jbuilder 2.14 以上は Rails 7.0 以上が必要。omniauth-rails_csrf_protection 2.0 の変化は Rails 8.1 だけが対象 |
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
 | a-nti_manner_kick_course | — | 1-b-1 で 0.5.0 を足す → Rails 8.2 以上で外すかを判断（今回の目標の外なので、epic の間は残す） | development・test だけ。Gemfile の先頭に置く。Rails 8.2 で入る Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない。README によると、Rails 7.2 以上は `rails runner 1` の代わりに `rails boot` で起動できる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
@@ -494,6 +542,7 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 | logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
 | base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
 | cgi（activerecord-session_store 経由、RP） | 0.3.7（0-f-1 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.5.2 が lock に入り、アプリが読む cgi が変わるため、一時固定で 0.3.7 にした |
+| ostruct（doorkeeper-openid_connect 1.8.11 以上経由、OP） | — | 1-b-3-2 で 0.5.2 に一時固定 → Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。固定しないと 0.6.3 が lock に入り、アプリが読む ostruct が変わる |
 
 ## 8. 各 Step 共通の手順
 

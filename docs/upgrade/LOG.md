@@ -1475,10 +1475,83 @@ Step 1 で使い捨ての統合テストで行った応答の前後比較を、�
 
 コードレビューの後も、3 アプリの minitest を seed を変えて 2 回と `CI=1` で流して 0 failures（件数は上と同じ）、主な壊したときの確認（OP の `SameSite`・`<link>` の `media`）で前と同じ件数が落ちること、RuboCop・E2E（10 passed）・安全チェックが通ることを確かめた。
 
-## Step 1-b-3: Rails 7.0 を必要とする周辺 gem
+## Step 1-b-3-1: Rails 7.0 を必要とする周辺 gem（RP の gem・jbuilder・devise）（2026-10-09）
 
 - ブランチ / PR: `upgrade/step1b-rails70-gems` / （PR 作成後に記入）
+- バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。jbuilder 2.13.0 → 2.15.1（RP・OP）、activerecord-session_store 2.1.0 → 2.2.0・omniauth-rails_csrf_protection 1.0.0 → 1.0.2（RP）、devise 4.9.4 → 5.0.4（OP）
+- 追随した gem の既定値・雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 1-b-3）」に記録した（DEF-7.0-38〜42）
 
 ### スキル化の計画の見直し
 
 着手の前に、Step 1 の後に人間と振り返った結果を、PLAN.md の 13 章（スキル化の計画）に反映した（人間が承認）。振り分けの基準（スキル・リポジトリのスクリプト・PLAN.md などの文書）を決め、当初の rails-minor を 4 つの作業に分け、既定値への追随の解説と記録を独立した作業にした。スキルを作るのは、1-b-3 と Step 2 を手作業で通した後にした。あわせて、10 章の完了条件に、これまで Step ごとに行っていた確認（`CI=1` の minitest、起動の途中の読み込みの検査、無視リストを空にした bundler-audit、lock の default gem の版、手動確認用の環境のハッシュ）を足し、5 章のロードマップにスキル化の行を足した。
+
+### 作業計画で決めたこと
+
+着手時に PLAN.md 8 章の手順で調べ（サブエージェント 3 つ: doorkeeper 系、devise、RP の gem と jbuilder）、作業計画を出して承認を得た。調べたことと決めたことの一覧は PLAN.md の Step 1-b-3 の節に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 上げる先 | Ruby 3.1.7・Rails 7.0.10 で使える最新（doorkeeper は 5.9.9、doorkeeper-openid_connect は 1.10.1） | 0-f と同じ方針。doorkeeper は GHSA-h5m9-42h9-vcq6（revoke の認可の不備。`< 5.9.1`）を直すため 5.9.x まで上げる。この advisory は ruby-advisory-db になく、bundler-audit は検出しない（GitHub の doorkeeper のリポジトリの advisory で確かめた） |
+| PR の分け方 | 1-b-3-1（RP の gem・jbuilder・devise）と 1-b-3-2（doorkeeper 系）の 2 つ | doorkeeper は 4 段あり、OP・RP・RS の間のやり取りの変化（B）の確認がまとまって出る。ほかの gem と混ぜると、スナップショットの差分が読みにくくなる |
+| 一時固定 | omniauth-rails_csrf_protection 1.0.2（固定しないと 2.0.1）。1-b-3-2 では doorkeeper-openid_connect 1.8.11 と ostruct 0.5.2 | 2.x は Rails 8.1 向けの変更（Step 7）。ostruct は Ruby 3.1.7 の default gem と同じ版にする |
+| activerecord-session_store 2.2.0 で DB に入る JSON の文字列が変わる | A として扱う（DEF-7.0-38） | 読み戻す値は同じで、escape の形だけが変わる |
+| gem の generator の雛形 | initializer・ロケール・上書きしているビューにも追随する。doorkeeper のロケールとビューは 1-b-3-2 で合わせる（IMP-008） | 作業計画への返事で人間が決めた。今の挙動を残す理由がなく、雛形に合わせておけば gem の今後の版に追随しやすい。PLAN.md の 3 章の 2 の境目の 1 と CLAUDE.md に書いた |
+| 手動確認 | 1-b-3-1 は devise を上げた後に 1 回、1-b-3-2 は doorkeeper 5.9.9 の後に 1 回 | 13 章の「いつ行うかは Step ごとに人間と決める」 |
+| 道具 | `scripts/check-apps` を、gem を上げる前のコミットで入れる | 13 章の 4（人間が承認）。1-b-3 と Step 2 で使いながら直す |
+
+### 作業計画からの変更点
+
+- `scripts/check-apps` の無視リストを空にした bundler-audit は、計画では件数を情報として出すだけにしていた。出力の `Name:` の行は 1 つの advisory でも複数出て件数にならず、10 章の目的（解消した advisory を無視リストから消す）にも合わないので、「無視リストにあるのに報告されない ID」があれば失敗にする検査に変えた。devise を上げたときに、無視リストの devise の 2 件をこの検査で見つけた
+- 手動確認の前に、RP・OP とも前回の手動確認からログインしたままで、RP の「Re Login」では OP のログイン画面が出ないと分かった。人間の判断で、OP のタブで JavaScript からログアウトのフォーム（`DELETE /users/sign_out`。CSRF のトークン付き）を送った
+- 手動確認で、OP の画面に flash が出ないこと（元からの挙動）が分かり、人間の承認を得て docs/IMPROVEMENTS.md に IMP-010 を足した
+
+### gem ごとの対応
+
+| gem | バージョン | アプリ | 対応 |
+|---|---|---|---|
+| jbuilder | 2.13.0 → 2.15.1 | RP・OP | 動いたのは jbuilder だけ。`.jbuilder` のテンプレートはない。OP では doorkeeper の `ActionController::API` のコントローラーで新しい hook が走るが、応答のスナップショットは同じ |
+| activerecord-session_store | 2.1.0 → 2.2.0 | RP | multi_json 1.15.0 が lock から外れた。セッションの JSON で `<>&` を escape しなくなった（DEF-7.0-38）。先に足したテストの期待値を直した |
+| omniauth-rails_csrf_protection | 1.0.0 → 1.0.2 | RP | Gemfile に `'1.0.2'` を足して `bundle update` → 行を消して `bundle lock --local`。Gemfile は元のまま、lock はこの gem の 1 行だけが変わった |
+| devise | 4.9.4 → 5.0.4 | OP | 動いたのは devise だけ。ビューの HTML（DEF-7.0-39・40）とログイン失敗の文言（DEF-7.0-41）が変わった。無視リストから CVE-2026-32700・CVE-2026-40295 を消した |
+| （devise の initializer） | 4.8 の雛形 → 5.0.4 の雛形 | OP | 失敗の応答が 422、リダイレクトが 303 になった（DEF-7.0-42）。コメントアウトされた `secret_key`・`pepper` の例の値は、install のときに作られた乱数なので残した |
+
+- ダウンロードした `.gem`（jbuilder・activerecord-session_store・omniauth-rails_csrf_protection・devise）の SHA-256 が、rubygems.org の値と同じことを確かめた
+- lock に入れた default gem（json 2.6.1・bigdecimal 3.1.1・logger 1.5.0・base64 0.1.1、RP の cgi 0.3.7）と、Step 1 の一時固定（benchmark・securerandom・drb・mutex_m・ruby2_keywords）は動いていない
+- gem の initializer は a-nti_manner_kick_course の検査の範囲の外なので、gem ごとに、`config/initializers` を読む直前に読み込み済みの部品（TIPS.md の「設定の値と応答の比較」）を、test と development で前後に書き出して比べた。どれも前後で同じだった。devise は、Devise の設定（responder・`navigational_formats`・`sign_in_after_change_password` など）と Rails の設定の値も前後で同じだった
+
+### テストの追加
+
+gem を上げる前に、テストで守られていない挙動を記録した。
+
+| アプリ | テスト | 上げた後 |
+|---|---|---|
+| RP | セッションの JSON の `omniauth.origin` で、`<>&` が escape されている | activerecord-session_store 2.2.0 で落ち、DEF-7.0-38 の解説の根拠にした。期待値を直した |
+| RP | CSRF のトークンのないログインの POST は、OP へリダイレクトせず `/auth/failure` へ（テストの中だけ `allow_forgery_protection` を有効にした） | omniauth-rails_csrf_protection 1.0.2 でも同じ |
+| OP | ユーザー登録・ユーザー編集の、失敗と成功の応答のスナップショット 4 つ | devise 5.0.4 で失敗の 2 つの HTML が、initializer で 4 つのステータスが変わった |
+| OP | 登録に成功するとユーザーが 1 人増える、パスワードを変えた後もログインしたまま | 同じ |
+
+### 手動確認
+
+devise を上げ、initializer を雛形に合わせた後に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（パスワードの入力は人間が操作）。
+
+- OP のタブでログアウトのフォームを送ると、303 See Other で `/` に戻った
+- RP の「Re Login」で OP のログイン画面が出た。誤ったパスワードで 2 回ログインし、どちらもログイン画面に戻った（メッセージは出ない。下）。サーバーのログには、warden の 401 と、描き直したログイン画面の 200 が出る（FailureApp がログを書いた後でステータスを 422 に置き換える。`devise-5.0.4/lib/devise/failure_app.rb` の `recall`）。ブラウザとは別のセッションの `curl` で、ダミーの誤ったパスワードでのログインが 422 で返ることを確かめた
+- 正しいパスワードでログインすると、303 See Other で認可エンドポイントに戻り、同意画面を省いて（my_op のアプリにこのユーザーのトークンがあるため。Step 0-f-3 の条件）RP に戻り、「ログインしました」「Logged in as …」が出た
+- OP のレイアウト（`app/views/layouts/application.html.erb`）は flash を描かないので、ログイン失敗のメッセージは出ない。タグ `rails-6.1` から変わっていない元からの挙動で、IMP-010 に記録した
+- 手動確認用の環境: 作業の開始時に、9 ファイルのハッシュが Step 1-b-2 の後と同じことと、件数が Step 1 の手動確認の後と同じことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 12 → 13 件、`oauth_access_tokens` が 31 → 32 件、RP の development DB は `sessions` が 10 件のまま（既にある行を更新）で、どちらもハッシュが変わった。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt` は変わっていない。以降の基準は手動確認の後のハッシュ
+
+### 遭遇した問題
+
+1. `scripts/check-apps` の最初の版は、ログのファイルの番号を `$(...)` の中で増やしていたので、番号が親のシェルで進まず、すべての検査のログが同じファイルに上書きされていた。全部を流した結果の一覧で気づき、番号を親のシェルで増やすように直した（コミットの前）
+2. コミットメッセージに `\u003c` と書いたつもりが、`<` になっていた。Claude Code のツールに渡す段階で `\u` の並びが Unicode の文字に変換されていた（Python でファイルに書いたときは崩れなかった）。push の前に、人間の承認を得て、RP のテストを足したコミットのメッセージを直し、その上の 11 コミットを cherry-pick で作り直した。作り直す前と後のツリーが同じことと、ほかのコミットのメッセージが同じことを確かめた。以降、`\u` を含むメッセージは Python でファイルに書いて `git commit -F` に渡した
+3. OP のディレクトリで `git diff --name-only` の結果を `git add` に渡すと、`git diff` はリポジトリ直下からのパスを出すので、パスが見つからずに失敗した（コミットはされなかった）。パスを直接指定して `git add` した
+
+### 確認結果
+
+- `scripts/check-apps`（3 アプリと E2E）: 36 の検査がすべて通った。各コミットの前にも、対象のアプリと E2E で流した
+- minitest: RS 11 runs・RP 31 → 33 runs・OP 51 → 57 runs、0 failures。`CI=1`（eager load あり）でも同じ件数で通る
+- E2E: 10 passed。スナップショットの差分なし
+- RuboCop: 3 アプリとも `no offenses detected`。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test（`CI=1` 付きも）・development で `✅Congratulations!`。bundler-audit: `No vulnerabilities found`。無視リストを空にした bundler-audit で、無視リストの ID はすべて今も報告される（devise の 2 件は消した）。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`。`bin/rails runner` は 3 アプリとも 7.0.10
+- 応答のスナップショットの変化は、DEF-7.0-39・40（devise のビュー）と DEF-7.0-42（devise の responder）だけ。どれも解説して返事をもらってから作り直した
+- 手動確認用の環境: 作業の最後に、9 ファイルのハッシュが手動確認の後と同じだった
+
