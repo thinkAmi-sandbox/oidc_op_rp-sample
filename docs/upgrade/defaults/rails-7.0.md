@@ -43,6 +43,7 @@
 | DEF-7.0-33 | `action_dispatch.default_headers`（`X-XSS-Protection: 0`） | `load_defaults`（グループ 5） | 3 アプリ | 追随 |
 | DEF-7.0-34 | `action_view.button_to_generates_button_tag = true` | `load_defaults`（グループ 6） | 3 アプリ | 追随 |
 | DEF-7.0-35 | `action_view.apply_stylesheet_media_default = false` | `load_defaults`（グループ 7） | 3 アプリ | 追随 |
+| DEF-7.0-36 | `active_support.key_generator_hash_digest_class = OpenSSL::Digest::SHA256` | `load_defaults`（グループ 8） | 3 アプリ | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -202,7 +203,7 @@
 
 ## `load_defaults`（`new_framework_defaults_7_0.rb`）
 
-グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。グループ 3 は、SQL や内部の処理だけが変わるもの。グループ 4 は、今のリダイレクトが対象にならないもの。グループ 5〜7 は、応答のヘッダーや HTML が変わるもの（1 つずつ有効にして、そのたびに応答を書き出して比べた）。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
+グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。グループ 3 は、SQL や内部の処理だけが変わるもの。グループ 4 は、今のリダイレクトが対象にならないもの。グループ 5〜7 は、応答のヘッダーや HTML が変わるもの（1 つずつ有効にして、そのたびに応答を書き出して比べた）。グループ 8 は、既存の Cookie が読めなくなるもの（ブラウザで手動確認した）。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
 
 RP では、グループ 1・2 を有効にした時点で、一部の設定（DEF-7.0-24・25・27）が効かなかった。原因と対応は、すぐ下の「補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）」。
 
@@ -426,4 +427,19 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: RP のレイアウトは `media: 'all'` を明示しているので変わらない。OP の CSS のファイルは `public/` になく、Sprockets も読み込んでいないので、前後とも 404 で見た目は変わらない。応答の `Link` ヘッダー（preload）も変わらない
 - 扱い: 追随
 - 出典: [rails/rails#41215](https://github.com/rails/rails/pull/41215)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.11.19 `config.action_view.apply_stylesheet_media_default`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-36: `active_support.key_generator_hash_digest_class = OpenSSL::Digest::SHA256`
+
+- 種類: `load_defaults`（グループ 8）/ 対象: 3 アプリ
+- 何が変わるか: `secret_key_base` から、暗号化・署名の Cookie などの鍵を導くときのハッシュが SHA1 → SHA256。これまでの鍵で作った暗号化・署名の Cookie は読めなくなる
+- なぜ: SHA1 は古いアルゴリズムで、セキュリティの監査で好まれない（PR の説明）。SHA256 にそろえる
+- 3 アプリへの影響
+  - OP: セッション Cookie は暗号化されたもの（`データ--IV--認証タグ` の 3 つの部分）。test 環境で、SHA1 の鍵で作った Cookie（中身は `session_id`・`user_return_to`・`flash`）を控え、この設定を有効にしてから読むと `nil` になった。ログイン済みのブラウザは一度ログアウトした状態になる（認可の途中の戻り先や flash も消える。開いたままのフォームを送ると CSRF の確認で失敗する）
+  - RP: セッション Cookie は 32 文字の 16 進数（セッション ID だけ）で、署名も暗号化もない。セッションの中身は DB にあるので、ログインは続く
+  - RS: Cookie を使わない
+  - 鍵の生成を使うほかの仕組みは使っていない。devise の `token_generator`（パスワードの再設定などのトークン）は、OP で使っていないモジュール（devise は `database_authenticatable`・`registerable`・`validatable` だけ）のためのもの
+  - 手動確認（ブラウザペイン）: この設定なしで RP からログインし、3 アプリを止めてこの設定を有効にして起動し直した。RP のログインは続き、RP の「Re Login」で OP のログイン画面が出た（OP のセッションが切れた）。もう一度ログインした後、RP のログインと introspection 用 RP の流れ（RS が 200・401・revoke の後に 401、introspect が `active: true` → `active: false`）は Step 0-f-3 と同じだった
+- 扱い: 追随。移行用のコード（Cookie のローテーション）は書かない（PLAN.md の 3 章の 2 の境目の 6、12 章）
+- 出典: [rails/rails#40770](https://github.com/rails/rails/pull/40770)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.10 キージェネレータのメッセージダイジェストクラスがSHA256に変更」（ローテーションのコードの例がある）、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.7 `config.active_support.key_generator_hash_digest_class`」
 - コミット: （コミット後に記入）
