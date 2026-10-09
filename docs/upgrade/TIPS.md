@@ -30,6 +30,12 @@
 | brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`、`Ignored Warnings: 2` |
 | E2E | `e2e/` で `mise exec -- npm test` | 約 10 秒で 10 passed。手動確認用のサーバーが動いていると起動に失敗する |
 
+上の検査は、リポジトリ直下の `scripts/check-apps` でまとめて流せる（Step 1-b-3 から）。3 アプリの検査（`CI=1` の minitest と起動の途中の読み込みを含む）と E2E を順に流し、失敗しても後の検査を流して、最後に結果の一覧と minitest・E2E の件数を出す。各検査の出力は `CHECK_APPS_LOG_DIR`（scratchpad を指す）に残る。
+
+- `--app rs|rp|op`（繰り返せる）でアプリを絞り、`--no-e2e` で E2E を外し、`--e2e-only` で E2E だけを流す
+- 「bundler-audit（無視リストに解消済みの ID がないか）」は、無視リストを空にして流し、`.bundler-audit.yml` にあるのに報告されない ID があれば失敗する。gem を上げて advisory が解消したら、無視リストから消す
+- 1 つでも失敗すると終了コード 1。`| tail` に渡すと `$?` は `tail` の終了コードになる（zsh には `PIPESTATUS` がない）ので、終了コードを見るときは出力を `>/dev/null` にする
+
 CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途中の読み込みは test と development の両方）。違いは、OP の署名鍵をジョブの中で作ること、bundler-audit に `--update` を付けて advisory のデータベースの最新を使うこと、E2E を mise なしで流すこと。
 
 ## CI の結果を読む

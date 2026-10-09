@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# 3 アプリ（RS・RP・OP）の検査と E2E を手元で流し、最後に結果の一覧を出す。
+# CI（.github/workflows/ci.yml）の rails ジョブ・e2e ジョブと同じ検査に、CI=1 の minitest と、
+# 無視リストを空にした bundler-audit（解消した advisory が無視リストに残っていないか）を足したもの。
+# 手順の中での使い方は docs/upgrade/TIPS.md の「確認のコマンド」。
+#
+# 使い方:
+#   scripts/check-apps                 3 アプリの検査と E2E
+#   scripts/check-apps --app rp        RP の検査と E2E（--app は繰り返せる。rs / rp / op）
+#   scripts/check-apps --no-e2e        E2E を流さない
+#   scripts/check-apps --e2e-only      E2E だけを流す
+#
+# 失敗しても後の検査を流す。1 つでも失敗すると終了コード 1。各検査の出力はログのディレクトリ
+# （環境変数 CHECK_APPS_LOG_DIR。なければ一時ディレクトリ）に残し、一覧にファイル名を出す。
+# Ruby・Node は各ディレクトリで mise を通して使う（CI は mise を使わない）。
+
+set -u
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOG_DIR="${CHECK_APPS_LOG_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/check-apps.XXXXXX")}"
+mkdir -p "$LOG_DIR"
+
+apps=()
+run_rails=1
+run_e2e=1
+
+usage() {
+  sed -n '6,11p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --app)
+      case "${2:-}" in
+        rs) apps+=(rails_resource_server) ;;
+        rp) apps+=(rails_relying_party_of_backend) ;;
+        op) apps+=(rails_open_id_provider) ;;
+        *) echo "--app には rs / rp / op を渡す" >&2; exit 2 ;;
+      esac
+      shift 2
+      ;;
+    --no-e2e) run_e2e=0; shift ;;
+    --e2e-only) run_rails=0; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "不明な引数: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ ${#apps[@]} -eq 0 ]; then
+  apps=(rails_resource_server rails_relying_party_of_backend rails_open_id_provider)
+fi
+
+results=()
+counts=()
+failed=0
+seq=0
+
+# 検査ごとのログのファイル（通し番号）。$(...) の中で呼ぶと番号が進まないので、変数 log に入れる
+next_log() {
+  seq=$((seq + 1))
+  log="$(printf '%s/%02d.log' "$LOG_DIR" "$seq")"
+}
+
+# check <ラベル> <ディレクトリ> <コマンド...>
+check() {
+  local label="$1" dir="$2"
+  shift 2
+  local log
+  next_log
+  printf '%s ... ' "$label"
+  if (cd "$ROOT/$dir" && "$@") >"$log" 2>&1; then
+    results+=("OK    $label")
+    echo OK
+  else
+    results+=("FAIL  $label（$log）")
+    failed=1
+    echo FAIL
+  fi
+  # minitest と E2E は件数を控える（LOG.md に書く要約のため）
+  local summary
+  summary="$(grep -E '[0-9]+ runs, |^ +[0-9]+ (passed|failed|flaky|skipped)' "$log" | tail -3 | sed 's/^ *//' | paste -sd ' ' -)"
+  [ -n "$summary" ] && counts+=("$label: $summary")
+  return 0
+}
+
+# 無視リストを空にして bundler-audit を流し、無視リスト（.bundler-audit.yml）にあるのに報告されない ID
+# （gem を上げて解消したもの）があれば失敗にする。カレントディレクトリはアプリ
+stale_ignores() {
+  local reported stale
+  reported="$(mise exec -- bundle exec bundle-audit check --config "$empty_audit_config" | sed -n -E 's/^(CVE|GHSA): //p' | sort -u)"
+  stale="$(sed -n -E 's/^ *- ([A-Za-z0-9-]+).*/\1/p' .bundler-audit.yml | sort -u | comm -23 - <(echo "$reported"))"
+  if [ -n "$stale" ]; then
+    echo "無視リストにあるが、報告されない ID（無視リストから消す）:"
+    echo "$stale"
+    return 1
+  fi
+  echo "無視リストの ID は、すべて今も報告される"
+}
+
+empty_audit_config="$LOG_DIR/bundler-audit-empty.yml"
+printf 'ignore: []\n' >"$empty_audit_config"
+
+if [ "$run_rails" -eq 1 ]; then
+  for app in "${apps[@]}"; do
+    check "$app RuboCop" "$app" mise exec -- bundle exec rubocop
+    check "$app 応答のスナップショットのヘルパー" "$app" \
+      sh -c 'for other in ../rails_*/test/support/response_snapshot_helper.rb; do diff -u "$other" test/support/response_snapshot_helper.rb || exit 1; done'
+    check "$app zeitwerk:check" "$app" mise exec -- bin/rails zeitwerk:check
+    # ANTI_MANNER は起動を途中で終了コード 0 で終えるので、この検査のコマンドにだけ付ける
+    check "$app 起動の途中の読み込み（test）" "$app" \
+      env ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1
+    check "$app 起動の途中の読み込み（test、CI=1）" "$app" \
+      env ANTI_MANNER=1 RAILS_ENV=test CI=1 mise exec -- bin/rails runner 1
+    # 手動確認用の development DB に触れないよう、E2E 用の DB を指す
+    check "$app 起動の途中の読み込み（development）" "$app" \
+      env ANTI_MANNER=1 RAILS_ENV=development DATABASE_URL=sqlite3:db/e2e.sqlite3 mise exec -- bin/rails runner 1
+    check "$app minitest" "$app" mise exec -- bin/rails test
+    check "$app minitest（CI=1）" "$app" env CI=1 mise exec -- bin/rails test
+    check "$app bundler-audit" "$app" mise exec -- bundle exec bundle-audit check
+    check "$app bundler-audit（無視リストに解消済みの ID がないか）" "$app" stale_ignores
+    check "$app brakeman" "$app" mise exec -- bundle exec brakeman --no-pager -q
+  done
+fi
+
+if [ "$run_e2e" -eq 1 ]; then
+  check "e2e oxlint" e2e mise exec -- npm run lint
+  check "e2e oxfmt" e2e mise exec -- npm run fmt:check
+  check "e2e Playwright" e2e mise exec -- npm test
+fi
+
+echo
+echo "== 結果（ログ: $LOG_DIR）"
+printf '%s\n' "${results[@]}"
+
+if [ ${#counts[@]} -gt 0 ]; then
+  echo
+  echo "== 件数"
+  printf '%s\n' "${counts[@]}"
+fi
+
+exit "$failed"
