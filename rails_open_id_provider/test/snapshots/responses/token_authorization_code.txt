@@ -1,0 +1,22 @@
+HTTP 200
+cache-control: no-store
+content-length: <CONTENT_LENGTH>
+content-type: application/json; charset=utf-8
+etag: <ETAG>
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+{
+  "access_token": "<ACCESS_TOKEN:string>",
+  "token_type": "Bearer",
+  "expires_in": 600,
+  "scope": "openid",
+  "created_at": 1767225600,
+  "id_token": "<ID_TOKEN:string>"
+}

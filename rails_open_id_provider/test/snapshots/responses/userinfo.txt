@@ -1,0 +1,18 @@
+HTTP 200
+cache-control: max-age=0, private, must-revalidate
+content-length: <CONTENT_LENGTH>
+content-type: application/json; charset=utf-8
+etag: <ETAG>
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+{
+  "sub": "227792459",
+  "email": "user@example.com"
+}

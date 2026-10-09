@@ -1,0 +1,15 @@
+HTTP 401
+cache-control: no-store
+content-length: <CONTENT_LENGTH>
+content-type: text/html
+referrer-policy: strict-origin-when-cross-origin
+www-authenticate: Bearer realm="Doorkeeper", error="invalid_token", error_description="The access token is invalid"
+x-content-type-options: nosniff
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-request-id: <REQUEST_ID>
+x-runtime: <RUNTIME>
+x-xss-protection: 0
+
+
