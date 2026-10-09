@@ -11,6 +11,11 @@ module RailsResourceServer
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 6.1
 
+    # Rails 7.0 の既定値のうち、new_framework_defaults_7_0.rb ではなくここに書く必要があるもの。
+    # load_defaults 7.0 にしたら消す
+    config.active_support.cache_format_version = 7.0
+    config.active_support.disable_to_s_conversion = true
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

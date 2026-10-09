@@ -28,7 +28,7 @@
 # Change the digest class for ActiveSupport::Digest.
 # Changing this default means that for example Etags change and
 # various cache keys leading to cache invalidation.
-# Rails.application.config.active_support.hash_digest_class = OpenSSL::Digest::SHA256
+Rails.application.config.active_support.hash_digest_class = OpenSSL::Digest::SHA256
 
 # Don't override ActiveSupport::TimeWithZone.name and use the default Ruby
 # implementation.
@@ -58,7 +58,7 @@ Rails.application.config.active_record.verify_foreign_keys_for_fixtures = true
 # Disable partial inserts.
 # This default means that all columns will be referenced in INSERT queries
 # regardless of whether they have a default or not.
-# Rails.application.config.active_record.partial_inserts = false
+Rails.application.config.active_record.partial_inserts = false
 
 # Protect from open redirect attacks in `redirect_back_or_to` and `redirect_to`.
 # Rails.application.config.action_controller.raise_on_open_redirects = true
