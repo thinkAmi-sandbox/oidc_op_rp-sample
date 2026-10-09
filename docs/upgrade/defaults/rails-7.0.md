@@ -35,6 +35,10 @@
 | DEF-7.0-25 | `active_record.automatic_scope_inversing = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
 | DEF-7.0-26 | `active_support.executor_around_test_case = true` | `load_defaults`（グループ 2） | 3 アプリ | 追随 |
 | DEF-7.0-27 | `active_record.verify_foreign_keys_for_fixtures = true` | `load_defaults`（グループ 2） | 3 アプリ | 追随 |
+| DEF-7.0-28 | `active_record.partial_inserts = false` | `load_defaults`（グループ 3） | 3 アプリ | 追随 |
+| DEF-7.0-29 | `active_support.hash_digest_class = OpenSSL::Digest::SHA256` | `load_defaults`（グループ 3） | 3 アプリ | 追随 |
+| DEF-7.0-30 | `active_support.disable_to_s_conversion = true` | `load_defaults`（グループ 3。`config/application.rb`） | 3 アプリ | 追随 |
+| DEF-7.0-31 | `active_support.cache_format_version = 7.0` | `load_defaults`（グループ 3。`config/application.rb`） | 3 アプリ | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -194,7 +198,7 @@
 
 ## `load_defaults`（`new_framework_defaults_7_0.rb`）
 
-グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
+グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。グループ 3 は、SQL や内部の処理だけが変わるもの。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
 
 RP では、グループ 1・2 を有効にした時点で、一部の設定（DEF-7.0-24・25・27）が効かなかった。原因と対応は、すぐ下の「補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）」。
 
@@ -335,4 +339,44 @@ RP では、グループ 1・2 を有効にした時点で、一部の設定（D
 - 3 アプリへの影響: fixtures があるのは OP だけ（`oauth_applications.yml`・`users.yml`）で、違反はなく、テストは通った。RP には fixtures がない
 - 扱い: 追随
 - 出典: [rails/rails#42674](https://github.com/rails/rails/pull/42674)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.35 `config.active_record.verify_foreign_keys_for_fixtures`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-28: `active_record.partial_inserts = false`
+
+- 種類: `load_defaults`（グループ 3）/ 対象: 3 アプリ
+- 何が変わるか: INSERT 文に、値を渡していない列も含めて全部の列を書く。3 アプリとも `ActiveRecord::Base.partial_inserts` が `true` → `false`
+- なぜ: 列の既定値を DB から安全に外せるようにするため。部分的な INSERT では、DB の既定値に頼る列があると既定値を外せない。以前の利点（列を消すときの事故を防ぐ）は、今は `ignored_columns` で安全にできる、と PR は説明している
+- 3 アプリへの影響: OP は doorkeeper の 3 つのテーブルで INSERT の列が増えた（例: `oauth_access_tokens` に `refresh_token`・`revoked_at`・`previous_refresh_token`）。test 環境でレコードを作って読み直し、保存された値が前後で同じことを確かめた（`confidential: true`・`previous_refresh_token: ""` などは、DB の既定値と同じ値が入る）。RP の `op_users`・`sessions` はもともと全部の列を渡しているので、SQL も値も同じ。RS はテーブルがない
+- 扱い: 追随
+- 出典: [rails/rails#42769](https://github.com/rails/rails/pull/42769)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.16 `config.active_record.partial_inserts`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-29: `active_support.hash_digest_class = OpenSSL::Digest::SHA256`
+
+- 種類: `load_defaults`（グループ 3）/ 対象: 3 アプリ
+- 何が変わるか: `ActiveSupport::Digest` のアルゴリズムが SHA1 → SHA256
+- なぜ: SHA1 が使われているところを SHA256 にそろえるため
+- 3 アプリへの影響: `ActiveSupport::Digest` を使うのは、Rails 自身の `fresh_when`・`stale?` の ETag、ビューのフラグメントキャッシュの digest、`relation.cache_key`、キャッシュストアだけで、3 アプリはどれも使っていない（lock の gem にも使うものはない）。応答の ETag は `Rack::ETag` が SHA256 で計算するもの（`rack-2.2.24/lib/rack/etag.rb`）。ETag を伏せずに応答を書き出して前後を比べ、変わったのは同じ設定でも毎回変わる 4 つ（CSRF のトークンなどを本文に含む OP の応答）だけだった
+- 扱い: 追随
+- 出典: [rails/rails#41043](https://github.com/rails/rails/pull/41043)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.11 `ActiveSupport::Digest`で用いられるメッセージダイジェストクラスがSHA256に変更」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.6 `config.active_support.hash_digest_class`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-30: `active_support.disable_to_s_conversion = true`
+
+- 種類: `load_defaults`（グループ 3。雛形のコメントのとおり `config/application.rb` に書く）/ 対象: 3 アプリ
+- 何が変わるか: Date・Time・Numeric・Array・Range などの `to_s(:形式)` の上書きを読み込まない。3 アプリとも `1000.to_s(:delimited)` が、非推奨の警告付きで動く状態から `TypeError` になる
+- なぜ: Ruby 3.1 の、文字列の式展開を速くする最適化は、`to_s` を上書きしたクラスでは効かない。Rails は `to_s(:形式)` を非推奨にして `to_fs`（`to_formatted_s`）に移し、上書きをやめられるようにした。設定は `initialize!` の最初に環境変数 `RAILS_DISABLE_DEPRECATED_TO_S_CONVERSION` を立てる形で効く（`railties-7.0.10/lib/rails/application/bootstrap.rb`）
+- 3 アプリへの影響: アプリ・テスト・lock の gem に `to_s(:形式)` の呼び出しはなく、Rails 7.0.10 にした後の development のログに非推奨の警告もない。RP は `77c26df`（上の「補足」）の後なので効く
+- 扱い: 追随。`load_defaults 7.0` にするときに `config/application.rb` から消す
+- 出典: [rails/rails#43772](https://github.com/rails/rails/pull/43772)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.18 `config.active_support.disable_to_s_conversion`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-31: `active_support.cache_format_version = 7.0`
+
+- 種類: `load_defaults`（グループ 3。雛形のコメントのとおり `config/application.rb` に書く）/ 対象: 3 アプリ
+- 何が変わるか: `ActiveSupport::Cache` に保存するときの形式が 7.0 の形式になる（`ActiveSupport.cache_format_version` が 6.1 → 7.0）。6.1 のアプリはこの形式を読めない
+- なぜ: 以前の形式は `Entry` オブジェクトを丸ごと Marshal で保存していて、1 件ごとの無駄が大きく、内部を変えると形式が壊れやすかった。速く小さい形式にした
+- 3 アプリへの影響: `Rails.cache` を使っていない。development は `tmp/caching-dev.txt` がないので `:null_store`、test も `:null_store` で、保存されたキャッシュはない
+- 扱い: 追随（6.1 に戻す予定はない）。`load_defaults 7.0` にするときに `config/application.rb` から消す
+- 出典: [rails/rails#42025](https://github.com/rails/rails/pull/42025)、[アップグレードガイド v7.0](https://railsguides.jp/v7.0/upgrading_ruby_on_rails.html)「2.12 `ActiveSupport::Cache`の新しいシリアライズフォーマット」、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.9 `config.active_support.cache_format_version`」
 - コミット: （コミット後に記入）
