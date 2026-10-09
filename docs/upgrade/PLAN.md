@@ -23,7 +23,18 @@
 ## 3. 基本方針
 
 1. 一度に上げるのは 1 つだけ。Ruby・Rails・周辺 gem を同時に上げず、マイナーバージョンも飛ばさない
-2. アップグレード中は挙動を変えない。例外は「意図的な仕様変更」として本計画に明記したものだけ
+2. アップグレード中は、各システムの業務的な挙動を変えない。Rails の既定値の変化には追随する。定義は次のとおり（Step 1 の着手時に人間と決めた。Step 0 の判断は見直さない）
+   - **A. Rails の既定値・雛形の変化**: 追随する。例: `load_defaults` の各設定、`app:update` の雛形、Rails の既定の応答ヘッダー、Rails のヘルパーが出すタグの形。追随しないと、版を上げるたびに古い既定値のままで問題がないかを確かめ続けることになり、セキュリティや性能の改善も取り込めない
+   - **B. 各システムの業務的な挙動**: 変えない。例: 画面に描画される文字、アプリが持つ URL・ルーティング、画面遷移とリダイレクト先、OP・RP・RS の間のやり取り（認可要求・トークン要求・ID トークン・userinfo・introspect）、DB に入るデータ。変えるときは「意図的な仕様変更」として本計画に明記し、LOG.md に記録する
+   - 境目の扱い
+     1. Rails 以外の gem の既定値の変化も、原則は A と同じく追随する。ただし OP・RP・RS の間のやり取りが変わるもの（oauth2 の `auth_scheme` のように、相手が受け付けなくなりうるもの）は B として扱い、その都度人間に確かめる。既存のやり取りの方法が不適切で、ライブラリに追随したほうがよい場合もあるため
+     2. 描画される文字・遷移・送信内容が同じなら、Rails が出すタグの形が変わっても A（`button_to` の `<button>` など）
+     3. A による追随が起きたら、コミットの前に、項目ごとに「何が変わるか・なぜ起きたか・今回のアプリへの影響・提案」を解説し、人間の返事をもらってからコミットする。出典として、Rails の PR・CHANGELOG・gem のソースに加え、日本語版の Rails ガイドに該当の節があればページと見出しを示す。ガイドは上げる先の版のページ（例: `https://railsguides.jp/v7.0/`）を使い、その版になければ最新版のページを使って、そう明記する。同じ内容を LOG.md の「Rails の既定値への追随」に記録する。「意図的な仕様変更」は B を変えるときだけに使う
+     4. アプリが意図して書いた設定（理由のコメントがある、業務に関わる）は残す。昔の雛形の値が残っているだけの設定は、新しい雛形に合わせる。迷うものはその都度人間に確かめる
+     5. 既にある部品の設定・既定値の変化は A。gem・インフラ・部品を新しく足すもの（4 の新しい構成）と、使っていない機能を動かし始めるもの（Active Storage のマイグレーションなど）は採用しない
+     6. 一度きりの移行の影響（Cookie の鍵の算出方式が変わり、ログインが一度切れるなど）は A として追随し、移行用のコードは書かない
+     7. ログの出力の変化は A。アプリが足した伏せる対象（`filter_parameters` の `:code`）は 4 にあたるので残す
+     8. A で E2E のスナップショットが変わったときは、理由を確かめたうえで更新し、LOG.md に書く
 3. 脆弱性が公表されている gem の修正は即時に行う。設定の改善（PKCE 必須化、secret のハッシュ化など）は epic を main に取り込んだ後に別作業で行う。見送った改善は [docs/IMPROVEMENTS.md](../IMPROVEMENTS.md) に記録する
 4. `app:update` が提案する新しい構成（Propshaft、Solid Queue/Cache/Cable、Kamal、Thruster など）は採用しない
 5. 伊藤さん式の「ステージング確認・本番デプロイ」は、「3 アプリ通しの E2E ＋ OP の応答のスナップショットとの比較＋ PR レビュー」に置き換える
@@ -302,8 +313,8 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
   - sprockets-rails は Gemfile に足さない（下の「調べたこと」の Sprockets の行。当初の計画から変更）
   - annotate は 3.2.0 に上げ、annotaterb への置き換えは Step 5 のまま（当初は「3.2.0 には上げない」としていた。7 章）
   - Rails 7.0 以上を必要とする周辺 gem（devise 5.x、doorkeeper 5.8 以上と doorkeeper-openid_connect 1.8.10 以上、jbuilder 2.14 以上、activerecord-session_store 2.2 以上、omniauth-rails_csrf_protection 1.0.2）は、サブステップ 1-b として別の PR にする。Step 1 が epic に入ってから調べて作業計画を出す
-  - `app:update` の差分: アプリ独自の設定（RP の `config/application.rb` の session_store の serializer、`test.rb` の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code`）は戻す。development.rb の `file_watcher` の行が消えることと `server_timing = true` は雛形に合わせる。`test.rb` の `cache_classes`・`eager_load` も雛形に合わせる。`db/schema.rb` の `ActiveRecord::Schema[6.1]` は採用し、`active_storage:update` が足すマイグレーションは採用しない（Active Storage は使っていない）
-  - `X-XSS-Protection`、`button_to`、`stylesheet_link_tag` の `media` の変化（下の表の 5〜7）は「意図的な仕様変更」として受け入れる。Cookie の鍵の算出方式（8）は 12 章のとおり許容し、ローテーション用のコードは入れない
+  - `app:update` の差分: アプリ独自の設定（RP の `config/application.rb` の session_store の serializer、`test.rb` の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code`）は戻す。development.rb の `file_watcher` の行が消えることと `server_timing = true` は雛形に合わせる。`test.rb` の `cache_classes`・`eager_load` も雛形に合わせる。RS の `config/application.rb` は、雛形どおり個別の require を `require "rails/all"` にする（読み込むフレームワークとミドルウェアは同じで、initializer の順番だけが変わる）。`db/schema.rb` の `ActiveRecord::Schema[6.1]` は採用し、`active_storage:update` が足すマイグレーションは採用しない（Active Storage は使っていない）
+  - `X-XSS-Protection`、`button_to`、`stylesheet_link_tag` の `media` の変化（下の表の 5〜7）と、Cookie の鍵の算出方式（8）は、3 章の 2 の A（Rails の既定値への追随）にあたる。Cookie のローテーション用のコードは入れない（12 章）
   - コミットは段階ごとに、アプリごと（RS → RP → OP）に分ける。PR は 1 つ
 
 `new_framework_defaults_7_0.rb` を有効にする順番:
@@ -314,9 +325,9 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 | 2 | `verify_foreign_keys_for_fixtures`、`executor_around_test_case` | テストだけ | minitest |
 | 3 | `partial_inserts = false`、`hash_digest_class = SHA256`、`disable_to_s_conversion`、`cache_format_version = 7.0` | INSERT の列だけ変わる（入る値は同じ）。ETag の計算とキャッシュは使っていない | minitest・E2E。RP は値で確かめる（下の「調べたこと」） |
 | 4 | `raise_on_open_redirects` | 変わらない | OP の外部へのリダイレクトのテスト・E2E |
-| 5 | `default_headers`（`X-XSS-Protection` が `1; mode=block` → `0`。3 アプリの全応答） | 変わる（意図的な仕様変更） | 応答の前後比較 |
-| 6 | `button_to_generates_button_tag`（OP の devise の `/users/edit` の「Cancel my account」） | 変わる（意図的な仕様変更） | 応答の前後比較 |
-| 7 | `apply_stylesheet_media_default = false`（OP の doorkeeper のレイアウトの `<link>` から `media="screen"` が消える。RP は `media: 'all'` を明示している） | 変わる（意図的な仕様変更） | 応答の前後比較 |
+| 5 | `default_headers`（`X-XSS-Protection` が `1; mode=block` → `0`。3 アプリの全応答） | 変わる（Rails の既定値への追随） | 応答の前後比較 |
+| 6 | `button_to_generates_button_tag`（OP の devise の `/users/edit` の「Cancel my account」） | 変わる（Rails の既定値への追随） | 応答の前後比較 |
+| 7 | `apply_stylesheet_media_default = false`（OP の doorkeeper のレイアウトの `<link>` から `media="screen"` が消える。RP は `media: 'all'` を明示している） | 変わる（Rails の既定値への追随） | 応答の前後比較 |
 | 8 | `key_generator_hash_digest_class = SHA256` | OP の既存のセッション Cookie が読めなくなる。RP のセッション Cookie は署名のない ID だけ、RS は Cookie を使わない | 手動確認（古い Cookie を持ったブラウザ） |
 
 調べたこと（着手時の 2026-10-08。作業計画のときにサブエージェントで調べ、要点は自分で確かめた）:
