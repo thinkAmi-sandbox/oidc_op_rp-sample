@@ -1348,6 +1348,7 @@ Step 1 の後に、人間が「gem やアプリのコードが起動の途中で
 |---|---|---|
 | RS | `config/application.rb` の `Bundler.require` の次の行に `ActiveRecord::Base` | test・development とも終了コード 1。`on_load(:active_record)` と、疑わしい行として `config/application.rb:8` が出た |
 | RP | `config/application.rb` の末尾に、Step 1 の `77c26df` で移す前の `ActiveRecord::SessionStore::Session.serializer = :json` | test・development とも終了コード 1、`on_load(:active_record)`。疑わしい行は gem の中（`activerecord-session_store-2.1.0/lib/active_record/session_store/session.rb:7`）を指し、`ANTI_MANNER_DEBUG=1` でスタックトレース全部を出すと `config/application.rb:40` の行があった |
+| RS | `config/environments/test.rb`・`development.rb` の末尾に `ActiveRecord::Base`（コードレビューの後に足した確認） | それぞれの環境で終了コード 1、`on_load(:active_record)`。疑わしい行として `config/environments/test.rb:61`・`development.rb:66` が出た |
 | OP | `config/initializers/` に `ActionController::Base` だけを書いた一時ファイル | test・development とも終了コード 0（検出できない。上の「作業計画からの変更点」） |
 | OP | 同じ置き方で `ActionDispatch::Request` | test・development とも終了コード 0（監視の一覧にない） |
 
@@ -1359,3 +1360,20 @@ Step 1 の後に、人間が「gem やアプリのコードが起動の途中で
 - RuboCop: 3 アプリとも `no offenses detected`（Gemfile も対象）。bundler-audit: `No vulnerabilities found`。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`。`zeitwerk:check` は `All is good!`
 - `.github/workflows/ci.yml` は YAML として読め、`rails` ジョブのステップの順番と `env` が計画どおりなことを確かめた。CI での結果は PR を作った後に書く
 - 手動確認用の環境: 作業の前と後で、9 ファイル（3 アプリの development DB、OP の署名鍵、RP・RS の `.env`、3 アプリの `tmp/development_secret.txt`）のハッシュが、Step 1 の手動確認の後と同じだった
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| TIPS.md に「検出できない範囲は、上の `@loaded` を書き出す方法で手で確かめる」と書いたが、その方法の probe は `config/initializers` を読む直前の時点を見るので、`config/initializers` の中での読み込みは見えない | 手での確認は、値の比較（有効にする前後で値を書き出す）を主にし、`@loaded` の方法では `config/initializers` の中が見えないことを TIPS.md と defaults/rails-7.0.md の申し送りに書いた |
+| 検出できる範囲に `config/environments/*.rb` を入れたが、壊して試していない（initializer の順番からの推測） | RS で試した（上の「壊したときの確認」に足した） |
+| Gemfile のコメントが検出の範囲を書かず、`config/initializers` も見ているように読める。ci.yml のコメントとも食い違う | 3 アプリのコメントに、`config/application.rb` と gem の require を検出し、ほかの gem の initializer と `config/initializers` は検出できないことを書いた |
+| RS・RP の build コミットのメッセージが「before the initializers run」で、範囲が不正確 | push の前なので、人間の承認を得て、`docs: record the step 1-b-1 plan in the upgrade plan` の上に 3 つの build コミットを作り直し（Gemfile のコメントの修正も含めた）、ci と docs のコミットを cherry-pick し直した。作り直す前と後のツリーの差が Gemfile のコメント 3 か所だけなことを `git diff` で確かめた |
+| 検出できない範囲の原因は、gem の initializer に `before: :eager_load!` しか指定がないこと。範囲を何か所にも書くより、gem に直す提案をするのが根本の対応 | 手元で試した（下）。人間の判断で、gem に提案（issue か PR）を送ることを docs/IMPROVEMENTS.md の IMP-009 の改善案に足した。送るかどうかは人間が判断し、送るときも人間が送る |
+| 検出できる範囲の説明が、PLAN.md・TIPS.md・defaults/rails-7.0.md・IMPROVEMENTS.md・LOG.md・ci.yml の 7 か所にある | 対応しない。範囲の正本は PLAN.md の Step 1-b-1「調べたこと」の「検出できる範囲」で、ほかは要点とそこへの参照だけにしている |
+
+gem の initializer の位置を変えたときの確かめ方: scratchpad のスクリプトで、`config/application` を require した後、gem の initializer `anti_manner` の `@options[:after]` を `:load_config_initializers` にしてから `Rails.application.initialize!` を呼んだ（gem もアプリも変えていない）。
+
+- 検査は、OP の test で 217 個中 148 番目（アプリの `load_config_initializers` の直後）に移った。最初は `@after` を差し替えて位置が変わらず、Rails 7.0 の `Rails::Initializable::Initializer` が `before`・`after` を `@options` に持つと分かってやり直した
+- 3 アプリとも、test・development で終了コード 0
+- OP の `config/initializers/` に `ActionController::Base` だけを書いた一時ファイルを置くと、終了コード 1（`on_load(:action_controller_base)`、疑わしい行は一時ファイルの 1 行目）。`ActionDispatch::Request` は終了コード 0。一時ファイルは消した
