@@ -12,6 +12,17 @@ class SessionsTest < ActionDispatch::IntegrationTest
     assert_select 'form[action="/auth/my_op"] button', 'Login'
   end
 
+  # serializer の設定は config/initializers/session_store.rb の on_load(:active_record) にある。
+  # 設定が効かないと、既定の :marshal（Base64 の Marshal）で保存される
+  test 'セッションは sessions テーブルに JSON で保存する' do
+    post '/auth/my_op'
+
+    session_record = ActiveRecord::SessionStore::Session.last
+    raw_data = session_record.read_attribute(ActiveRecord::SessionStore::Session.data_column_name)
+
+    assert_equal session_record.data, JSON.parse(raw_data)['value']
+  end
+
   test 'ログアウトすると、トップに「ログアウトしました」が出る' do
     log_in_via_op
 
