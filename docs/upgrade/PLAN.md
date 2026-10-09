@@ -400,7 +400,7 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
   - JSON の本文は、キーの順を変えずに整形する（E2E のスナップショットはキーを並べ替える）。伏せた値は E2E と同じく型を残す（`<ACCESS_TOKEN:string>`）
   - 更新は `UPDATE_SNAPSHOTS=1 bin/rails test`。ファイルがないときは、この環境変数がなければ失敗する（E2E の扱いにそろえる）。更新したときの扱いは 3 章の 2 の境目の 8
   - development だけの応答の差（`Server-Timing`、rack-mini-profiler・web-console）と、test 環境では出ない CSRF のトークンは、このテストでも E2E でも扱わない。Rails を上げる Step で、これまでどおり development の応答ヘッダーを `curl` で見る
-  - CI は変えない（既存の `bin/rails test` がこのテストも流し、スナップショットのファイルは `public-safety` ジョブの検査の対象に入る）
+  - CI は変えない（既存の `bin/rails test` がこのテストも流し、スナップショットのファイルは `public-safety` ジョブの検査の対象に入る）。コードレビューの後に、3 アプリのヘルパーが同じかを `diff` で比べるステップを `rails` ジョブに足した（人間が判断）
   - PR は 1 つ
 
 調べたこと（着手時の 2026-10-09）:

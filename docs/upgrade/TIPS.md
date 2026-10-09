@@ -22,7 +22,7 @@
 | RuboCop | `mise exec -- bundle exec rubocop` | `no offenses detected` |
 | minitest | `mise exec -- bin/rails test` | 0 failures。RP の出力の `Authentication failure!` は想定どおり（ID トークンの検証失敗のテスト） |
 | minitest（CI と同じ eager load あり） | `CI=1 mise exec -- bin/rails test` | 上と同じ件数で 0 failures。Step 1（Rails 7.0 の雛形）から、test 環境は `ENV["CI"]` があると eager load する（DEF-7.0-08） |
-| 応答のスナップショット（Step 1-b-2） | minitest に含まれる。作り直すときは `UPDATE_SNAPSHOTS=1 mise exec -- bin/rails test`（ファイルを指定して絞れる）の後に `git diff -- test/snapshots` | 差分がない。差分が出たら下の「応答のスナップショット」 |
+| 応答のスナップショット（Step 1-b-2） | minitest に含まれる。作り直すときは `UPDATE_SNAPSHOTS=1 mise exec -- bin/rails test`（ファイルを指定して絞れる）の後に `git status --short -- test/snapshots` と `git diff -- test/snapshots`（新しいファイルは `git diff` に出ない） | 差分がない。差分が出たら下の「応答のスナップショット」 |
 | Zeitwerk | `mise exec -- bin/rails zeitwerk:check` | `All is good!` |
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
 | 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」 |
@@ -67,7 +67,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 
 ## 応答のスナップショット（Step 1-b-2）
 
-- 各アプリの `test/integration/response_snapshot*_test.rb` が、応答のステータス・ヘッダー・本文を `test/snapshots/responses/<名前>.txt` と比べる。伏せる処理は `test/support/response_snapshot_helper.rb`（3 アプリで同じ内容。直したら 3 つとも同じにし、`diff` で確かめる）
+- 各アプリの `test/integration/response_snapshot*_test.rb` が、応答のステータス・ヘッダー・本文を `test/snapshots/responses/<名前>.txt` と比べる。伏せる処理は `test/support/response_snapshot_helper.rb`（3 アプリで同じ内容。直したら 3 つとも同じにする。CI の `rails` ジョブが、ほかのアプリのものと `diff` で比べる）
 - 伏せるのは、実行ごとに変わる値だけ。ヘッダーの `X-Request-Id`・`X-Runtime`、本文から決まる `ETag`・`Content-Length`（値だけ。ヘッダーがあるかどうかは比べる）、Cookie の値、クエリと hidden field の `code`・`state`・`nonce`・`code_challenge`、JSON の `access_token`・`refresh_token`・`id_token` と JWKS の `n`・`kid`。名前で決め、文字列の形では伏せない。OP のトークン系のテストは `travel_to` で時刻を固定し、`created_at`・`iat`・`exp` も比べる
 - 知らない値が毎回変わるようになると、伏せずに落ちる。そのときは伏せる名前を足す前に、その値が本当に毎回変わるもの（トークンなど）かを確かめる。伏せる名前を足すと、その値の変化は見えなくなる
 - 落ちたら、まず差分を読み、変化の理由（Rails・gem の版、設定）を確かめる。PLAN.md の 3 章の 2 の A なら、項目ごとに解説して人間の返事をもらってから `UPDATE_SNAPSHOTS=1 mise exec -- bin/rails test` で作り直し、変化を起こしたコミットにスナップショットも入れる。B なら作り直さずに止まって確かめる

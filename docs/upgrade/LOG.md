@@ -1413,6 +1413,8 @@ Step 1 で使い捨ての統合テストで行った応答の前後比較を、�
 - `travel_to` は、時刻が応答に出る OP のトークン系のテスト（`response_snapshot_token_test.rb`）だけに付けた。ほかの応答には時刻が出ない
 - 計画では OP のテストから渡す nonce を固定値にするとしていたが、hidden field とクエリの `nonce` は名前で伏せるので、既存のヘルパーと同じく `SecureRandom` のままにした。RP の introspection 用 RP のコールバックの後の画面に flash で出るアクセストークンは、計画どおりテストの定数（固定のダミーの文字列）にして伏せていない
 
+- コードレビューの後に、計画では変えないとしていた fixtures（`oauth_applications.yml` の `created_at`）と CI（ヘルパーが 3 アプリで同じかの `diff`）を変えた（どちらも人間が判断。下の「コードレビュー」）
+
 ### 伏せた値
 
 | 置き換え | 何を伏せたか | 件数（RS / RP / OP） |
@@ -1430,7 +1432,7 @@ Step 1 で使い捨ての統合テストで行った応答の前後比較を、�
 ### 実行ごとに同じになることの確認
 
 - 3 アプリとも、`UPDATE_SNAPSHOTS=1` で作った後、seed を変えて 2〜3 回と `CI=1`（eager load あり）で流して 0 failures。もう一度 `UPDATE_SNAPSHOTS=1` で作り直して、前のファイルと `diff -r` で同じだった
-- `/oauth/applications` は fixtures の作成時刻が同じで、並びは doorkeeper の `ordered_by(:created_at)` の同順の扱いに任される。手元では毎回同じ並び（ID の順）だった。CI でも同じかは PR の CI で確かめる
+- `/oauth/applications` は doorkeeper が `created_at` の順に並べる。最初は fixtures の作成時刻が 3 つとも同じで、並びが DB に任されていた（手元では毎回 ID の順だった）。コードレビューの後に、fixtures に 1 秒ずつずらした `created_at` を書いて並びを決めた（下の「コードレビュー」）
 - トークン・JWT の形の値（`eyJ` と 32 文字以上の英数字）は、ヘッダー名（`x-permitted-cross-domain-policies`）にしか当たらなかった
 
 ### 壊したときの確認
@@ -1456,3 +1458,19 @@ Step 1 で使い捨ての統合テストで行った応答の前後比較を、�
 - 安全チェック: スナップショットのファイル・ヘルパー・テストを `--files` で、コミットのたびに hooks で検査して通った。`.public-safety-allow` への追記はない
 - 3 つのヘルパー（`test/support/response_snapshot_helper.rb`）が同じ内容なことを `diff` で確かめた
 - 手動確認用の環境: 作業の前と後で、9 ファイル（3 アプリの development DB、OP の署名鍵、RP・RS の `.env`、3 アプリの `tmp/development_secret.txt`）のハッシュが同じだった
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| ヘッダーの値を `to_s` で文字列にしていて、Rack 3（Step 3 の Rails 7.1 以降で入りうる）が `Set-Cookie` を配列で持つと、配列の inspect の形で書かれ、2 つ目の Cookie の値が伏せられない | 配列の値も 1 つずつ別の行にした（3 アプリのヘルパー） |
+| hidden field を `<input type="hidden" name="...` の並びでしか見ておらず、属性の並びが変わると認可コードなどが伏せられない。そのまま `UPDATE_SNAPSHOTS=1` で作り直すと、安全チェックの `oauth-param` ルールでは拾えない形でファイルに残る | `<input>` のタグごとに `name` と `value` を見るようにした。並びを変えたタグでも伏せることを `bin/rails runner` で確かめた |
+| JSON の本文を `JSON.pretty_generate` で書いていて、空の `{}` の整形が json の版で変わる（json 2.6.1 は 2 行）。Ruby を上げる Step で、応答が同じでもスナップショットが変わる | 空の `{}`・`[]` を 1 行にそろえた。OP の `revoke.txt` だけが `{}` に変わった |
+| `application/json` で本文が空だと `JSON::ParserError` で止まり、`+json` の media type では JSON のキーを伏せない | 本文が空なら JSON として読まず、`+json` も JSON として扱うようにした |
+| JWKS の `n`・`kid` を、JWKS 以外の JSON でも伏せていた（伏せすぎ） | `keys` の配列の中だけで伏せるようにした |
+| 認証のない introspect のテストが、エラーの応答に出ないトークンのために認可コードフローを一通り流していた | 適当な文字列（`SecureRandom.hex`）を渡すようにした。スナップショットは変わらない |
+| TIPS.md の作り直しの手順が `git diff -- test/snapshots` だけで、新しいファイル（未追跡）が見えない | `git status --short` も見るように直した |
+| `/oauth/applications` は `created_at` の順に並べるが、fixtures の 3 つのアプリの `created_at` が同じで、並びが DB に任されていた（sqlite3 2.x などで変わりうる） | 人間に、①fixtures に固定の `created_at` を書く、②変えずに申し送る、を示し、①に決まった。seeds と同じ順に 1 秒ずつずらした時刻を書いた。fixtures の `created_at` を使うほかのテストはない。my_op の時刻を一時的に後ろにずらすと、このスナップショットが落ちることを確かめた |
+| 同じ内容のヘルパーを 3 アプリにコピーしていて、手での `diff` でしか同じことを確かめていない | 人間に、CI に `diff` のステップを足す・何もしない・リポジトリ直下のファイルを `require_relative` で読む、を示し、CI に足すことに決まった。`rails` ジョブの RuboCop の後に、自分のヘルパーをほかのアプリのものと `diff -u` で比べるステップを足した。ワークフローのそのステップのスクリプトを手元で各アプリのディレクトリで流し、3 つが同じなら通り、1 つを変えると 3 アプリとも落ち、1 つを消すとそのアプリが落ちることを確かめた |
+
+コードレビューの後も、3 アプリの minitest を seed を変えて 2 回と `CI=1` で流して 0 failures（件数は上と同じ）、主な壊したときの確認（OP の `SameSite`・`<link>` の `media`）で前と同じ件数が落ちること、RuboCop・E2E（10 passed）・安全チェックが通ることを確かめた。
