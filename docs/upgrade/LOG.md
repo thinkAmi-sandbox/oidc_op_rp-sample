@@ -1370,6 +1370,8 @@ PR #22 の最初の実行（head は `docs: record the code review of step 1-b-1
 - E2E: 10 passed
 - 安全チェック: 追跡中の全ファイルと、PR の 8 コミットのメッセージ
 
+PR #22 の最後の実行（head は `docs: link the step 1-b-1 pull request and record its CI run` のコミット。PR の 9 コミット）も、6 ジョブとも通り、minitest・E2E の件数は上と同じだった（Step 1-b-2 の着手時に確かめた）。
+
 ### コードレビュー（`/code-review`）
 
 | 指摘 | 対応 |
