@@ -33,6 +33,8 @@
 | DEF-7.0-23 | `active_storage.multiple_file_field_include_hidden = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
 | DEF-7.0-24 | `action_dispatch.return_only_request_media_type_on_content_type = false` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
 | DEF-7.0-25 | `active_record.automatic_scope_inversing = true` | `load_defaults`（グループ 1） | 3 アプリ | 追随 |
+| DEF-7.0-26 | `active_support.executor_around_test_case = true` | `load_defaults`（グループ 2） | 3 アプリ | 追随 |
+| DEF-7.0-27 | `active_record.verify_foreign_keys_for_fixtures = true` | `load_defaults`（グループ 2） | 3 アプリ | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -192,9 +194,9 @@
 
 ## `load_defaults`（`new_framework_defaults_7_0.rb`）
 
-グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
+グループ 1 は、3 アプリとも該当の処理を通らないか、既に同じ値のもの。グループ 2 は、テストのときだけ効くもの。どのグループも、有効にする前後で、`bin/rails runner`（test 環境）から実際の値と、関連の `inverse_of` を書き出して比べた。値を読む前に `ActionView::Base` などのクラスを読み込む（`on_load` の中で値が入る設定があるため）。
 
-RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`initialize!` より前に `ActiveRecord::Base` と `ActionDispatch::Request` を読み込む。そのため、`new_framework_defaults_7_0.rb` に書いた設定のうち、`on_load(:active_record)`・`on_load(:action_dispatch_request)` で入るもの（DEF-7.0-24・25）は RP では効かず、`load_defaults 7.0` にしたときに効く。
+RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session.serializer = :json` が、`initialize!` より前に `ActiveRecord::Base` と `ActionDispatch::Request` を読み込む。そのため、`new_framework_defaults_7_0.rb` に書いた設定のうち、`on_load(:active_record)`・`on_load(:action_dispatch_request)` で入るものと、`activerecord-7.0.10/lib/active_record/railtie.rb` の `active_record.set_configs` が `ActiveRecord` に写すもの（DEF-7.0-24・25・27）は RP では効かず、`load_defaults 7.0` にしたときに効く。
 
 ### DEF-7.0-16: `action_dispatch.cookies_serializer = :json`
 
@@ -294,4 +296,24 @@ RP は `config/application.rb` の末尾の `ActiveRecord::SessionStore::Session
 - 3 アプリへの影響: 推定された `inverse_of` は、3 アプリのモデル（OP の doorkeeper のモデルを含む）で前後とも同じ。doorkeeper の scope 付きの関連は `foreign_key:` を指定していて、推定の対象外（`doorkeeper-5.7.1/lib/doorkeeper/orm/active_record/mixins/application.rb`）
 - 扱い: 追随
 - 出典: [rails/rails#43358](https://github.com/rails/rails/pull/43358)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.30 `config.active_record.automatic_scope_inversing`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-26: `active_support.executor_around_test_case = true`
+
+- 種類: `load_defaults`（グループ 2）/ 対象: 3 アプリ
+- 何が変わるか: `ActiveSupport::TestCase` に include されるものが、`ActiveSupport::CurrentAttributes::TestHelper`・`ActiveSupport::ExecutionContext::TestHelper` から `ActiveSupport::Executor::TestHelper` に替わる。テストケースごとに `Rails.application.executor.wrap` で包まれ、テストの中でも Active Record のクエリキャッシュが有効になる。`ActionController::TestCase.executor_around_each_request` も `nil` → `true`
+- なぜ: テストを、実際のリクエストやジョブに近い条件で動かすため。本番ではリクエストごとに executor が走ってクエリキャッシュなどが有効になるが、6.1 の既定ではテストの中で無効だった
+- 3 アプリへの影響: テストのときだけで、development・production は変わらない。同じテストの中で 2 回読んだ値がキャッシュされることがあるが、今のテストは、リクエストの前後で件数などを読む書き方（RP の `assert_difference 'OpUser.count'`、OP の `Doorkeeper::AccessGrant.last` など）も含めて、すべて同じ結果で通った（書き込みのたびにキャッシュが消える）。新しくテストを書くときは、このキャッシュがある前提になる
+- 扱い: 追随
+- 出典: [rails/rails#43550](https://github.com/rails/rails/pull/43550)、`activesupport-7.0.10/lib/active_support/railtie.rb` の `on_load(:active_support_test_case)`、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.14.17 `config.active_support.executor_around_test_case`」
+- コミット: （コミット後に記入）
+
+### DEF-7.0-27: `active_record.verify_foreign_keys_for_fixtures = true`
+
+- 種類: `load_defaults`（グループ 2）/ 対象: 3 アプリ
+- 何が変わるか: fixtures を入れた後に、外部キーの制約に違反していないかを確かめ、違反があればテストを失敗させる。RS・OP は `ActiveRecord.verify_foreign_keys_for_fixtures` が `false` → `true`。RP は変わらない（この節の冒頭）
+- なぜ: SQLite・PostgreSQL などは、fixtures を入れる間は外部キーの検査を止めているので、壊れた fixtures でもテストが動いてしまう。入れた後に確かめて、早く気づけるようにする
+- 3 アプリへの影響: fixtures があるのは OP だけ（`oauth_applications.yml`・`users.yml`）で、違反はなく、テストは通った。RP には fixtures がない
+- 扱い: 追随
+- 出典: [rails/rails#42674](https://github.com/rails/rails/pull/42674)、[設定ガイド v7.0](https://railsguides.jp/v7.0/configuring.html)「3.8.35 `config.active_record.verify_foreign_keys_for_fixtures`」
 - コミット: （コミット後に記入）
