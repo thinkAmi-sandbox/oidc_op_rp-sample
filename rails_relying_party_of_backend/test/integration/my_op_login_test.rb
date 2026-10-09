@@ -18,6 +18,19 @@ class MyOpLoginTest < ActionDispatch::IntegrationTest
     assert_predicate authorization['nonce'], :present?
   end
 
+  # test 環境では allow_forgery_protection が false なので、このテストの中だけ有効にする。
+  # トークンの確認は omniauth-rails_csrf_protection（OmniAuth の request_validation_phase）が行う
+  test 'CSRF のトークンのないログインの POST は、OP へリダイレクトせず /auth/failure へリダイレクトする' do
+    original = ActionController::Base.allow_forgery_protection
+    ActionController::Base.allow_forgery_protection = true
+
+    post '/auth/my_op'
+
+    assert_redirected_to '/auth/failure?message=ActionController%3A%3AInvalidAuthenticityToken&strategy=my_op'
+  ensure
+    ActionController::Base.allow_forgery_protection = original
+  end
+
   test 'トークン要求に、認可要求の code_challenge に対応する code_verifier を付ける' do
     authorization = request_authorization('my_op')
     stub_op(id_token: id_token_for(authorization))
