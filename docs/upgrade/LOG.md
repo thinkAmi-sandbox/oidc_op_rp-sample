@@ -1388,3 +1388,71 @@ gem の initializer の位置を変えたときの確かめ方: scratchpad の�
 - 検査は、OP の test で 217 個中 148 番目（アプリの `load_config_initializers` の直後）に移った。最初は `@after` を差し替えて位置が変わらず、Rails 7.0 の `Rails::Initializable::Initializer` が `before`・`after` を `@options` に持つと分かってやり直した
 - 3 アプリとも、test・development で終了コード 0
 - OP の `config/initializers/` に `ActionController::Base` だけを書いた一時ファイルを置くと、終了コード 1（`on_load(:action_controller_base)`、疑わしい行は一時ファイルの 1 行目）。`ActionDispatch::Request` は終了コード 0。一時ファイルは消した
+
+## Step 1-b-2: 3 アプリの応答のスナップショットのテスト（2026-10-09）
+
+- ブランチ / PR: `upgrade/step1b-response-snapshot` / （PR 作成後に記入）
+- バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。gem の追加・更新はない
+
+### 作業計画で決めたこと
+
+Step 1 で使い捨ての統合テストで行った応答の前後比較を、毎回の minitest と CI で流れるスナップショットのテストにすると、人間が決めた。着手時に PLAN.md 8 章の手順で調べ、作業計画を出して承認を得た。調べたことと決めたことの一覧は PLAN.md の Step 1-b-2 の節に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 番号 | この作業を 1-b-2 とし、周辺 gem を 1-b-3 に移す | 1-b-1 と同じく、周辺 gem の更新で起きる変化を捉えるための下準備。Step 1-b-1 の節の「1-b-2（周辺 gem）」は当時の記録なので直さない |
+| 対象の応答 | Step 1 の書き出し（OP 20・RP 5・RS 2）に足して、RS 3・RP 11・OP 26 | 足したのは、使っている経路のうち Step 1 で書き出していなかったもの（RS の `active: false`、RP の introspection 用 RP の流れと ID トークンの検証の失敗、OP のログイン成功・ユーザー登録画面・クライアントクレデンシャル・revoke の後の introspect・同意画面を省く認可要求）と、アプリが上書きしている doorkeeper の管理画面のビュー（`/oauth/applications`） |
+| 伏せ方 | ヘッダー名・パラメーター名・hidden field の名前・JSON のキーで決める。時刻は `travel_to` で固定して比べる | Step 1 の道具は正規表現で `client_id`・`sub`・時刻まで伏せていた。伏せすぎると変化を見逃す |
+| 更新 | `UPDATE_SNAPSHOTS=1`。ファイルがなければ失敗する | E2E のスナップショットの扱い（`--update-snapshots`、黙って作らない）にそろえる |
+| development だけの差 | 扱わない | 開発用の道具が足すヘッダーで、業務的な挙動ではない。Rails を上げる Step で `curl` で見る |
+| CI | 変えない | 既存の `bin/rails test` と、追跡中の全ファイルの安全チェックの対象に入る |
+
+### 作業計画からの変更点
+
+- OP のテストを 1 つのファイルにすると、26 テストで RuboCop の `Metrics/ClassLength`（136 行。上限 100）になった。`rubocop:disable` は付けず、既存の OP の統合テストと同じく領域ごとに 4 つのファイル（`response_snapshot_discovery_test.rb`・`_devise_`・`_authorization_`・`_token_`）に分けた。RS・RP は計画どおり `response_snapshot_test.rb` の 1 つ
+- `travel_to` は、時刻が応答に出る OP のトークン系のテスト（`response_snapshot_token_test.rb`）だけに付けた。ほかの応答には時刻が出ない
+- 計画では OP のテストから渡す nonce を固定値にするとしていたが、hidden field とクエリの `nonce` は名前で伏せるので、既存のヘルパーと同じく `SecureRandom` のままにした。RP の introspection 用 RP のコールバックの後の画面に flash で出るアクセストークンは、計画どおりテストの定数（固定のダミーの文字列）にして伏せていない
+
+### 伏せた値
+
+| 置き換え | 何を伏せたか | 件数（RS / RP / OP） |
+|---|---|---|
+| `<REQUEST_ID>`・`<RUNTIME>` | `X-Request-Id`・`X-Runtime` の値 | 3 / 11 / 26 ずつ |
+| `<CONTENT_LENGTH>`・`<ETAG>` | 本文から決まるヘッダーの値（ヘッダーがあるかどうかは比べる） | 3・1 / 11・4 / 26・16 |
+| `<COOKIE>` | `Set-Cookie` の値（名前と属性は比べる） | 0 / 4 / 12 |
+| `<STATE>`・`<NONCE>`・`<CODE_CHALLENGE>` | omniauth の認可要求のクエリ、OP の同意画面の hidden field | 0 / 4 ずつ / 0・2・2 |
+| `<AUTH_CODE>` | doorkeeper の認可コード（Location・本文のリンク・form_post の hidden field） | 0 / 0 / 5 |
+| `<ACCESS_TOKEN:string>`・`<ID_TOKEN:string>` | トークン応答の値 | 0 / 0 / 2・1 |
+| `<MODULUS:string>`・`<KID:string>` | JWKS の `n`・`kid`（署名鍵は手元と CI で違う） | 0 / 0 / 1 ずつ |
+
+伏せていないもの: トークン応答の `created_at`・`expires_in`、introspect の `exp`・`iat`（`travel_to` で固定）、`client_id`（fixtures・`.env.test` の固定のダミー）、userinfo の `sub`（fixtures のラベルから決まる ID）、Location の `redirect_uri`・`scope`・`code_challenge_method`、ヘッダーのほかの値。
+
+### 実行ごとに同じになることの確認
+
+- 3 アプリとも、`UPDATE_SNAPSHOTS=1` で作った後、seed を変えて 2〜3 回と `CI=1`（eager load あり）で流して 0 failures。もう一度 `UPDATE_SNAPSHOTS=1` で作り直して、前のファイルと `diff -r` で同じだった
+- `/oauth/applications` は fixtures の作成時刻が同じで、並びは doorkeeper の `ordered_by(:created_at)` の同順の扱いに任される。手元では毎回同じ並び（ID の順）だった。CI でも同じかは PR の CI で確かめる
+- トークン・JWT の形の値（`eyJ` と 32 文字以上の英数字）は、ヘッダー名（`x-permitted-cross-domain-policies`）にしか当たらなかった
+
+### 壊したときの確認
+
+手元で一時的に設定やコードを変えてスナップショットのテストを流し、確かめた後で戻した（`git diff` が空なことを確かめた）。
+
+| アプリ | 一時的な変更 | 結果 |
+|---|---|---|
+| RS | `config/environments/test.rb` で `default_headers` の `X-XSS-Protection` を `1; mode=block` に | 3 件とも失敗（`x-xss-protection` の行の差分） |
+| RS | スナップショットを 1 つ消す | 環境変数なしでは「スナップショット … がない」で失敗。`UPDATE_SNAPSHOTS=1` で前と同じ内容に作り直された |
+| RP | レイアウトの `stylesheet_link_tag` から `media: 'all'` を外す | `<link>` を出す 4 件が失敗 |
+| RP | 独自ストラテジーの `scope` を `openid profile` に | 認可要求の 1 件が失敗（Location を伏せすぎていない） |
+| OP | `button_to_generates_button_tag = false` | `/users/edit` の 1 件が失敗（`<button>` → `<input>`） |
+| OP | `apply_stylesheet_media_default = true` | doorkeeper のレイアウトを使う 4 件（同意画面・エラー画面・form_post・管理画面）が失敗 |
+| OP | `access_token_expires_in` を 11 分に | トークン応答 2 件と introspect の 1 件が失敗（`expires_in`・`exp` を伏せていない） |
+| OP | `cookies_same_site_protection = :strict` | `Set-Cookie` のある 12 件が失敗（Cookie の属性を伏せていない） |
+
+### 確認結果
+
+- minitest: RS 8 → 11 runs・RP 20 → 31 runs・OP 25 → 51 runs、0 failures。`CI=1` でも同じ件数で通る。アプリごとのコミットの前に流した
+- E2E: アプリごとのコミットの前に流して 10 passed。スナップショットの差分なし
+- RuboCop: 3 アプリとも `no offenses detected`。bundler-audit: `No vulnerabilities found`。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test・development で `✅Congratulations!`。`bin/rails runner` は 3 アプリとも 7.0.10
+- 安全チェック: スナップショットのファイル・ヘルパー・テストを `--files` で、コミットのたびに hooks で検査して通った。`.public-safety-allow` への追記はない
+- 3 つのヘルパー（`test/support/response_snapshot_helper.rb`）が同じ内容なことを `diff` で確かめた
+- 手動確認用の環境: 作業の前と後で、9 ファイル（3 アプリの development DB、OP の署名鍵、RP・RS の `.env`、3 アプリの `tmp/development_secret.txt`）のハッシュが同じだった

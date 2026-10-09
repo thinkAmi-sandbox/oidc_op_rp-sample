@@ -388,9 +388,9 @@ Step 1 で、RP の `config/application.rb` の serializer の設定が起動の
 
 Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・本文）を使い捨ての統合テストで書き出し、前後で diff して Rails の既定値への追随（DEF-7.0-15・33〜35）を見つけた。この比べ方を、毎回の minitest と CI で流れるスナップショットのテストにする。PR のスナップショットの差分を、既定値への追随の解説の根拠にし、1-b-3（doorkeeper 5.8 で `Pragma` が戻るなど）や仕上げの Dependabot の更新でも変化に気づけるようにするため。アプリのコードと設定は変えない。
 
-- [ ] 3 アプリに `test/integration/response_snapshot_test.rb`（1 テスト 1 応答）、伏せる処理の `test/support/response_snapshot_helper.rb`（3 アプリで同じ内容）、スナップショットの `test/snapshots/responses/<名前>.txt` を足す（RS → RP → OP の順に、アプリごとのコミット）
-- [ ] 実行ごとに同じになること（seed を変えて 2 回、`CI=1`）と、わざと壊すと落ちることを確かめる（確かめた後で戻す）
-- [ ] 更新の方法と扱いを TIPS.md・CLAUDE.md に書く
+- [x] 3 アプリに `test/integration/response_snapshot_test.rb`（1 テスト 1 応答。OP は RuboCop の `Metrics/ClassLength` のため、領域ごとに `response_snapshot_<領域>_test.rb` の 4 つに分けた）、伏せる処理の `test/support/response_snapshot_helper.rb`（3 アプリで同じ内容）、スナップショットの `test/snapshots/responses/<名前>.txt` を足す（RS → RP → OP の順に、アプリごとのコミット）
+- [x] 実行ごとに同じになること（seed を変えて 2 回、`CI=1`）と、わざと壊すと落ちることを確かめる（確かめた後で戻す）
+- [x] 更新の方法と扱いを TIPS.md・CLAUDE.md に書く
 - 着手時の作業計画で決めたこと（人間が承認）
   - 番号: この作業を 1-b-2 とし、周辺 gem を 1-b-3 に移す。ブランチは `upgrade/step1b-response-snapshot`
   - 対象の応答: Step 1 の書き出し（OP 20・RP 5・RS 2）に足して、RS 3・RP 11・OP 26。足すのは、RS の introspect が `active: false` の 401、RP の introspection 用の画面・認可要求・コールバック・コールバックの後の画面・ID トークンの検証に失敗したコールバック・`/auth/failure`、OP のログイン成功・`/users/sign_up`・クライアントクレデンシャルのトークン・revoke の後の introspect・同意画面を省く認可要求・`/oauth/applications`。`/oauth/authorized_applications`（fixtures の作成時刻を表示する）と `/oauth/applications/:id`（client secret を表示する）、使っていない経路は足さない
