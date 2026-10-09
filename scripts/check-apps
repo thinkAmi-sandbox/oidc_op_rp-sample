@@ -46,6 +46,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$run_rails" -eq 0 ] && [ "$run_e2e" -eq 0 ]; then
+  echo "--no-e2e と --e2e-only は一緒に使えない" >&2
+  exit 2
+fi
+
 if [ ${#apps[@]} -eq 0 ]; then
   apps=(rails_resource_server rails_relying_party_of_backend rails_open_id_provider)
 fi
@@ -86,8 +91,17 @@ check() {
 # 無視リストを空にして bundler-audit を流し、無視リスト（.bundler-audit.yml）にあるのに報告されない ID
 # （gem を上げて解消したもの）があれば失敗にする。カレントディレクトリはアプリ
 stale_ignores() {
-  local reported stale
-  reported="$(mise exec -- bundle exec bundle-audit check --config "$empty_audit_config" | sed -n -E 's/^(CVE|GHSA): //p' | sort -u)"
+  local output reported stale
+  output="$(mise exec -- bundle exec bundle-audit check --config "$empty_audit_config" 2>&1)"
+  # advisory が見つかると終了コード 1 になるので、終了コードでは失敗を見分けられない。
+  # 結果の行がなければ bundle-audit 自体が失敗した（advisory のデータベースがないなど）とみなす。
+  # そのまま比べると、無視リストの ID がすべて「報告されない」と出てしまう
+  if ! echo "$output" | grep -qE '^(Vulnerabilities found!|No vulnerabilities found)'; then
+    echo "bundle-audit の結果を読めなかった:"
+    echo "$output"
+    return 1
+  fi
+  reported="$(echo "$output" | sed -n -E 's/^(CVE|GHSA): //p' | sort -u)"
   stale="$(sed -n -E 's/^ *- ([A-Za-z0-9-]+).*/\1/p' .bundler-audit.yml | sort -u | comm -23 - <(echo "$reported"))"
   if [ -n "$stale" ]; then
     echo "無視リストにあるが、報告されない ID（無視リストから消す）:"
