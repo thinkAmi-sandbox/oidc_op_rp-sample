@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2021_08_13_014029) do
+ActiveRecord::Schema[6.1].define(version: 2021_08_13_014029) do
 
   create_table "op_users", force: :cascade do |t|
     t.string "provider"
