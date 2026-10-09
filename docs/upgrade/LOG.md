@@ -1391,7 +1391,7 @@ gem の initializer の位置を変えたときの確かめ方: scratchpad の�
 
 ## Step 1-b-2: 3 アプリの応答のスナップショットのテスト（2026-10-09）
 
-- ブランチ / PR: `upgrade/step1b-response-snapshot` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step1b-response-snapshot` / [#23](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/23)
 - バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。gem の追加・更新はない
 
 ### 作業計画で決めたこと
