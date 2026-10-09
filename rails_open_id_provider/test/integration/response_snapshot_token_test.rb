@@ -67,9 +67,7 @@ class ResponseSnapshotTokenTest < ActionDispatch::IntegrationTest
   end
 
   test '認証のない introspect の応答' do
-    access_token = issue_tokens['access_token']
-
-    post oauth_introspect_path, params: { token: access_token }
+    post oauth_introspect_path, params: { token: SecureRandom.hex(16) }
 
     assert_response_snapshot 'introspect_error'
   end

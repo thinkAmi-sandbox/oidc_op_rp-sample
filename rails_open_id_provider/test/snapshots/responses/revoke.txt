@@ -12,5 +12,4 @@ x-request-id: <REQUEST_ID>
 x-runtime: <RUNTIME>
 x-xss-protection: 0
 
-{
-}
+{}
