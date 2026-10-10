@@ -110,11 +110,12 @@ GEM
       responders
       warden (~> 1.2.3)
     docile (1.4.1)
-    doorkeeper (5.7.1)
+    doorkeeper (5.9.9)
       railties (>= 5)
-    doorkeeper-openid_connect (1.8.9)
-      doorkeeper (>= 5.5, < 5.8)
+    doorkeeper-openid_connect (1.10.1)
+      doorkeeper (>= 5.5, < 6.0)
       jwt (>= 2.5)
+      ostruct (>= 0.5)
     drb (2.1.0)
       ruby2_keywords
     erubi (1.10.0)
@@ -164,6 +165,7 @@ GEM
     nokogiri (1.18.10-x86_64-linux-gnu)
       racc (~> 1.4)
     orm_adapter (0.5.0)
+    ostruct (0.5.2)
     parallel (1.28.0)
     parser (3.3.12.0)
       ast (~> 2.4.1)

@@ -1,9 +1,9 @@
-HTTP 200
-cache-control: max-age=0, private, must-revalidate
+HTTP 403
+cache-control: no-store
 content-length: <CONTENT_LENGTH>
-content-type: application/json; charset=utf-8
-etag: <ETAG>
+content-type: text/html
 referrer-policy: strict-origin-when-cross-origin
+www-authenticate: Bearer realm="Doorkeeper", error="insufficient_scope", error_description="Access to this resource requires scope _openid_."
 x-content-type-options: nosniff
 x-download-options: noopen
 x-frame-options: SAMEORIGIN
@@ -12,7 +12,4 @@ x-request-id: <REQUEST_ID>
 x-runtime: <RUNTIME>
 x-xss-protection: 0
 
-{
-  "email": "user@example.com",
-  "sub": "227792459"
-}
+

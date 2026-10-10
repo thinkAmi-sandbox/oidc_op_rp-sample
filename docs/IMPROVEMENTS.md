@@ -23,9 +23,10 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 | IMP-005 | トークン要求の `redirect_uri` からコールバックのクエリを外す | RP | 挙動の変更 | 未着手 |
 | IMP-006 | 独自ストラテジーの `site` を OP のベース URL に直す | RP | コードの整理 | 未着手 |
 | IMP-007 | introspect 用のトークンを使い回す | RS | 性能 | 未着手 |
-| IMP-008 | 上書きしている doorkeeper のビューを新しい雛形に合わせる | OP | コードの整理 | 未着手 |
+| IMP-008 | 上書きしている doorkeeper のビューを新しい雛形に合わせる | OP | コードの整理 | 済み（Step 1-b-3-2） |
 | IMP-009 | 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する | RP・OP | コードの整理 | 未着手 |
 | IMP-010 | OP のレイアウトに flash（ログイン失敗などのメッセージ）を出す | OP | 挙動の変更 | 未着手 |
+| IMP-011 | `max_age` の判定に `auth_time_from_session` を使う | OP | セキュリティの設定 | 未着手 |
 
 ## IMP-001: PKCE を必須にし、S256 だけを受け付ける
 
@@ -109,6 +110,7 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: 同意画面などの HTML が変わる。アップグレード中は挙動を変えない
 - 確かめ方: OP のテスト（同意画面、form_post、エラー画面、同意の拒否）と E2E のログイン
 - 記録した Step: 0-f-3
+- 対応: アップグレード中は行わない予定だったが、Step 1-b-3 で gem の generator の雛形にも追随すると決めた（PLAN.md の 3 章の 2 の境目の 1）ので、Step 1-b-3-2 で doorkeeper 5.9.9 の雛形に合わせた（docs/upgrade/defaults/rails-7.0.md の DEF-7.0-45）。nonce の hidden field は残した。拒否を `response_mode=form_post` で返すと落ちていた経路が動くようになった（LOG.md の Step 1-b-3-2「意図的な仕様変更」）
 
 ## IMP-009: 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する
 
@@ -131,3 +133,13 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: 画面に出る文字が変わる。アップグレード中は挙動を変えない
 - 確かめ方: 応答のスナップショット（`users_sign_in_failure`・`users_sign_in_success` の後の画面など）を作り直して差分を見る。`user_sign_in_test.rb` は `flash[:alert]` の値を確かめている。E2E のログイン
 - 記録した Step: 1-b-3
+
+## IMP-011: `max_age` の判定に `auth_time_from_session` を使う
+
+- 対象: `rails_open_id_provider/config/initializers/doorkeeper_openid_connect.rb`
+- 現状: `auth_time_from_resource_owner` のブロックは値を返さない。そのため、`max_age` を付けた認可要求は、値によらず毎回再認証になる（`max_age=0` は doorkeeper-openid_connect 1.8.11 から。`prompt=none` と組み合わせると 1.10.0 から `login_required`）。1.10.x は、`max_age` を付けた要求があると、`auth_time_from_resource_owner` の非推奨の警告を `Kernel#warn` で 1 回出す（`doorkeeper-openid_connect-1.10.1/lib/doorkeeper/openid_connect/helpers/controller.rb`）。ID トークンに `auth_time` は出ない
+- 改善案: ログインした時刻をセッションに入れ、`auth_time_from_session` で返して、`max_age` を正しく判定させる（1.10.0 の #271。同じユーザーの複数のセッションを区別できない問題への対応）。ID トークンに `auth_time` を出すかどうかもあわせて決める
+- 経緯: LOG.md の Step 1-b-3-2「意図的な仕様変更」。`prompt`・`max_age` の応答のスナップショットを足したときに、警告と毎回の再認証を確かめた
+- 見送った理由: RP は `max_age` を送らない。ID トークンの項目も変わるので、アップグレード中は挙動を変えない
+- 確かめ方: `rails_open_id_provider/test/integration/response_snapshot_authorization_prompt_test.rb` の `max_age` のスナップショット、ID トークンのテスト（`authorization_code_flow_test.rb`）、E2E のログイン
+- 記録した Step: 1-b-3-2

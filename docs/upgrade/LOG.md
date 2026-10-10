@@ -1053,6 +1053,7 @@ OP の gem を 1 つずつ上げ、そのたびにコミットした。RS・RP �
 
 - discovery と userinfo のコントローラーの基底が `Doorkeeper::ApplicationController` から `ApplicationMetalController` に変わった（doorkeeper-openid_connect 1.8.2 #170）が、ヘッダーと Cookie に違いはない
 - `Pragma` が消えた後も、RP・RS を通す E2E と手動確認は通る
+- 追記（Step 1-b-3-2）: トークン要求の成功の応答の `Pragma: no-cache` は、doorkeeper 5.8.0（#1712）で戻った。エラーの応答には戻っていない。Step 1 で「挙動を変えない」の定義（PLAN.md の 3 章の 2）を決めた後なので、1-b-3-2 では、戻ることを記録だけにせず「意図的な仕様変更」として扱った（下の Step 1-b-3-2「意図的な仕様変更」の「`Pragma` の扱いの経緯」）
 
 ### ビュー・ロケールの比較
 
@@ -1477,7 +1478,7 @@ Step 1 で使い捨ての統合テストで行った応答の前後比較を、�
 
 ## Step 1-b-3-1: Rails 7.0 を必要とする周辺 gem（RP の gem・jbuilder・devise）（2026-10-09）
 
-- ブランチ / PR: `upgrade/step1b-rails70-gems` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step1b-rails70-gems` / [#24](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/24)
 - バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。jbuilder 2.13.0 → 2.15.1（RP・OP）、activerecord-session_store 2.1.0 → 2.2.0・omniauth-rails_csrf_protection 1.0.0 → 1.0.2（RP）、devise 4.9.4 → 5.0.4（OP）
 - 追随した gem の既定値・雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 1-b-3）」に記録した（DEF-7.0-38〜42）
 
@@ -1569,3 +1570,139 @@ devise を上げ、initializer を雛形に合わせた後に、`.claude/launch.
 
 コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通ることを確かめた。
 
+## Step 1-b-3-2: Rails 7.0 を必要とする周辺 gem（doorkeeper 系）（2026-10-09〜2026-10-10）
+
+- ブランチ / PR: `upgrade/step1b-doorkeeper` / （PR 作成後に記入）
+- バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。OP の doorkeeper-openid_connect 1.8.9 → 1.8.11 → 1.10.1、doorkeeper 5.7.1 → 5.8.2 → 5.9.9。ostruct 0.5.2（一時固定）が lock に入った
+- 追随した gem の雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 1-b-3）」に記録した（DEF-7.0-43〜47）
+
+### 作業計画で決めたこと
+
+着手時に PLAN.md 8 章の手順で確かめ直し（サブエージェント 3 つ: doorkeeper 5.7.1 → 5.9.9、doorkeeper-openid_connect 1.8.9 → 1.10.1、アプリの使い方とテストの範囲）、作業計画を出して承認を得た。確かめたことと決めたことの一覧は PLAN.md の Step 1-b-3 の節（「1-b-3-2 の着手時に確かめ直したこと」以下）に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版と順番 | 1-b-3-1 の作業計画のまま（doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9）。どの段も 1 gem だけを動かす | 新しい版は Ruby 3.2 以上かプレリリースだけ。lock のコピーで、どの段も 1 gem だけが動くことを確かめた |
+| advisory | GHSA-8r7r-wh7x-27ff（doorkeeper-openid_connect `<= 1.10.3`。DCR の scope）は、DCR を有効にしていないので影響しない。修正版の 1.10.4 は Ruby 3.2 以上なので Step 2 の後 | DCR は既定で無効で、ルートも有効にしたときだけ足される |
+| 先に足すテスト | クライアント認証（Basic だけ、Basic と本文の両方、Basic と別の `client_id`）、userinfo のトークンの渡し方（`access_token` 引数だけ、Bearer ヘッダーと引数の両方、scope の足りないトークン）、`prompt`・`max_age`、Webfinger、form_post での拒否 | 段ごとの変化をスナップショットの差分で見るため。Webfinger と form_post での拒否は、今は例外になるので `assert_raises` で記録した |
+| B の扱い | 段ごとに止まり、スナップショットの差分を根拠に 1 つずつ人間に確かめる | CLAUDE.md の「アップグレードのルール」 |
+| 雛形への追随 | gem をすべて上げた後に、initializer（doorkeeper・doorkeeper-openid_connect）→ ロケールとビュー（1 コミット）の順に行う。独自の設定と nonce の hidden field は残す | 5.9.1 で `:` がビューからロケールに移ったので、ロケールとビューを別のコミットにすると、どちらかのコミットで表示が崩れる |
+| 手動確認 | 雛形に合わせた後に 1 回（introspection の流れまで） | 1-b-3-1 の作業計画のまま |
+
+### 作業計画からの変更点
+
+- 応答のスナップショットのヘルパー（`test/support/response_snapshot_helper.rb`）を、3 アプリで直した（人間が承認）。doorkeeper-openid_connect は OIDC のエラーをリダイレクトで返すとき、エラー応答のヘッダー（`Content-Type: application/json`・`WWW-Authenticate`・`Cache-Control: no-store`）を足したまま `redirect_to` するので、302 の本文は Rails のリダイレクトの HTML なのに `application/json` を名乗る。ヘルパーは `Content-Type` で JSON かどうかを決めて `JSON.parse` していたので、1.10.1 で `prompt=select_account` などがこの経路を通るようになると、比べる前に落ちた。JSON として読めない本文はテキストとして扱うようにした（下の「OIDC のエラーのリダイレクトのヘッダー」。コードレビューの後に、リダイレクトの応答だけに絞った）。1.10.1 の lock の変更を退避し、1.8.11・5.8.2 の状態で 3 アプリの検査と E2E を流してからコミットした
+- 先に足した例外のテスト 2 本は、変化を起こしたコミットで置き換えた。Webfinger は 1.10.1 のコミットでスナップショット `webfinger` に、form_post での拒否はロケールとビューのコミットで、フォームを返すテストとスナップショット `authorize_form_post_deny` に
+- 既存のテスト「登録されていない redirect_uri では、エラーの説明を 400 で表示する」を、前後の空白を除いて比べるように直した。雛形のエラー画面は `<pre>` の中で説明の前後を改行・字下げするので、`assert_select` の `text:` では一致しない（DEF-7.0-45）
+- 残した nonce の hidden field にも、雛形にならって `id: nil` を付けた（DEF-7.0-45）
+- doorkeeper のロケールで画面と introspect のエラーの文言が変わることは、計画では A としていた。画面の文字は B の例に挙がっているので、あらためて確かめ、A として追随すると人間が決めた（DEF-7.0-46）
+- 手動確認の後に、IMP-011（`max_age` の判定に `auth_time_from_session` を使う）を docs/IMPROVEMENTS.md に足した（人間が承認）
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| doorkeeper-openid_connect | 1.8.9 → 1.8.11 | 一時固定（固定しないと 1.10.1 になり、doorkeeper 5.7 で discovery が壊れる）。依存の ostruct も 0.5.2（Ruby 3.1.7 の default gem）に一時固定した。ostruct はダウンロードされず、default gem が使われる |
+| doorkeeper | 5.7.1 → 5.8.2 | 固定不要（1.8.11 が `< 5.9`） |
+| doorkeeper-openid_connect | 1.8.11 → 1.10.1 | 固定不要（Ruby 3.1 で使える最新） |
+| doorkeeper | 5.8.2 → 5.9.9 | 固定不要（1.10.1 が `< 6.0`、6.0 はプレリリースだけ）。GHSA-h5m9-42h9-vcq6（revoke の認可の不備。5.9.1 で修正）を解消した。ruby-advisory-db にない advisory なので、無視リストの変更はない |
+
+- 一時固定は過去の Step と同じく、Gemfile に版を足して `bundle install` → 外して `bundle lock --local` → Gemfile が戻り、lock に固定した版が残ることを確かめた
+- ダウンロードした `.gem`（doorkeeper-openid_connect 1.8.11・1.10.1、doorkeeper 5.8.2・5.9.9）の SHA-256 が、rubygems.org の値と同じことを確かめた
+- epic と比べて OP の lock で変わったのは、doorkeeper・doorkeeper-openid_connect の版と依存の行、ostruct 0.5.2 の行だけ。lock に入れた default gem（json 2.6.1・bigdecimal 3.1.1・logger 1.5.0・base64 0.1.1）、Step 1 の一時固定（benchmark・securerandom・drb・mutex_m・ruby2_keywords）、jwt 2.10.3 は動いていない。Gemfile は変えていない
+
+### 意図的な仕様変更
+
+どれも gem の更新か雛形への追随に伴うもので、設定では元に戻せない。RP・RS は使わない経路か、値の変わらないもの。段ごとに人間に確かめた。
+
+| 変化 | 前 | 後 | 版 | 確かめ方 |
+|---|---|---|---|---|
+| 認可要求の `max_age=0` | 同意画面（200） | ログアウトさせてログイン画面へ（302） | doorkeeper-openid_connect 1.8.11（#222） | スナップショット `authorize_max_age_zero` |
+| トークン要求の成功の応答の `Pragma: no-cache` | なし | あり | doorkeeper 5.8.0（#1712） | スナップショット `token_*` の 5 件 |
+| 認証のない introspect の `error_description` | `invalid_request.unknown` の文言 | `invalid_request.request_not_authorized` の文言（ロケールを合わせた後は、その 5.9.9 の文言） | doorkeeper 5.8.0（#1715） | スナップショット `introspect_error` |
+| userinfo の JSON のキーの順 | `sub, email` | `email, sub` | doorkeeper-openid_connect 1.10.0（#273） | スナップショット `userinfo` ほか 2 件 |
+| Webfinger | `NoMethodError`（`root_url`。OP に `root` のルートがない） | 200（`href` は issuer） | doorkeeper-openid_connect 1.10.0（#250） | スナップショット `webfinger` |
+| 認可要求の `prompt=select_account` | 同意画面 | `account_selection_required` のエラーのリダイレクト | doorkeeper-openid_connect 1.10.0（#279） | スナップショット `authorize_prompt_select_account` |
+| 認可要求の `prompt=none` と `max_age` | ログアウトさせてログイン画面へ | `login_required` のエラーのリダイレクト | doorkeeper-openid_connect 1.10.0（#275） | スナップショット `authorize_prompt_none_max_age` |
+| 有効なトークンの introspect のキーの順 | `exp, iat` | `iat, exp` | doorkeeper 5.9.1（#1818） | スナップショット `introspect_active` |
+| クライアント認証を 2 重に使うトークン要求（Basic と本文の両方に secret、Basic と別の `client_id`） | 200（Basic を使う） | 400 `invalid_request` | doorkeeper 5.9.5・5.9.6 | スナップショット `token_basic_and_body_auth`・`token_basic_and_other_client_id` |
+| トークンを Bearer ヘッダーと `access_token` 引数の両方で渡す userinfo | 200 | 401 `invalid_token` | doorkeeper 5.9.7（6.0 で 400 `invalid_request` になる予定。CHANGELOG） | スナップショット `userinfo_bearer_and_param` |
+| scope の足りないトークンの 403 | `WWW-Authenticate` なし | `insufficient_scope` の `WWW-Authenticate` あり | doorkeeper 5.9.1（#1795） | スナップショット `userinfo_insufficient_scope` |
+| `response_mode=form_post` で拒否 | 上書きしていたビューが `NoMethodError` | `error=access_denied` を POST するフォーム（200） | ビューを 5.9.9 の雛形に合わせた（DEF-7.0-45） | テストとスナップショット `authorize_form_post_deny` |
+
+#### `Pragma` の扱いの経緯
+
+- doorkeeper 5.6.6（#1644）で、トークン応答とエラー応答から `Pragma: no-cache` が消えた。Step 0-f-3 では、0-f-1 で `Cache-Control` を記録だけにしたのにならい、消えたことを記録だけにした（上の Step 0-f-3「応答ヘッダーの前後比較」）
+- その後、Step 1 で「挙動を変えない」の定義（PLAN.md の 3 章の 2）を決め、OP・RP・RS の間のやり取り（応答ヘッダーを含む）の変化は B として扱うことにした
+- doorkeeper 5.8.0（#1712）で、トークン要求の成功の応答にだけ `Pragma: no-cache` が戻った（エラーの応答には戻っていない）。1-b-3-2 では、この定義に従って「意図的な仕様変更」として扱った（人間が承認）。RFC 6749 の 5.1 は、トークン応答に `Cache-Control: no-store` と `Pragma: no-cache` を付けることを求めている
+
+### テストの追加
+
+gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で、例外を記録した 2 本を置き換え、form_post での拒否のスナップショットを 1 本足した（69 runs）。
+
+| テスト | 足したときの挙動 | 変わった段 |
+|---|---|---|
+| スナップショット `token_basic_auth` | 200 | doorkeeper 5.8.2（`Pragma`） |
+| スナップショット `token_basic_and_body_auth`・`token_basic_and_other_client_id` | 200（Basic を使う） | 5.8.2（`Pragma`）、5.9.9（400） |
+| スナップショット `userinfo_access_token_param` | 200 | doorkeeper-openid_connect 1.10.1（キーの順） |
+| スナップショット `userinfo_bearer_and_param` | 200 | 1.10.1（キーの順）、doorkeeper 5.9.9（401） |
+| スナップショット `userinfo_insufficient_scope` | 403（本文なし） | 5.9.9（`WWW-Authenticate`） |
+| スナップショット `authorize_prompt_select_account`・`authorize_prompt_none_max_age`・`authorize_max_age_zero` | 同意画面・ログイン画面へのリダイレクト・同意画面 | 1.8.11（`max_age=0`）、1.10.1（`prompt`） |
+| Webfinger は落ちる（`discovery_test.rb`） | `NoMethodError` | 1.10.1 でスナップショット `webfinger` に置き換えた |
+| form_post で拒否すると落ちる（`authorization_endpoint_test.rb`） | `ActionView::Template::Error` | ロケールとビューのコミットで、フォームを返すテストに置き換え、スナップショット `authorize_form_post_deny` を足した |
+
+- 新しいファイルは `response_snapshot_token_auth_test.rb`（クライアント認証とトークンの渡し方）と `response_snapshot_authorization_prompt_test.rb`（`prompt`・`max_age`）
+- 壊したときの確認: スナップショットの 1 件を書き換えると、そのテストだけが落ちる。`test/support/` に一時的に `root_url` を定義するパッチを置くと、Webfinger のテストが落ちる（確かめた後で消した）
+
+### OIDC のエラーのリダイレクトのヘッダー
+
+上の「作業計画からの変更点」のヘルパーの修正の前に、人間の求めで調べた。
+
+- doorkeeper-openid_connect の `handle_oidc_error!` は、確かめたタグ（v1.2.0・v1.4.0・v1.5.0・v1.6.0・v1.7.0・v1.7.5）では `render json: error_response.body, status: :found, location: ...` で JSON の本文を返していたので、`Content-Type: application/json` と本文が合っていた。1.8.0 のコミット `d07ba31`（PR #138。doorkeeper 5.5 の form_post に対応するため、doorkeeper の `redirect_or_render` を使うようにした）で HTML のリダイレクトになったが、その前の `response.headers.merge!(error_response.headers)` が残った
+- 1.10.5・2.0.0・master（2026-08-23 の a9ff52b まで）でも同じで、doorkeeper の `ErrorResponse#headers` も 5.9.9・6.0.0.rc2 で同じ。両方のリポジトリに、この件の issue・PR は見つからなかった
+- OpenID Connect Core 1.0 の 3.1.2.6（Authentication Error Response）と RFC 6749 の 4.1.2.1 は、リダイレクトで `error`・`state` をクエリに付けることを決めているだけで、ヘッダーは決めていない。`WWW-Authenticate` は RFC 6750 の 3 章で保護されたリソースへのリクエストを拒むときのもので、`Content-Type` は RFC 9110 の 8.3 で本文のメディアタイプを示す。エラーの返し方と値は仕様どおりで、足されるヘッダーは仕様にないもの（`Content-Type` は本文と合わない）
+- doorkeeper 本体の拒否のリダイレクト（スナップショット `authorize_deny`）は `text/html` で、`WWW-Authenticate` はない
+- ブラウザと omniauth は 302 の `Location` だけを使うので、RP への実害はない
+
+### 起動の途中の読み込み
+
+- 各段で、a-nti_manner の検査（test・`CI=1`・development）が通った
+- 範囲の外は、各段の前後に test と development で、`config/initializers` を読む直前と `initialize!` の後に読み込み済みの部品（`ActiveSupport` の `@loaded`）、doorkeeper のモデルが読み込まれているか、`filter_parameters` と `ActiveRecord::Base.filter_attributes` を書き出して比べた。変わったのは、doorkeeper 5.9.9 で `Doorkeeper::AccessToken` が起動の時点で読み込まれなくなったことだけ（5.9.2 の #1830 でモデルを遅延して読み込むようになった。`Doorkeeper::AccessGrant` は doorkeeper-openid_connect の `on_load(:active_record)` で読み込まれる）。読み込み済みの部品と `filter_parameters` は前後で同じ（development の `action_dispatch_request` は既知の web-console の分。IMP-009）
+
+### 手動確認
+
+ロケールとビューを雛形に合わせた後に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（パスワードの入力と同意は人間が操作）。
+
+- ログイン（RP の my_op）: OP のログイン画面でログインした後、同意画面を省いて RP に戻り、「ログインしました」が出た。OP のログは、ログインが 303、認可エンドポイントが 302、トークン・userinfo・JWKS が 200
+- introspection 用 RP: 前回のトークンは revoke 済みなので、雛形に合わせた同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke は 200、revoke の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回
+- サーバーの出力: 3 アプリとも、エラー・warning・DEPRECATION の新しいものはない。RP の `/stylesheets/application.css` のルーティングのエラーは元からのもの（Sprockets を読み込んでいない）
+- 手動確認用の環境: 作業の開始時に 9 ファイルのハッシュを控え、件数が Step 1-b-3-1 の手動確認の後と同じこと（OP `oauth_access_grants` 13・`oauth_access_tokens` 32、RP `sessions` 10・`op_users` 1）を確かめた。手動確認の直前にハッシュが同じことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 13 → 15 件、`oauth_access_tokens` が 32 → 37 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 10 → 12 件になり、どちらもハッシュが変わった。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt` は変わっていない。以降の基準は手動確認の後のハッシュ
+
+### 遭遇した問題
+
+1. lock のコピーで段ごとの解決を確かめるとき、zsh で `bundle lock --update $4` の `$4` に 2 つの gem 名を入れると、1 つの単語として渡されて `Could not find gem 'doorkeeper-openid_connect ostruct'` になった。`${=4}` にした（TIPS.md にある注意）。また、lock にない ostruct は `--update` で指定できないので、Gemfile に版を書いて `bundle lock` で確かめた
+2. 先に足したテストの 2 本が、doorkeeper-openid_connect 1.10.1 で、スナップショットと比べる前に `JSON::ParserError` で落ちた。上の「作業計画からの変更点」のヘルパーの修正で直した
+
+### 確認結果
+
+- `scripts/check-apps`（3 アプリと E2E）: 36 の検査がすべて通った。gem・雛形のコミットの前には、OP と E2E で流した
+- minitest: RS 11 runs・RP 33 runs・OP 57 → 69 runs、0 failures。`CI=1`（eager load あり）でも同じ件数で通る
+- E2E: 10 passed。スナップショットの差分なし（userinfo・introspect のキーの順の変化は、キーを並べ替えて比べるので出ない）
+- RuboCop: 3 アプリとも `no offenses detected`。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test（`CI=1` 付きも）・development で `✅Congratulations!`。bundler-audit: `No vulnerabilities found`。無視リストを空にした bundler-audit で、無視リストの ID はすべて今も報告される。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`
+- 応答のスナップショットの変化は、上の「意図的な仕様変更」と DEF-7.0-45・46 だけ。どれも人間に確かめてから作り直した
+- `bin/rails s` は手動確認で 3 アプリとも起動した
+- 手動確認用の環境: 上の「手動確認」
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| DEF-7.0-45 が、エラー画面の雛形がローカル変数 `error_response` を読み、`<pre>` の中で改行するようになった版を 5.6.7（#1676）・5.7.0（#1702）としているが、doorkeeper のタグのソースでは 5.6.5 から（5.6.4 までは 1 行） | DEF-7.0-45 を直した。5.7.0 の #1702 は `respond_to?` を `local_assigns` にした変更。v5.6.4・v5.6.5 のタグで確かめた |
+| エラー画面のテストのコメントの「doorkeeper 5.7.0 からの雛形は」も同じ誤り | 5.6.5 に直した |
+| 応答のスナップショットのヘルパーが、JSON の `Content-Type` のどの応答でも、読めない本文をテキストとして扱う。トークン応答などが壊れた JSON を返すようになると、JSON のキーで伏せる処理が効かないまま、`UPDATE_SNAPSHOTS` で本物のトークンがファイルに書かれうる | テキストとして扱うのをリダイレクト（`response.redirect?`）の応答だけに絞った（人間が承認。3 アプリ）。リダイレクト以外の応答で壊れた JSON を返すと `JSON::ParserError` で落ちることを、一時的なテストで確かめた（確かめた後で消した） |
+| 上の「テストの追加」の「後で 1 本を置き換え」は、置き換えたのが 2 本（Webfinger・form_post での拒否） | 直した |
+| 上の「OIDC のエラーのリダイレクトのヘッダー」の「1.2〜1.7.5」は、確かめたタグの範囲を超えている | 確かめたタグ（v1.2.0・v1.4.0・v1.5.0・v1.6.0・v1.7.0・v1.7.5）を書いた |
+| DEF-7.0-45・46 を記録したコミット（a7738c6）が、その時点ではまだない LOG.md の Step 1-b-3-2 の節を指している（CLAUDE.md の「まだ存在しないものを現在形で書かない」） | 直さない。この PR の docs のコミットで節ができたので、PR の時点では参照先がある。履歴は書き換えない。今後は、参照する LOG.md の節を先に書く |
+| ヘルパーが本文を 2 回 `JSON.parse` する（判定と整形） | 直さない（人間が承認）。応答 1 件ごとの小さな手間で、判定を分けたほうが読みやすい |
+
+コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通ることを確かめた。
