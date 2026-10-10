@@ -23,4 +23,12 @@ class ResponseSnapshotDiscoveryTest < ActionDispatch::IntegrationTest
 
     assert_response_snapshot 'jwks'
   end
+
+  # RP・RS は使わない。doorkeeper-openid_connect 1.10.0 から href が issuer になり、
+  # それまでは OP の routes に root がなくて落ちていた
+  test 'Webfinger の応答' do
+    get '/.well-known/webfinger', params: { resource: 'acct:user@example.com' }
+
+    assert_response_snapshot 'webfinger'
+  end
 end

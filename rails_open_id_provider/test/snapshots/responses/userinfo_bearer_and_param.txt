@@ -13,6 +13,6 @@ x-runtime: <RUNTIME>
 x-xss-protection: 0
 
 {
-  "sub": "227792459",
-  "email": "user@example.com"
+  "email": "user@example.com",
+  "sub": "227792459"
 }

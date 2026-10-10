@@ -1,11 +1,11 @@
-HTTP 200
-cache-control: max-age=0, private, must-revalidate
+HTTP 302
+cache-control: no-store
 content-length: <CONTENT_LENGTH>
-content-type: text/html; charset=utf-8
-etag: <ETAG>
-link: </stylesheets/doorkeeper/application.css>; rel=preload; as=style; nopush
+content-type: application/json; charset=utf-8
+location: http://localhost:3781/auth/my_op/callback?error=account_selection_required&error_description=The+authorization+server+requires+end-user+account+selection
 referrer-policy: strict-origin-when-cross-origin
 set-cookie: _rails_open_id_provider_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
+www-authenticate: Bearer realm="Doorkeeper", error="account_selection_required", error_description="The authorization server requires end-user account selection"
 x-content-type-options: nosniff
 x-download-options: noopen
 x-frame-options: SAMEORIGIN
@@ -14,68 +14,4 @@ x-request-id: <REQUEST_ID>
 x-runtime: <RUNTIME>
 x-xss-protection: 0
 
-<!DOCTYPE html>
-<html>
-<head>
-  <title>OAuth authorization required</title>
-  <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <link rel="stylesheet" href="/stylesheets/doorkeeper/application.css" />
-  
-</head>
-<body>
-<div id="container">
-
-  <header class="page-header" role="banner">
-  <h1>Authorization required</h1>
-</header>
-
-<main role="main">
-  <p class="h4">
-    Authorize <strong class="text-info">RP (my_op)</strong> to use your account?
-  </p>
-
-    <div id="oauth-permissions">
-      <p>This application will be able to:</p>
-
-      <ul class="text-info">
-          <li>Authenticate your account</li>
-      </ul>
-    </div>
-
-  <div class="actions">
-    <form action="/oauth/authorize" accept-charset="UTF-8" method="post">
-      <input type="hidden" name="client_id" id="client_id" value="test-dummy-rp-my-op-client-id" autocomplete="off" />
-      <input type="hidden" name="redirect_uri" id="redirect_uri" value="http://localhost:3781/auth/my_op/callback" autocomplete="off" />
-      <input type="hidden" name="state" id="state" autocomplete="off" />
-      <input type="hidden" name="response_type" id="response_type" value="code" autocomplete="off" />
-      <input type="hidden" name="response_mode" id="response_mode" value="query" autocomplete="off" />
-      <input type="hidden" name="scope" id="scope" value="openid" autocomplete="off" />
-
-      <input type="hidden" name="nonce" id="nonce" value="<NONCE>" autocomplete="off" />
-
-      <input type="hidden" name="code_challenge" id="code_challenge" value="<CODE_CHALLENGE>" autocomplete="off" />
-      <input type="hidden" name="code_challenge_method" id="code_challenge_method" value="S256" autocomplete="off" />
-      <input type="submit" name="commit" value="Authorize" class="btn btn-success btn-lg btn-block" data-disable-with="Authorize" />
-</form>    <form action="/oauth/authorize" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
-      <input type="hidden" name="client_id" id="client_id" value="test-dummy-rp-my-op-client-id" autocomplete="off" />
-      <input type="hidden" name="redirect_uri" id="redirect_uri" value="http://localhost:3781/auth/my_op/callback" autocomplete="off" />
-      <input type="hidden" name="state" id="state" autocomplete="off" />
-      <input type="hidden" name="response_type" id="response_type" value="code" autocomplete="off" />
-      <input type="hidden" name="response_mode" id="response_mode" value="query" autocomplete="off" />
-      <input type="hidden" name="scope" id="scope" value="openid" autocomplete="off" />
-
-      <input type="hidden" name="nonce" id="nonce" value="<NONCE>" autocomplete="off" />
-
-      <input type="hidden" name="code_challenge" id="code_challenge" value="<CODE_CHALLENGE>" autocomplete="off" />
-      <input type="hidden" name="code_challenge_method" id="code_challenge_method" value="S256" autocomplete="off" />
-      <input type="submit" name="commit" value="Deny" class="btn btn-danger btn-lg btn-block" data-disable-with="Deny" />
-</form>  </div>
-</main>
-
-</div>
-</body>
-</html>
-
+<html><body>You are being <a href="http://localhost:3781/auth/my_op/callback?error=account_selection_required&amp;error_description=The+authorization+server+requires+end-user+account+selection">redirected</a>.</body></html>

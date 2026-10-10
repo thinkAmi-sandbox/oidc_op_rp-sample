@@ -13,6 +13,11 @@ x-runtime: <RUNTIME>
 x-xss-protection: 0
 
 {
-  "email": "user@example.com",
-  "sub": "227792459"
+  "subject": "acct:user@example.com",
+  "links": [
+    {
+      "rel": "http://openid.net/specs/connect/1.0/issuer",
+      "href": "http://localhost:3780"
+    }
+  ]
 }
