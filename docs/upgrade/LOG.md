@@ -1706,3 +1706,87 @@ gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で�
 | ヘルパーが本文を 2 回 `JSON.parse` する（判定と整形） | 直さない（人間が承認）。応答 1 件ごとの小さな手間で、判定を分けたほうが読みやすい |
 
 コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通ることを確かめた。
+
+## Step 2: Ruby 3.2（2026-10-10）
+
+- ブランチ / PR: `upgrade/step2-ruby32` / （PR 作成後に記入）
+- バージョン: Ruby 3.1.7 → 3.2.11 / Rails 7.0.10（変更なし）。Bundler 2.3.27 → 2.4.19（`BUNDLED WITH`）。lock の default gem を 3.2.11 の版に合わせ直した。nokogiri 1.18.10 → 1.19.4
+- Ruby だけを上げる最初の Step。分かった手順は TIPS.md の「Ruby を上げる」にまとめた（スキル化の材料。PLAN.md の 13 章）
+- 既定値への追随（A）と業務的な挙動の変化（B）は、どちらも起きなかった（下の「前後の比較」）。defaults/ への記録はない
+
+### 作業計画で決めたこと
+
+着手時に PLAN.md 8 章の手順で確かめ直し（サブエージェント 3 つ: Ruby 3.2.11 の事実、gem の対応、lock の解決）、作業計画を出して承認を得た。lock の解決の試行は、Plan モードではファイルを書けないので、承認の後に Ruby 3.2.11 を入れてから scratchpad のコピーで行った。確かめたことと決めたことの一覧は PLAN.md の Step 2 の節に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版 | 3.2.11 | 3.2 系の最新で最後のリリース。3.2 は EOL だが、マイナーを飛ばさない |
+| lock の default gem | Ruby を上げるコミットの中で、3.2.11 の default gem の版に合わせ直す | 合わせ直さないと、旧版（json 2.6.1・bigdecimal 3.1.1 は C 拡張）を rubygems から落としてビルドすることになり、アプリが読む版も default gem からずれる |
+| `BUNDLED WITH` | 3.2.11 の Bundler 2.4.19 | 2.3.27 のままだと、手元の Bundler 2.4.19 と CI の setup-ruby が bundler 2.3.27 を落として使う |
+| gem の入れ直し | 前の版のキャッシュの `.gem` をコピーして `bundle install --local` | Ruby のマイナーで置き場所（`vendor/bundle/ruby/3.2.0`）が変わる。3 アプリで約 75 MB のダウンロードを避ける |
+| PR に入れるもの | Ruby・`TargetRubyVersion`・nokogiri 1.19.4 | nokogiri は advisory の修正で、PLAN.md 6 章で Step 2 に入れると決めていた。Ruby を上げるコミットとは分けた |
+| ほかの Ruby 3.2 以上を必要とする gem | サブステップ 2-b として別の PR | 1 つずつ上げる。web-console 4.3 は Rails 8 が必要なので Step 6、faraday-net_http は 3.0.2 のまま Step 8 で見直す（PLAN.md 7 章） |
+| 手動確認 | 3 アプリの Ruby を上げた後に 1 回（introspection の流れまで） | 人間の指示 |
+
+### 作業計画からの変更点
+
+- gem の入れ直しは、計画の `bundle install --local` では動かず、`BUNDLE_CACHE_PATH` でコピーしたキャッシュを指した。RS・RP では、そのために default gem の `.gem` を落としてしまった（下の「遭遇した問題」1）。OP は人間の承認を得て `--no-cache` を付け、ダウンロードなしで入れた
+- 計画では lock の試行で `bundle update --bundler=2.4.19` も試すつもりだったが、`BUNDLER_VERSION=2.4.19` で `bundle lock` を流すと `BUNDLED WITH` が 2.4.19 になったので、要らなかった
+- CVE-2026-41316（erb）は、計画どおり記録と一緒に相談し、記録だけにした（下の「CVE-2026-41316（erb）」）
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| （Ruby） | 3.1.7 → 3.2.11 | `mise install ruby@3.2.11`。ruby-build 20260924 がソースからビルドし、Homebrew の OpenSSL 3.5.0・libyaml 0.2.5 にリンクした。落としたのは `ruby-3.2.11.tar.gz`（19,984,344 B）だけで、ruby-build の定義の SHA256 は告知の値と同じ |
+| json / bigdecimal / logger / drb / mutex_m | 2.6.1 / 3.1.1 / 1.5.0 / 2.1.0 / 0.1.1 → 2.6.3 / 3.1.3 / 1.5.3 / 2.1.1 / 0.1.2 | 3.2.11 の default gem の版に合わせ直した（3 アプリ）。default gem から読まれることを確かめた |
+| ostruct | 0.5.2 → 0.5.5 | 同上（OP） |
+| base64 / cgi / ruby2_keywords | 0.1.1 / 0.3.7 / 0.0.5（変更なし） | 3.2.11 の default gem と同じ版（cgi は RP） |
+| benchmark / securerandom | 0.3.0（変更なし） | 3.2.11 の default gem（0.2.1・0.2.2）は activesupport 7.0.10 の `>= 0.3` を満たさない |
+| nokogiri | 1.18.10 → 1.19.4 | `bundle update nokogiri --conservative`。動いたのは nokogiri の 3 つのプラットフォームの行だけ。advisory 12 件（GHSA-5prr-v3j2-97mh ほか）を無視リストから消した |
+
+- lock の試行（scratchpad のコピー。Ruby 3.2.11・`BUNDLER_VERSION=2.4.19`）: Gemfile の `ruby` を変えて default gem を固定して `bundle lock` → 固定を外して `bundle lock --local` で、3 アプリとも動いたのは default gem の行と `RUBY VERSION`（`ruby 3.2.11p268`）・`BUNDLED WITH` だけ。`PLATFORMS` は変わらない。この lock をアプリに持ち込んだ（アプリの Gemfile とコピーの Gemfile が同じことを `diff` で確かめた）
+- C 拡張は Ruby 3.2 向けにビルドし直した（bootsnap・byebug・date・msgpack・nio4r・prism・puma・racc・websocket-driver、RP・OP は bindex、OP は bcrypt）。nokogiri・sqlite3 は arm64-darwin のプラットフォーム版の 3.2 のバイナリを使う
+- ダウンロードした nokogiri 1.19.4-arm64-darwin（6,547,456 B。3 アプリで 1 回ずつ）の SHA-256 は rubygems.org の値と同じ
+- epic と比べて lock で動いたのは、上の行と `RUBY VERSION`・`BUNDLED WITH` だけ。Step 1 の一時固定（benchmark・securerandom）、faraday-net_http 3.0.2、jwt 2.10.3、Gemfile の `ruby` 以外の行は動いていない
+
+### CVE-2026-41316（erb）
+
+- 2026-04-21 に公表された erb の advisory（`<= 6.0.3`）。信頼できないデータを `Marshal.load` するプロセスで、erb と activesupport を読み込んでいるとガジェットになる。Ruby 3.2.11 の default gem の erb 4.0.2 も、作業前の 3.1.7 の erb 2.2.3 も対象で、3.2 は EOL なので 3.2 の修正版は出ない
+- 3 アプリには、信頼できないデータを `Marshal.load` する経路がない。アプリのコード（app・lib・config）に `Marshal` はなく、Cookie は JSON で直列化し（DEF-7.0-16）、RP のセッションストアも JSON、キャッシュは test・development とも `:null_store`（development は `tmp/caching-dev.txt` がない）
+- 人間の判断で、Gemfile に erb を足さずに記録だけにした。Ruby 3.3.12 の default gem の erb は 4.0.3.1、3.4.11 は 4.0.4.1（修正版。GitHub のタグの `lib/erb/version.rb` で確かめた）なので、Step 4 で解消を確かめる（PLAN.md 7 章の erb の行）。default gem の erb は lock にないので、bundler-audit は検出しない
+
+### 前後の比較
+
+Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動の途中に読み込み済みの部品（`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後。test・development）を書き出し、各アプリを上げた後と比べた。
+
+- `scripts/check-apps`: 3.1.7 でも 3.2.11 でも 36 の検査がすべて通り、件数は同じ（下の「確認結果」）
+- 応答のスナップショット（minitest）と E2E のスナップショット: 差分なし
+- 起動の途中に読み込み済みの部品: 3 アプリとも test・development で前後が同じ（RP の `action_dispatch_request`、OP・RP の development の web-console の分は既知の IMP-009）
+- テストの出力の警告: 前後とも OP の `auth_time_from_resource_owner` の DEPRECATION（IMP-011）だけ。Ruby の `warning:` の行はない
+- brakeman: EOLRuby の警告は「Support for Ruby 3.2.11 ended on 2026-03-31」になったが、fingerprint にメッセージは含まれないので、無視リストに当たったまま（`Ignored Warnings: 2`）。無視リストのメッセージは 3.1.7 のまま残した
+- RuboCop: `TargetRubyVersion` を 3.2 にしても新しい指摘はない
+
+### 手動確認
+
+3 アプリの Ruby を上げた後（`TargetRubyVersion`・nokogiri の前）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（同意は人間が操作）。3 アプリとも Puma の起動の出力に Ruby 3.2.11 が出た。
+
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP のセッションが前回の手動確認から残っていたので、ログイン画面を経ず、同意画面も省いて（my_op のアプリにこのユーザーの有効なトークンがあるため）RP に戻り、「ログインしました」が出た。OP のログは、認可エンドポイントが 302、トークン・userinfo・JWKS が 200。パスワードを入れる経路（devise のログイン）は、この手動確認では通っていない（minitest・E2E で確かめている）
+- introspection 用 RP: 前回のトークンは revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke は 200、revoke の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回
+- サーバーの出力: 3 アプリとも、エラー・warning・DEPRECATION の新しいものはない。RP の `/stylesheets/application.css` のルーティングのエラーは元からのもの
+- 手動確認用の環境: 作業の開始時に 9 ファイルのハッシュを控え、件数が Step 1-b-3-2 の手動確認の後と同じこと（OP `oauth_access_grants` 15・`oauth_access_tokens` 37、RP `sessions` 12・`op_users` 1）を確かめた。手動確認の直前にハッシュが同じことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 15 → 17 件、`oauth_access_tokens` が 37 → 42 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 12 件のまま（既にある行を更新）で、どちらもハッシュが変わった。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt` は変わっていない。以降の基準は手動確認の後のハッシュ
+
+### 遭遇した問題
+
+1. 意図しないダウンロード: `bundle install --local` は、インストール先のキャッシュ（`vendor/bundle/ruby/3.2.0/cache`）ではなくアプリのキャッシュ（`cache_path`。既定は `vendor/cache`）しか見ないので、コピーした `.gem` が見つからずに止まった（何も入れていない）。`BUNDLE_CACHE_PATH` でコピーしたキャッシュを指して流し直すと入ったが、入れた後にアプリのキャッシュを最新にする処理が走り、キャッシュになかった default gem の `.gem`（base64 0.1.1・bigdecimal 3.1.3・ruby2_keywords 0.0.5・drb 2.1.1・logger 1.5.3・mutex_m 0.1.2・json 2.6.3、RP は cgi 0.3.7 も。1 つ 7〜87 KB）を、`--local` を付けていても rubygems.org から落とした。RS では出力の末尾だけを見ていて気づかず、RP で気づいて止まり、人間に報告した。落としたファイルの SHA-256 は rubygems.org の値と同じで、キャッシュに置かれただけでインストールはされていない（アプリは default gem を読む）。人間の承認を得て、ファイルはキャッシュに残し、OP は `--no-cache` を付けてダウンロードなしで入れた。TIPS.md の「Ruby を上げる」に書いた
+2. Claude Code の hooks の安全チェックが、`git commit` と同じコマンド行の `grep -n` を `git commit -n`（`--no-verify`）と見なして止めた。コミットは別の呼び出しで流した（TIPS.md の「コミット」）
+3. lock の試行のディレクトリを作り直そうとした `rm -rf` が、変数を使ったパスのために Claude Code の安全確認で止められた。新しいディレクトリだったので、消さずに作って進めた
+
+### 確認結果
+
+- `scripts/check-apps`（3 アプリと E2E）: 36 の検査がすべて通った。各アプリのコミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・RP 33 runs・OP 69 runs、0 failures（3.1.7 と同じ）。`CI=1`（eager load あり）でも同じ件数で通る
+- E2E: 10 passed。スナップショットの差分なし
+- RuboCop: 3 アプリとも `no offenses detected`（`TargetRubyVersion: 3.2`）。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test（`CI=1` 付きも）・development で `✅Congratulations!`。bundler-audit: `No vulnerabilities found`。無視リストを空にした bundler-audit で、無視リストの ID はすべて今も報告される（nokogiri の 12 件は消した）。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`
+- `bin/rails s` は手動確認で、`bin/rails c` は作業の最後に、3 アプリとも起動した
+- 手動確認用の環境: 上の「手動確認」。作業の最後に、9 ファイルのハッシュが手動確認の後と同じだった
