@@ -52,6 +52,7 @@
 | DEF-7.0-41 | ログイン失敗の flash の文言が `Invalid email or password.` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
 | DEF-7.0-42 | devise の initializer を雛形に合わせ、失敗の応答を 422、リダイレクトを 303 にする | 周辺 gem の雛形（devise 5.0.4 の initializer） | OP | 追随 |
 | DEF-7.0-43 | doorkeeper の initializer を 5.9.9 の雛形に合わせる（コメントだけ） | 周辺 gem の雛形（doorkeeper 5.9.9 の initializer） | OP | 追随 |
+| DEF-7.0-44 | doorkeeper-openid_connect の initializer を 1.10.1 の雛形に合わせる（コメントだけ） | 周辺 gem の雛形（doorkeeper-openid_connect 1.10.1 の initializer） | OP | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -543,3 +544,18 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 扱い: 追随
 - 出典: `doorkeeper-5.9.9/lib/generators/doorkeeper/templates/initializer.rb`、doorkeeper の CHANGELOG（5.9.0 の #1791、5.7.0 の #1705、5.9.6 の `client_credentials` の説明、5.9.9 の script スキームの拒否）。doorkeeper は Rails の外の gem なので、Rails ガイドに該当の節はない
 - コミット: OP（`follow the doorkeeper 5.9.9 initializer template`）
+
+### DEF-7.0-44: doorkeeper-openid_connect の initializer を 1.10.1 の雛形に合わせる（コメントだけ）
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.1 の `lib/generators/doorkeeper/openid_connect/templates/initializer.rb`）/ 対象: OP
+- 何が変わるか: `config/initializers/doorkeeper_openid_connect.rb` を 1.10.1 の雛形を下敷きに作り直す。コメントを除いたコードは前後で同じで、印の外は雛形と同じになる。変わるのはコメントだけ
+  - 「変更開始」の印の中に残している元の雛形の例を 1.10.1 の文言にする。`issuer` の例は引数が 3 つ（`_resource_owner, _application, _request`）のブロックになる
+  - 設定の例が増える: `signing_key` の配列での鍵のローテーション、`auth_time_from_session`、`dynamic_client_registration`（既定は無効）、`open_id_request_class`
+  - `auth_time_from_resource_owner` の中に、ID トークンの `auth_time` に使い、`auth_time_from_session` がないときは `max_age` の判定にも使う、という説明が加わる
+  - `select_account_for_resource_owner` の上の DoubleRenderError の回避策のコメントが消える（gem の中で扱うようになったため）
+  - `configure do` の直後の空行がなくなる
+- なぜ: 今のファイルは doorkeeper-openid_connect 1.8 系の雛形のままだった。gem の generator の雛形にも追随すると人間が決めた（[PLAN.md](../PLAN.md) の 3 章の 2 の境目の 1）
+- 3 アプリへの影響: 設定の値は変わらない。OP の minitest（`CI=1` も）・E2E が通り、応答のスナップショットと、起動の途中の読み込み（a-nti_manner の検査と、test・development の書き出し）は前後で同じ。`auth_time_from_session` は設定しないので、`max_age` を付けた認可要求で、doorkeeper-openid_connect 1.10 の非推奨の警告（`Kernel#warn`）が出るのは変わらない
+- 扱い: 追随
+- 出典: `doorkeeper-openid_connect-1.10.1/lib/generators/doorkeeper/openid_connect/templates/initializer.rb`、doorkeeper-openid_connect の CHANGELOG（1.9.0 の #230・#232・#233、1.10.0 の #271・#283 と `issuer` のブロックの引数の変更、1.10.1 の #297）。Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper-openid_connect 1.10.1 initializer template`）
