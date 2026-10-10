@@ -1763,7 +1763,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - `scripts/check-apps`: 3.1.7 でも 3.2.11 でも 36 の検査がすべて通り、件数は同じ（下の「確認結果」）
 - 応答のスナップショット（minitest）と E2E のスナップショット: 差分なし
 - 起動の途中に読み込み済みの部品: 3 アプリとも test・development で前後が同じ（RP の `action_dispatch_request`、OP・RP の development の web-console の分は既知の IMP-009）
-- テストの出力の警告: 前後とも OP の `auth_time_from_resource_owner` の DEPRECATION（IMP-011）だけ。Ruby の `warning:` の行はない
+- テストの出力の警告: 前後とも OP の `auth_time_from_resource_owner` の DEPRECATION（IMP-011）だけ。Ruby の `warning:` の行はない。Ruby の非推奨の警告は既定で出ないので、コードレビューの後に 3.2.11 で `RUBYOPT=-W:deprecated` を付けて 3 アプリの minitest と development の eager load（`bin/rails runner 'Rails.application.eager_load!'`）を流し、`warning:` の行が 0 件なことを確かめた（3.1.7 では流していない）
 - brakeman: EOLRuby の警告は「Support for Ruby 3.2.11 ended on 2026-03-31」になったが、fingerprint にメッセージは含まれないので、無視リストに当たったまま（`Ignored Warnings: 2`）。無視リストのメッセージは 3.1.7 のまま残した
 - RuboCop: `TargetRubyVersion` を 3.2 にしても新しい指摘はない
 
@@ -1790,3 +1790,14 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - RuboCop: 3 アプリとも `no offenses detected`（`TargetRubyVersion: 3.2`）。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test（`CI=1` 付きも）・development で `✅Congratulations!`。bundler-audit: `No vulnerabilities found`。無視リストを空にした bundler-audit で、無視リストの ID はすべて今も報告される（nokogiri の 12 件は消した）。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`
 - `bin/rails s` は手動確認で、`bin/rails c` は作業の最後に、3 アプリとも起動した
 - 手動確認用の環境: 上の「手動確認」。作業の最後に、9 ファイルのハッシュが手動確認の後と同じだった
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 前後の比較で `warning:` の行を見ているが、Ruby の非推奨の警告は既定で出ない（`Warning[:deprecated]` は false）ので、Ruby 3.2 で非推奨になったものを見落とす | 3.2.11 で `RUBYOPT=-W:deprecated` を付けて 3 アプリの minitest と development の eager load を流し、警告が 0 件なことを確かめた（上の「前後の比較」）。TIPS.md の「Ruby を上げる」の前後の比較に足した |
+| TIPS.md の Ruby の入れ方は mise 2026.5 系の挙動で、2026.8.0 からはビルド済みのもの（jdx/ruby）を落とす形が既定になる | TIPS.md に、手元の版と、mise を上げたら落とすものとサイズを確かめ直すことを書いた |
+| PLAN.md 7 章の faraday-net_http を「Step 8 で見直す」とした根拠がない | Ruby 3.3.12 の default gem の net-http は 0.4.1、3.4.11 は 0.6.0（GitHub のタグの `lib/net/http.rb`）で、faraday-net_http 3.4.x の `net-http ~> 0.5` を満たすのは 3.4 から。根拠を 7 章に書いた |
+| PLAN.md の Step 2 の「決めたこと」に、erb の扱いを「人間と決める」と書いたまま、決めた内容が別の行にある | 決めた内容の行を指すように直した |
+| brakeman.ignore の EOLRuby のメッセージが Ruby 3.1.7 のまま | 直さない。fingerprint にメッセージは含まれず、無視リストに当たり続ける。Step 1 で EOLRails のメッセージを残したのと同じ扱いで、上の「前後の比較」と TIPS.md に書いてある |
+| コピーしたキャッシュの `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない | 3 アプリの `vendor/bundle/ruby/3.2.0/cache` の `.gem` 360 個（重複を除いて 177）の SHA-256 が、すべて rubygems.org の値と同じことを確かめた。TIPS.md に確かめ方を足した |

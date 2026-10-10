@@ -63,7 +63,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 
 ## Ruby を上げる（Step 2）
 
-- mise 2026.5 系は ruby-build でソースからビルドする。ruby-build の定義（`share/ruby-build/<版>`）は tarball の SHA256 を持ち、展開の前に検証する。Homebrew の openssl@3・libyaml があれば、OpenSSL のソースは落とさない。入れた後は `mise where ruby@<版>` の `bin/ruby -ropenssl -e 'puts OpenSSL::OPENSSL_LIBRARY_VERSION'` でリンク先を見る
+- mise 2026.5 系は ruby-build でソースからビルドする（2026.8.0 から、既定は jdx/ruby のビルド済みのものを落とす形に変わる。Step 2 の時点の手元は 2026.5.10。mise を上げたら、落とすものとサイズを確かめ直す）。ruby-build の定義（`share/ruby-build/<版>`）は tarball の SHA256 を持ち、展開の前に検証する。Homebrew の openssl@3・libyaml があれば、OpenSSL のソースは落とさない。入れた後は `mise where ruby@<版>` の `bin/ruby -ropenssl -e 'puts OpenSSL::OPENSSL_LIBRARY_VERSION'` でリンク先を見る
 - その Ruby の default gem の版は、`ruby -e 'puts Gem::Specification.select(&:default_gem?).map { "#{_1.name} #{_1.version}" }'` で分かる。lock に入れた default gem（PLAN.md の 7 章）と比べる
 - 同じ系列の別のパッチ（Step 2 では手元の 3.2.3）で試さない。後から入れた Bundler（3.2.3 には 4.0.6）があると、素の `bundle` がそれで動く
 - lock の試行は、scratchpad の Gemfile と lock のコピーで、`env -i HOME="$HOME" PATH="$(mise where ruby@<版>)/bin:/usr/bin:/bin" BUNDLER_VERSION=<その Ruby の Bundler> BUNDLE_GEMFILE=<コピー> bundle _<その Bundler>_ lock` のように流す。`BUNDLER_VERSION` を付けないと、lock の `BUNDLED WITH` の版に切り替えようとする（`bundle install` なら、その版を落とす）。付けて lock を書くと、`BUNDLED WITH` は実行中の Bundler の版になる
@@ -72,7 +72,8 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - `bundle install --local` は、インストール先のキャッシュではなく、アプリのキャッシュ（`cache_path`。既定は `vendor/cache`）しか見ない。`BUNDLE_CACHE_PATH` を付けないと、gem が見つからずに止まる
   - `--no-cache` を付けないと、入れた後でアプリのキャッシュを最新にしようとして、キャッシュにない default gem の `.gem` を、`--local` でも rubygems.org から落とす（Step 2 の RS・RP で起きた。LOG.md の Step 2「遭遇した問題」）
   - 入れた後は、`Fetching` の行がないこと、default gem が default gem から読まれること（`Gem.loaded_specs["json"].default_gem?`）を見る
-- 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行、応答と E2E のスナップショット、起動の途中に読み込み済みの部品（下の「設定の値と応答の比較」の `@loaded`。`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後の 3 か所を、test と development で書き出す）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
+  - コピーした `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json?platform=<プラットフォーム>` の `sha` と比べる（Step 2 では `Gem::Package.new(<ファイル>).spec` で名前・版・プラットフォームを読んで比べた）
+- 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行（Ruby の非推奨の警告は既定で出ないので、`RUBYOPT=-W:deprecated` を付けた minitest と、development の `bin/rails runner 'Rails.application.eager_load!'` も流す）、応答と E2E のスナップショット、起動の途中に読み込み済みの部品（下の「設定の値と応答の比較」の `@loaded`。`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後の 3 か所を、test と development で書き出す）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
 - brakeman の EOLRuby の警告は、Ruby の版がメッセージにだけ入り、fingerprint は変わらないので、無視リストに当たり続ける（無視リストのメッセージは古い版のまま残る）
 
 ## 設定の値と応答の比較（Rails を上げる Step）
