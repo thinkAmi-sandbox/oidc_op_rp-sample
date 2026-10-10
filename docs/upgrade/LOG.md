@@ -1572,7 +1572,7 @@ devise を上げ、initializer を雛形に合わせた後に、`.claude/launch.
 
 ## Step 1-b-3-2: Rails 7.0 を必要とする周辺 gem（doorkeeper 系）（2026-10-09〜2026-10-10）
 
-- ブランチ / PR: `upgrade/step1b-doorkeeper` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step1b-doorkeeper` / [#25](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/25)
 - バージョン: Ruby 3.1.7・Rails 7.0.10（変更なし）。OP の doorkeeper-openid_connect 1.8.9 → 1.8.11 → 1.10.1、doorkeeper 5.7.1 → 5.8.2 → 5.9.9。ostruct 0.5.2（一時固定）が lock に入った
 - 追随した gem の雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 1-b-3）」に記録した（DEF-7.0-43〜47）
 
