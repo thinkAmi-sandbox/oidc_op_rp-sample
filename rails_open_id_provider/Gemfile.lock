@@ -86,7 +86,7 @@ GEM
     base64 (0.1.1)
     bcrypt (3.1.22)
     benchmark (0.3.0)
-    bigdecimal (3.1.1)
+    bigdecimal (3.1.3)
     bindex (0.8.1)
     bootsnap (1.26.0)
       msgpack (~> 1.5)
@@ -116,7 +116,7 @@ GEM
       doorkeeper (>= 5.5, < 6.0)
       jwt (>= 2.5)
       ostruct (>= 0.5)
-    drb (2.1.0)
+    drb (2.1.1)
       ruby2_keywords
     erubi (1.10.0)
     globalid (1.0.1)
@@ -127,12 +127,12 @@ GEM
     jbuilder (2.15.1)
       actionview (>= 7.0.0)
       activesupport (>= 7.0.0)
-    json (2.6.1)
+    json (2.6.3)
     jwt (2.10.3)
       base64
     language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
-    logger (1.5.0)
+    logger (1.5.3)
     loofah (2.25.2)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
@@ -147,7 +147,7 @@ GEM
     mini_mime (1.1.0)
     minitest (5.14.4)
     msgpack (1.8.5)
-    mutex_m (0.1.1)
+    mutex_m (0.1.2)
     net-imap (0.5.15)
       date
       net-protocol
@@ -165,7 +165,7 @@ GEM
     nokogiri (1.18.10-x86_64-linux-gnu)
       racc (~> 1.4)
     orm_adapter (0.5.0)
-    ostruct (0.5.2)
+    ostruct (0.5.5)
     parallel (1.28.0)
     parser (3.3.12.0)
       ast (~> 2.4.1)
@@ -304,7 +304,7 @@ DEPENDENCIES
   webmock
 
 RUBY VERSION
-   ruby 3.1.7p261
+   ruby 3.2.11p268
 
 BUNDLED WITH
-   2.3.27
+   2.4.19
