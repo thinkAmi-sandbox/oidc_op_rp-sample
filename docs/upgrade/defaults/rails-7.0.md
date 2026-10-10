@@ -51,6 +51,7 @@
 | DEF-7.0-40 | devise のエラーメッセージの部分の `data-turbo-cache="false"` が `data-turbo-temporary` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
 | DEF-7.0-41 | ログイン失敗の flash の文言が `Invalid email or password.` になる | 周辺 gem（devise 5.0.4） | OP | 追随 |
 | DEF-7.0-42 | devise の initializer を雛形に合わせ、失敗の応答を 422、リダイレクトを 303 にする | 周辺 gem の雛形（devise 5.0.4 の initializer） | OP | 追随 |
+| DEF-7.0-43 | doorkeeper の initializer を 5.9.9 の雛形に合わせる（コメントだけ） | 周辺 gem の雛形（doorkeeper 5.9.9 の initializer） | OP | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -527,3 +528,18 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 扱い: 追随。`:unprocessable_entity` は Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`）ので、Rack を 3.1 以上にする Step で雛形に合わせ直す（PLAN.md 7 章の devise の行）
 - 出典: `devise-4.9.4/CHANGELOG.md` の 4.9.0「Add support for Hotwire + Turbo」、[heartcombo/devise#5548](https://github.com/heartcombo/devise/pull/5548)、`devise-5.0.4/lib/generators/templates/devise.rb` の「Hotwire/Turbo configuration」、[Rails をはじめよう v7.0](https://railsguides.jp/v7.0/getting_started.html)「7.3 記事を1件作成する」（保存に失敗したら `status: :unprocessable_entity` で表示し直す）「7.5 記事を削除する」（`status: :see_other` でリダイレクトする）、[レイアウトとレンダリング v7.0](https://railsguides.jp/v7.0/layouts_and_rendering.html)「2.2.13.4 `:status` オプション」「2.3.1 リダイレクトのステータスコードを変更する」
 - コミット: OP（`follow the devise 5.0.4 initializer template`）
+
+### DEF-7.0-43: doorkeeper の initializer を 5.9.9 の雛形に合わせる（コメントだけ）
+
+- 種類: 周辺 gem の雛形（doorkeeper 5.9.9 の `lib/generators/doorkeeper/templates/initializer.rb`）/ 対象: OP
+- 何が変わるか: `config/initializers/doorkeeper.rb` を 5.9.9 の雛形を下敷きに作り直し、「変更開始」〜「変更終了」の印で囲んだ独自の設定（`resource_owner_authenticator`・`admin_authenticator`・`access_token_expires_in 10.minutes`・`default_scopes`/`optional_scopes`・`allow_token_introspection`）を同じ位置に入れ直す。コメントを除いたコードは前後で同じで、変わるのはコメントだけ
+  - コメントアウトされた設定の例が増える: `enable_multiple_database_roles`、`revoke_previous_authorization_code_token`、`force_pkce`、`handle_auth_errors :redirect`、`custom_access_token_attributes`
+  - `client_credentials` の説明に、callable を書くとクライアント認証の 2 重の確認（5.9.5・5.9.6）を通らなくなる注意が加わる
+  - `forbid_redirect_uri` の例が、javascript スキームの判定からホストの判定になる（script スキームは常に拒むようになったため）
+  - `access_token_expires_in` の説明が、`nil` にすると期限切れにならず `expires_in` も応答から消える、という内容になる（印の中の説明も雛形の文言にした）
+  - 綴りと用語の直し（`Be default` → `By default`、`whitelist` → `allow`・`allowlist`、RFC の URL を `datatracker.ietf.org` に）
+- なぜ: 今のファイルは、2021 年に doorkeeper 5.5 系で `rails g doorkeeper:install` したときの雛形のままで、その後の版で雛形に足されたコメントが入っていなかった。gem の generator の雛形にも追随すると人間が決めた（[PLAN.md](../PLAN.md) の 3 章の 2 の境目の 1）
+- 3 アプリへの影響: 設定の値は変わらない。OP の minitest（`CI=1` も）・E2E が通り、応答のスナップショットと、起動の途中の読み込み（a-nti_manner の検査と、test・development の書き出し）は前後で同じ
+- 扱い: 追随
+- 出典: `doorkeeper-5.9.9/lib/generators/doorkeeper/templates/initializer.rb`、doorkeeper の CHANGELOG（5.9.0 の #1791、5.7.0 の #1705、5.9.6 の `client_credentials` の説明、5.9.9 の script スキームの拒否）。doorkeeper は Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper 5.9.9 initializer template`）
