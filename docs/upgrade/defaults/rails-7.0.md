@@ -53,6 +53,9 @@
 | DEF-7.0-42 | devise の initializer を雛形に合わせ、失敗の応答を 422、リダイレクトを 303 にする | 周辺 gem の雛形（devise 5.0.4 の initializer） | OP | 追随 |
 | DEF-7.0-43 | doorkeeper の initializer を 5.9.9 の雛形に合わせる（コメントだけ） | 周辺 gem の雛形（doorkeeper 5.9.9 の initializer） | OP | 追随 |
 | DEF-7.0-44 | doorkeeper-openid_connect の initializer を 1.10.1 の雛形に合わせる（コメントだけ） | 周辺 gem の雛形（doorkeeper-openid_connect 1.10.1 の initializer） | OP | 追随 |
+| DEF-7.0-45 | 上書きしている doorkeeper のビューを 5.9.9 の雛形に合わせる | 周辺 gem の雛形（doorkeeper 5.9.9 のビュー） | OP | 追随 |
+| DEF-7.0-46 | doorkeeper のロケールを 5.9.9 の雛形に合わせる | 周辺 gem の雛形（doorkeeper 5.9.9 のロケール） | OP | 追随 |
+| DEF-7.0-47 | doorkeeper-openid_connect のロケールを 1.10.1 の雛形に合わせる | 周辺 gem の雛形（doorkeeper-openid_connect 1.10.1 のロケール） | OP | 追随 |
 
 `load_defaults` の設定は、`new_framework_defaults_7_0.rb` で 1 グループずつ有効にした（グループの順は [PLAN.md](../PLAN.md) の Step 1）。
 
@@ -559,3 +562,41 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 扱い: 追随
 - 出典: `doorkeeper-openid_connect-1.10.1/lib/generators/doorkeeper/openid_connect/templates/initializer.rb`、doorkeeper-openid_connect の CHANGELOG（1.9.0 の #230・#232・#233、1.10.0 の #271・#283 と `issuer` のブロックの引数の変更、1.10.1 の #297）。Rails の外の gem なので、Rails ガイドに該当の節はない
 - コミット: OP（`follow the doorkeeper-openid_connect 1.10.1 initializer template`）
+
+### DEF-7.0-45: 上書きしている doorkeeper のビューを 5.9.9 の雛形に合わせる
+
+- 種類: 周辺 gem の雛形（doorkeeper 5.9.9 の `app/views/doorkeeper/`）/ 対象: OP
+- 何が変わるか: `app/views/doorkeeper/` のうち雛形と違っていた 5 ファイルを、5.9.9 の雛形と同じにする。`authorizations/new.html.erb` だけは、nonce の hidden field 2 つを「追加開始」「追加終了」の印の中に残す（雛形にならって `id: nil` を付けた）。ほかの 9 ファイルと 2 つのレイアウトは元から雛形と同じ
+  - `authorizations/new.html.erb`: 同意と拒否の 2 つのフォームの hidden field に `id: nil` が付き、同じ `id` が 2 回出なくなる。`able_to` の後の `:` がロケールに移る
+  - `authorizations/error.html.erb`: ローカル変数 `error_response` を先に読む。説明の前後が `<pre>` の中で改行・字下げされる
+  - `authorizations/form_post.html.erb`: ローカル変数 `auth` を読む。拒否の経路で落ちなくなる（意図的な仕様変更。[LOG.md](../LOG.md) の Step 1-b-3-2）
+  - `applications/show.html.erb`・`authorizations/show.html.erb`: 見出しの `:` がロケールに移る（DEF-7.0-46 と合わせて表示は同じ）
+- なぜ: 上書きしていたビューは 5.5.2 の雛形のコピーだった。docs/IMPROVEMENTS.md の IMP-008 で新しい雛形に合わせるとしていたものを、gem の generator の雛形にも追随する方針（[PLAN.md](../PLAN.md) の 3 章の 2 の境目の 1）で、1-b-3-2 で行った
+- 3 アプリへの影響: OP だけ。同意画面の応答のスナップショット（`authorize_consent`）は hidden field の `id` が 18 か所なくなるだけで、送る項目と値は同じ。エラー画面（`authorize_error`）は `<pre>` の中に改行と字下げが入り、ブラウザでは説明の前に字下げの空白が見える。E2E のログイン（同意画面で Authorize を押す）は通る。テスト「登録されていない redirect_uri では、エラーの説明を 400 で表示する」は、前後の空白を除いて比べるように直した
+- 扱い: 追随
+- 出典: `doorkeeper-5.9.9/app/views/doorkeeper/authorizations/` の各ファイル、doorkeeper の CHANGELOG（5.6.0.rc1 の #1552、5.6.7 の #1676、5.7.0 の #1702、5.9.1 の #1784）。doorkeeper は Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper 5.9.9 locale and view templates`）
+
+### DEF-7.0-46: doorkeeper のロケールを 5.9.9 の雛形に合わせる
+
+- 種類: 周辺 gem の雛形（doorkeeper 5.9.9 の `config/locales/en.yml`）/ 対象: OP
+- 何が変わるか: `config/locales/doorkeeper.en.yml` を 5.9.9 の gem の `en.yml` と同じにする。応答に出る文言のうち次の 3 つが変わる
+  - 認可エンドポイントのエラー画面の redirect_uri の説明: `The requested redirect uri is malformed or doesn't match client redirect URI.` → `The requested redirect URI is malformed or doesn't match the client redirect URI.`
+  - 認証のない introspect の `error_description` と `WWW-Authenticate`: `Request need to be authorized. Required parameter for authorizing request is missing or invalid.` → `Request needs to be authorized. Required parameter for authorizing the request is missing or invalid.`
+  - doorkeeper の管理画面のアプリの詳細の見出し: `Callback urls:` → `Callback URLs:`
+  - ほかに、見出しの `:` がビューからロケールに移り（表示は同じ）、テストのない経路の文言（`not_match_configured`・`blank_redirect_uri`）が直り、PKCE の方式のエラーが複数形の形になり、`invalid_code_challenge`・`multiple_client_auth_methods`・`forbidden_token` が増える
+- なぜ: 5.9.1 の #1784 で、ビューに書いていた `:` をロケールの文言に移した。あわせて文法と表記（`uri` → `URI` など）が直された。OP のロケールは 2021 年の 5.5 系の雛形のままだった
+- 3 アプリへの影響: RS は introspect を正しく認証して呼び、RP は登録した redirect_uri で認可要求をするので、変わる文言は通らない。E2E は通る。応答のスナップショットは `authorize_error`・`introspect_error` の文言が変わる。画面の文字が変わるが、gem の generator の雛形への追随として A で扱うと人間が決めた（LOG.md の Step 1-b-3-2）
+- 扱い: 追随
+- 出典: `doorkeeper-5.9.9/config/locales/en.yml`、doorkeeper の CHANGELOG（5.8.0 の PKCE のエラー、5.9.1 の #1784、5.9.5 のクライアント認証の 2 重の拒否）。Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper 5.9.9 locale and view templates`）
+
+### DEF-7.0-47: doorkeeper-openid_connect のロケールを 1.10.1 の雛形に合わせる
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.1 の `config/locales/en.yml`）/ 対象: OP
+- 何が変わるか: `config/locales/doorkeeper_openid_connect.en.yml` を 1.10.1 の gem の `en.yml` と同じにする。増えるのはエラーの文言の 3 項目（`signing_key_not_configured`・`issuer_not_configured`・`dynamic_client_registration_unauthorized`）だけ
+- なぜ: OP のロケールは doorkeeper-openid_connect 1.8 系の雛形のままだった。1.10.x で設定の確認と DCR のエラーが足された
+- 3 アプリへの影響: 今の設定（issuer と署名鍵を設定し、DCR は無効）では、どれも出ない。応答のスナップショットの差分はない
+- 扱い: 追随
+- 出典: `doorkeeper-openid_connect-1.10.1/config/locales/en.yml`、doorkeeper-openid_connect の CHANGELOG（1.10.0 の #267、1.10.1 の #299）。Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper 5.9.9 locale and view templates`）
