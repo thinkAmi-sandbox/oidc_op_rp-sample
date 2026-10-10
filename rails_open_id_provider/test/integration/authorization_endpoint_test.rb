@@ -26,7 +26,7 @@ class AuthorizationEndpointTest < ActionDispatch::IntegrationTest
     get oauth_authorization_path, params: params.merge(redirect_uri: 'http://localhost:3781/unregistered/callback')
 
     assert_response :bad_request
-    # doorkeeper 5.7.0 からの雛形は、<pre> の中で説明の前後を改行して字下げする
+    # doorkeeper 5.6.5 からの雛形は、<pre> の中で説明の前後を改行して字下げする
     assert_equal I18n.t('doorkeeper.errors.messages.invalid_redirect_uri'), css_select('main pre').text.strip
   end
 
