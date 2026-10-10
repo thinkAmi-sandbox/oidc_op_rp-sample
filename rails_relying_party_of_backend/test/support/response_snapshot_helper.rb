@@ -83,12 +83,14 @@ module ResponseSnapshotHelper
     mask_params(body.gsub(INPUT_TAG) { |tag| mask_hidden_field(tag) })
   end
 
-  # Content-Type が JSON でも、本文が JSON として読めないときはテキストとして扱う。
+  # Content-Type が JSON でも、リダイレクトの本文が JSON として読めないときはテキストとして扱う。
   # doorkeeper-openid_connect は、OIDC のエラー（login_required など）をリダイレクトで返すときに、
-  # JSON の Content-Type を付けたまま、本文は Rails のリダイレクトの HTML にする
+  # JSON の Content-Type を付けたまま、本文は Rails のリダイレクトの HTML にする。
+  # リダイレクト以外は、JSON のキーで伏せる処理を飛ばして書き出さないよう、読めなければ JSON::ParserError で落とす
   def json_body?(body)
     media_type = response.media_type.to_s
     return false unless (media_type == 'application/json' || media_type.end_with?('+json')) && body.present?
+    return true unless response.redirect?
 
     JSON.parse(body)
     true
