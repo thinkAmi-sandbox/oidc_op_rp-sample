@@ -1,7 +1,8 @@
-HTTP 400
-cache-control: no-cache
+HTTP 200
+cache-control: max-age=0, private, must-revalidate
 content-length: <CONTENT_LENGTH>
 content-type: text/html; charset=utf-8
+etag: <ETAG>
 link: </stylesheets/doorkeeper/application.css>; rel=preload; as=style; nopush
 referrer-policy: strict-origin-when-cross-origin
 set-cookie: _rails_open_id_provider_session=<COOKIE>; path=/; HttpOnly; SameSite=Lax
@@ -27,15 +28,19 @@ x-xss-protection: 0
 <body>
 <div id="container">
 
-  <div class="border-bottom mb-4">
-  <h1>An error has occurred</h1>
-</div>
+  <header class="page-header">
+  <h1>Submit this form</h1>
+</header>
 
-<main role="main">
-  <pre>
-    The requested redirect URI is malformed or doesn&#39;t match the client redirect URI.
-  </pre>
-</main>
+<form name="redirect_form" action="http://localhost:3781/auth/my_op/callback" accept-charset="UTF-8" method="post">
+    <input type="hidden" name="error" id="error" value="access_denied" autocomplete="off" />
+    <input type="hidden" name="error_description" id="error_description" value="The resource owner or authorization server denied the request." autocomplete="off" />
+</form>
+<script>
+  window.onload = function () {
+    document.forms['redirect_form'].submit();
+  };
+</script>
 
 </div>
 </body>

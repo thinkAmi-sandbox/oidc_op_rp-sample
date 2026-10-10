@@ -3,7 +3,7 @@ cache-control: no-store
 content-length: <CONTENT_LENGTH>
 content-type: application/json; charset=utf-8
 referrer-policy: strict-origin-when-cross-origin
-www-authenticate: Bearer realm="Doorkeeper", error="invalid_request", error_description="Request need to be authorized. Required parameter for authorizing request is missing or invalid."
+www-authenticate: Bearer realm="Doorkeeper", error="invalid_request", error_description="Request needs to be authorized. Required parameter for authorizing the request is missing or invalid."
 x-content-type-options: nosniff
 x-download-options: noopen
 x-frame-options: SAMEORIGIN
@@ -14,5 +14,5 @@ x-xss-protection: 0
 
 {
   "error": "invalid_request",
-  "error_description": "Request need to be authorized. Required parameter for authorizing request is missing or invalid."
+  "error_description": "Request needs to be authorized. Required parameter for authorizing the request is missing or invalid."
 }

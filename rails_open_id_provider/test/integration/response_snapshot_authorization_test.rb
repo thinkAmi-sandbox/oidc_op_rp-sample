@@ -56,6 +56,14 @@ class ResponseSnapshotAuthorizationTest < ActionDispatch::IntegrationTest
     assert_response_snapshot 'authorize_form_post'
   end
 
+  test 'response_mode=form_post で拒否したときの応答' do
+    sign_in users(:user)
+
+    delete oauth_authorization_path, params: new_authorization_params.merge(response_mode: 'form_post')
+
+    assert_response_snapshot 'authorize_form_post_deny'
+  end
+
   test '同意済みで同意画面を省いたときの応答' do
     issue_tokens
 
