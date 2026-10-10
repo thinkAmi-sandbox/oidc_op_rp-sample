@@ -67,9 +67,9 @@
 | 1 | 3.1 | **7.0.x** | annotate 3.2.0、`app:update`、`load_defaults 7.0`、concurrent-ruby 1.3.7 |
 | 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、3 アプリの応答のスナップショットのテスト（1-b-2）、Rails 7.0 以上を必要とする周辺 gem（1-b-3-1: jbuilder・activerecord-session_store・omniauth-rails_csrf_protection・devise 5.x、1-b-3-2: doorkeeper 5.9・doorkeeper-openid_connect 1.10） |
 | 2 | **3.2** | 7.0 | Ruby、nokogiri 1.19（advisory の解消） |
-| 2-b | 3.2 | 7.0 | Ruby 3.2 以上を必要とする周辺 gem（doorkeeper-openid_connect 1.10.5、byebug 13、rack-mini-profiler 5、simplecov 1.2、zeitwerk、brakeman 8） |
+| 2-b | 3.2 | 7.0 | Ruby 3.2 以上を必要とする周辺 gem（doorkeeper-openid_connect 1.10.5、zeitwerk 2.7・2.8、byebug 13、simplecov 1.2、brakeman 8.0。rack-mini-profiler 5 は Step 3 に移した） |
 | スキル化 | 3.2 | 7.0 | `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（13 章） |
-| 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応） |
+| 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応）、rack-mini-profiler 5 |
 | 4 | **3.3** | 7.1 | Ruby のみ |
 | 5 | 3.3 | **7.2.x** | `Rails.application.secrets` 削除への対応、sqlite3 2.x、annotate → annotaterb |
 | 6 | 3.3 | **8.0.x** | puma 6 以上、Solid 系・Kamal 系の生成物は不採用 |
@@ -588,10 +588,49 @@ Ruby 3.2 以上を必要とする gem（2-b の候補。2-b の着手時に確�
 | brakeman | 7.1.1 → 8.0.6 | 警告の種類が変わりうる |
 | faraday-net_http | 3.0.2（一時固定） | 3.4.x は net-http `~> 0.5` で、3.2.11 の default の 0.4.1 では満たせない。3.1〜3.3 は `net-http >= 0` で、lock に net-http が増える |
 
+### Step 2-b: Ruby 3.2 以上を必要とする周辺 gem
+
+Step 2 が epic に入ってから調べ、作業計画を出して承認を得た（2026-10-10）。Ruby 3.2.11・Rails 7.0.10 のまま、Ruby 3.1 のために止めていた周辺 gem を上げる。経緯と作業の記録は LOG.md の Step 2-b。
+
+- [ ] doorkeeper-openid_connect 1.10.1 → 1.10.5（OP）。GHSA-8r7r-wh7x-27ff の修正版を含む
+- [ ] doorkeeper-openid_connect の initializer とロケールを 1.10.5 の雛形に合わせる（独自の設定は残す）
+- [ ] zeitwerk 2.6.18 → 2.7.5 → 2.8.3（3 アプリ）
+- [ ] byebug 12.0.0 → 13.0.0（3 アプリ。依存の reline 0.6.0・io-console 0.6.0 は一時固定）
+- [ ] simplecov 0.22.0 → 1.2.0（3 アプリ）
+- [ ] brakeman 7.1.1 → 8.0.6（3 アプリ）
+- [ ] ブラウザで手動確認（すべての gem を上げた後に、introspection の流れまで 1 回）
+- 着手時の作業計画で決めたこと（人間が承認）
+  - 順番: doorkeeper-openid_connect（advisory の修正版なので最初）→ 雛形への追随 → zeitwerk 2.7.5 → 2.8.3 → byebug → simplecov → brakeman。1 gem ずつ、アプリごとに RS → RP → OP の順でコミットする。PR は 1 つ
+  - doorkeeper-openid_connect は `bundle update doorkeeper-openid_connect --patch --conservative` で 1.10.5 にする（`--conservative` だけでは 2.0.0 になる）。2.0.0 はメジャーで、マイグレーションが要るので対象外（7 章）
+  - zeitwerk は 2.7.5 を一時固定で入れてから、2.8.3 にする（マイナーを飛ばさない。Rails 7.0.10 自身の lock が 2.7.3）
+  - byebug 13 の依存のうち、reline は「default gem の版では要件を満たせないものは、要件を満たす最小の版」（Step 1 の benchmark・securerandom と同じ扱い）で 0.6.0 に、io-console は default gem の版（0.6.0）に一時固定する
+  - brakeman は 8.0.6 にする（8.1.0 は 2026-10-01 公開で、2 週間たっていない）。8.1.0 は次の Step の最初に上げる（7 章）
+  - rack-mini-profiler 5.0.0 は上げず、Step 3（Rails 7.1）に移す（人間が判断。CLAUDE.md の ①対応版を待つ）。5.0.0 の railtie が Rails 7.1 の `Rails.env.local?` を使い、Rails 7.0 の development ではプロファイラーが無効になるため（下の「調べたこと」）
+  - gem の雛形への追随（A）は、項目ごとに解説して返事をもらってから、[defaults/rails-7.0.md](defaults/rails-7.0.md) に DEF-7.0-48 から記録する
+  - 2-b の対象は Ruby 3.2 以上を必要とする gem だけにする。`bundle outdated` に出るほかの gem（jwt 3.x、間接依存）は動かさない（7 章）
+  - 手動確認は、すべての gem を上げた後に 1 回（doorkeeper-openid_connect と、development の zeitwerk の読み込みを含めるため）
+
+調べたこと（着手時の 2026-10-10。rubygems の API、`bundle outdated`、3 アプリでの `bundle lock --update <gem> --conservative --print`（lock を書かずに解決の結果だけを出す）、GitHub のタグのソースと CHANGELOG。ソースと CHANGELOG はサブエージェント 3 つで調べ、要点は自分で確かめた）:
+
+| gem | 版・要件 | 分かったこと |
+|---|---|---|
+| doorkeeper-openid_connect | 1.10.5（2026-07-09。Ruby `>= 3.2`、`doorkeeper >= 5.5, < 6.0`・`jwt >= 2.5`・`ostruct >= 0.5`。36,864 B） | 1.10.2（#312）で、ID トークンの `iss`・`sub`・`aud`・`exp`・`iat` が nil か空なら `MissingRequiredClaim` を出す（OP は `issuer` が固定値、`sub` が `resource_owner.id`、`aud` が uid なので起きない）。1.10.2（#304）で、grant ごとの `auth_time` を返す `auth_time_from_access_token` が増えた（opt-in。列とマイグレーションは増えない）。`max_age` の判定は 1.10.5 も `auth_time_from_session` → 非推奨の `auth_time_from_resource_owner` の順で、IMP-011 の状況は変わらない。1.10.3（#308）で、`openid_request` の関連を `on_load(:active_record)` の `run_hooks` から `AccessGrantExtension#included` で足すようになった。1.10.4 で GHSA-8r7r-wh7x-27ff（DCR の scope）を直した（DCR は既定で無効のまま）。1.10.5（#329）は doorkeeper 5.8 未満の discovery の修正で、5.9.9 では値が同じ。雛形は、initializer がコメントだけの差分、ロケールが `missing_required_claim` の 1 つの追加、マイグレーションは同じ |
+| doorkeeper-openid_connect 2.0.0 | 2026-09-22 | メジャー。`post_logout_redirect_uris` の列を足すマイグレーション（#243）、`id_token token` の応答の変更、設定・定数の削除、discovery・Webfinger・JWKS の変化がある |
+| byebug | 13.0.0（2026-01-15。Ruby `>= 3.2.0`、`reline >= 0.6.0`。85,504 B） | readline をやめて reline を使う（#909・#905）。IRB は `irb` コマンドのときだけ読む（#824）。`require 'byebug'`（`Bundler.require`）では reline を読まず、`byebug` を呼んだときに読む。固定しないと reline 0.7.0 と io-console 0.9.4（C 拡張）が lock に入る |
+| reline / io-console | reline 0.6.0（2024-12-16。`io-console ~> 0.5`。51,712 B）。Ruby 3.2.11 の default gem は reline 0.3.2・io-console 0.6.0・irb 1.6.2（`reline >= 0.3.0`） | lock に reline が入ると、`bin/rails c` の irb 1.6.2（default gem。lock にない）も lock の reline を読む。irb 1.6.2 が使う Reline の API は、reline 0.6.0〜0.7.0 にすべて残っている（ソースの突き合わせ。reline の CI は irb の master しか試していない）。reline が使う io-console の機能は 0.6.0 にある |
+| rack-mini-profiler | 5.0.0（2026-08-21。Ruby `>= 3.2.0`） | `lib/mini_profiler_rails/railtie.rb` が、4.0.1 の `Rails.env.development? \|\| Rails.env.test?` を `Rails.env.local?` に変えた（#661。CHANGELOG にはない）。`local?` は Rails 7.1 で入ったもので、Rails 7.0.10 では `StringInquirer` の `method_missing` で false になる（OP の development で確かめた）。そのため development でも `authorization_mode = :allow_authorized` になり、バッジ・`x-miniprofiler-*` ヘッダー・Cache-Control の書き換えが出なくなる。gemspec の開発時の依存は `rails >= 7.1` |
+| simplecov | 1.2.0（2026-09-04。Ruby `>= 3.2`、依存なし。212,992 B）。1.3 は Ruby 3.3 以上 | docile・simplecov-html・simplecov_json_formatter が lock から消える（HTML と JSON の formatter は本体に取り込まれた）。`rails` プロファイルの集計の対象は同じ（`test/` は 0.22 でも除外）。結果の行が stdout から stderr に移り、文言が変わる。`coverage/` は 1 ファイルの `index.html`（1.1.0）と `coverage.json`、`.history.json`（1.2.0）などになる。`rails` プロファイルに `merge_subprocesses true` が入る。最低カバレッジを設定していないので、終了コードは変わらない |
+| zeitwerk | 2.7.5（2026-02-19。41,472 B）、2.8.3（2026-08-01。44,032 B）。どちらも Ruby `>= 3.2` | Rails v7.0.10 自身の lock が zeitwerk 2.7.3。Rails 7.0.10 が呼ぶ API（`Loader.new`・`push_dir`・`setup`・`on_load`・`on_unload`・`eager_load_all`・`reload`、zeitwerk:check が読むエラーの文言）は、2.7.5・2.8.3 に同じ形で残る。2.8.0〜2.8.2 の collapse の回帰は 2.8.3 で直った（Rails 7.0 とアプリは collapse を使わない）。lock で zeitwerk に依存するのは railties だけ |
+| brakeman | 8.0.6（2026-08-12。Ruby `>= 3.2.0`、`racc >= 0`。1,630,208 B）。8.1.0 は 2026-10-01 | fingerprint の計算、ignore ファイルの形式、終了コード、`--no-pager -q` は 7.1.1 と同じ。増えたチェックは Rails 4.2.5 以下が対象の `CheckRenderRCE` だけ。Ruby 3.2・Rails 7.0 の EOL の日付は同じ |
+| advisory | — | ローカルの ruby-advisory-db（2026-10-06）と GitHub の Advisory Database に、上の版と reline・io-console の advisory はない。GHSA-8r7r-wh7x-27ff は今もリポジトリの advisory にだけある |
+| lock の解決 | — | 3 アプリで `--print` を試すと、どの gem も、その gem（byebug は reline・io-console も、simplecov は依存の 3 つ）だけが動く。何も指定しないと、doorkeeper-openid_connect は 2.0.0、zeitwerk は 2.8.3、brakeman は 8.1.0 になる。`--patch` を付けると doorkeeper-openid_connect は 1.10.5 になる。lock の default gem と一時固定の gem は、どの試行でも動かない |
+| ほかの gem（`bundle outdated`） | — | Ruby 3.2 を必要とする直接の gem は上の表ですべて（web-console 4.3 は Rails 8 も必要で Step 6）。今の Ruby・Rails で上げられるものは、jwt 3.3.0（RP・OP）と間接依存（hashie・responders・i18n・tzinfo・minitest・rack-test など）だけ |
+
 ### Step 2〜9
 
 「8. 各 Step 共通の手順」に従う。Step 固有の作業はロードマップの表のとおり。補足:
 
+- **Step 3（Rails 7.1）**: rack-mini-profiler を 5.0.0 に上げる（Gemfile の `~> 4.0` を変える。Step 2-b から移した）
 - **Step 3（Rails 7.1）**: RP の独自ストラテジーを Zeitwerk に載せる（案 B）
   - `rails_relying_party_of_backend/config/application.rb` に以下を追加し、`app:update` が提案する `config.autoload_lib` は採用しない
     ```ruby
@@ -628,19 +667,19 @@ Ruby 3.2 以上を必要とする gem（2-b の候補。2-b の着手時に確�
 |---|---|---|---|
 | mail | 2.7.1 | 0-a で 2.8.1（済）→ 0-d-3 で 2.9.1（済） | 0-a は Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした。0-d-3 は advisory の修正 |
 | nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19.4（済。advisory 12 件を解消） | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
-| jwt（RP は直接使う。RS は oauth2 経由の間接依存。OP はテストが直接使い、doorkeeper-openid_connect 1.8.4 以上の依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま）→ 0-f-3 で OP に 2.10.3（済。test グループに明記。一時固定で入れた） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる |
+| jwt（RP は直接使う。RS は oauth2 経由の間接依存。OP はテストが直接使い、doorkeeper-openid_connect 1.8.4 以上の依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま）→ 0-f-3 で OP に 2.10.3（済。test グループに明記。一時固定で入れた） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる。3.x に上げる時期は未定（Ruby 3.2 を必要としないので Step 2-b の対象外とした。Step 3 以降の着手時に判断する） |
 | json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f-3 で外れた（済） | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だったが、OP は署名だけで decode しないため影響なし。doorkeeper-openid_connect 1.8.4 で jwt に置き換わった。OP の minitest は、0-f-3 で gem を上げる前に ruby-jwt に書き直した |
 | nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済）。msgpack は 0-d-3 で 1.8.5（済） | 0-a は clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新。0-d-3 は advisory の修正 |
 | thor（railties 経由） | 1.1.0 | 0-f-1 で 1.5.0（済） | 1.1.0 は Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし）。1.2.0 で出なくなった。railties 6.1 は `~> 1.0` |
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（済。同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
 | faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（済。oauth2 の後。RP は Gemfile に明記） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
 | faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Step 2 で見直し、3.0.2 のまま → Step 8（Ruby 3.4）で見直す（Ruby 3.3.12 の default gem の net-http は 0.4.1、3.4.11 は 0.6.0 で、3.4.x の `~> 0.5` を満たすのは 3.4 から。Step 2 のコードレビューで確かめた） | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない。3.4.x は net-http `~> 0.5` で、Ruby 3.2.11 の default gem の net-http 0.4.1 では満たせない（Step 2）。3.1〜3.3 は `net-http >= 0` で、lock に net-http が増える |
-| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（済。initializer・ロケール・ビューを雛形に合わせた）→ doorkeeper-openid_connect 1.10.5 は Step 2-b | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2-b で上げる。doorkeeper 6.0 では、トークンを 2 つの方法で渡す要求が 401 から 400 `invalid_request` になる（5.9.7 の CHANGELOG）ので、6.0 に上げるときに `userinfo_bearer_and_param` のスナップショットを見る。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
+| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（済。initializer・ロケール・ビューを雛形に合わせた）→ Step 2-b で doorkeeper-openid_connect 1.10.5（`--patch --conservative`。`--conservative` だけでは 2.0.0 になる）→ 2.0 は時期未定 | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2-b で上げる。2.0.0 はメジャーで、`post_logout_redirect_uris` の列を足すマイグレーション（#243）が要り、応答も変わる（Step 2-b の着手時）。doorkeeper 6.0 では、トークンを 2 つの方法で渡す要求が 401 から 400 `invalid_request` になる（5.9.7 の CHANGELOG）ので、6.0 に上げるときに `userinfo_bearer_and_param` のスナップショットを見る。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
 | devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ 1-b-3-1 で 5.0.4（済。advisory 2 件を解消。initializer を雛形に合わせた） | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認）。initializer の `config.responder.error_status = :unprocessable_entity` は、Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`）。Rack を 3.1 以上にする Step で、雛形に合わせ直す（テストの `assert_response :unprocessable_entity` も） |
 | dotenv-rails | 2.7.6 | 0-f-1 で 3.2.0（済） | 読むファイルの順番と、既にある環境変数を上書きしないことは 2.x と同じ。3.x はテストのたびに ENV を戻し、Rails のログに変数名を出す |
 | puma | 5.4 | 0-d-3 で 5.6.9（済）→ 0-f-1 で 6.6.1（済）→ 7.2.1 以上 | 7 系に上げる時期は後の Step で判断。5.5.0 以降（6.6.1 も）は PROXY protocol v1 の advisory 2 件（CVE-2026-47736 / 47737）の対象で、修正版は 7.2.1 / 8.0.2 だけ。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない（無視リストに入れた） |
 | spring | 2.1.1 | 0-f-1 で削除（済） | Rails 7 から標準で入らない。`bin/spring`・`config/spring.rb` も消し、`bin/rails`・`bin/rake` を Rails 7.0 の雛形の形にした |
-| byebug / web-console / listen / rack-mini-profiler | — | 0-f-1 で 12.0.0 / 4.2.1 / 3.10.1 / 4.0.1（済）→ listen は Step 1 で外した（済）→ Step 2-b で byebug 13・rack-mini-profiler 5 → web-console 4.3 は Step 6 | 次の版は Ruby 3.2 以上が必要。web-console 4.3.0 は actionview・railties 8.0 以上も必要（Step 2 の着手時）。byebug 13 は reline `>= 0.6` を依存に足す。rack-mini-profiler 5 は Gemfile の `~> 4.0` を変える必要がある。listen の `EventedFileUpdateChecker` の finalizer の `ThreadError` の警告（LOG.md の Step 0-b）は、3.10.1 でも出る（listen 側も未修正）。Rails 7.0 の development.rb の雛形には `file_watcher` の行がない。Step 1 で雛形に合わせて行を消し、使われなくなる listen を Gemfile から外す（人間が判断）。Step 1 の手動確認で警告が出なくなったことを確かめた。web-console 4.2.1 は development で `ActionDispatch::Request` を initializer より前に読み込む（4.3.0 も同じ。docs/upgrade/defaults/rails-7.0.md の「補足」） |
+| byebug / web-console / listen / rack-mini-profiler | — | 0-f-1 で 12.0.0 / 4.2.1 / 3.10.1 / 4.0.1（済）→ listen は Step 1 で外した（済）→ Step 2-b で byebug 13 → rack-mini-profiler 5 は Step 3 → web-console 4.3 は Step 6 | 次の版は Ruby 3.2 以上が必要。rack-mini-profiler 5.0.0 は railtie で Rails 7.1 の `Rails.env.local?` を使い、Rails 7.0 の development ではプロファイラーが無効になるので、Rails 7.1 にした後に上げる（Step 2-b の着手時に人間が判断）。web-console 4.3.0 は actionview・railties 8.0 以上も必要（Step 2 の着手時）。byebug 13 は reline `>= 0.6` を依存に足す。rack-mini-profiler 5 は Gemfile の `~> 4.0` を変える必要がある。listen の `EventedFileUpdateChecker` の finalizer の `ThreadError` の警告（LOG.md の Step 0-b）は、3.10.1 でも出る（listen 側も未修正）。Rails 7.0 の development.rb の雛形には `file_watcher` の行がない。Step 1 で雛形に合わせて行を消し、使われなくなる listen を Gemfile から外す（人間が判断）。Step 1 の手動確認で警告が出なくなったことを確かめた。web-console 4.2.1 は development で `ActionDispatch::Request` を initializer より前に読み込む（4.3.0 も同じ。docs/upgrade/defaults/rails-7.0.md の「補足」） |
 | sprockets-rails | 3.2.2（間接） | Step 1 で lock から外れた（済。Gemfile には足さない） | Rails 7.0 から rails gem の依存から外れる。3 アプリとも `sprockets/railtie` を読み込んでいない。Gemfile に足すと `Bundler.require` で `sprockets/railtie` が読み込まれ、アセットパイプラインが有効になるので足さない（Step 1） |
 | sqlite3 | 1.4.2 | 0-a で 1.7.3（済。clang 17 で 1.4 系がビルドできないため 0-f から前倒し）→ Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
 | annotate | 3.1.1 | Step 1 で 3.2.0（済）→ Step 5 で annotaterb に置換 | 3.1.1 は `activerecord < 7.0` で、Rails 7.0 にするには 3.2.0 が要る。3.2.0 も `activerecord < 8.0` で、Rails 8 に対応しない（0-f で gemspec を確認）。当初は「注釈の出力が変わるので 3.2.0 には上げない」としたが、Step 1 の調査で、OP の注釈に関わる差分はないと分かった。annotaterb の 4.23 以上は CI で Ruby 3.3 以上だけを試すので、置き換えは Step 5 のまま |
@@ -649,13 +688,14 @@ Ruby 3.2 以上を必要とする gem（2-b の候補。2-b の着手時に確�
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
 | a-nti_manner_kick_course | — | 1-b-1 で 0.5.0 を足す → Rails 8.2 以上で外すかを判断（今回の目標の外なので、epic の間は残す） | development・test だけ。Gemfile の先頭に置く。Rails 8.2 で入る Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない。README によると、Rails 7.2 以上は `rails runner 1` の代わりに `rails boot` で起動できる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
-| brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初（brakeman 8 系は Step 2-b） | brakeman 8 系は Ruby 3.1 では入らない |
-| simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初（simplecov 1.2 は Step 2-b） | simplecov 1.x は Ruby 3.2 以上が必要。1.3 は Ruby 3.3 以上（Step 2 の着手時） |
+| brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初（brakeman 8.0.6 は Step 2-b、8.1.0 は次の Step の最初） | brakeman 8 系は Ruby 3.1 では入らない。8.1.0 は 2026-10-01 公開で、Step 2-b の時点では 2 週間たっていない |
+| simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初（simplecov 1.2 は Step 2-b、1.3 は Step 4） | simplecov 1.x は Ruby 3.2 以上が必要。1.3 は Ruby 3.3 以上（Step 2 の着手時） |
 | json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | Step 2 で 2.6.3（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
 | bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | Step 2 で 3.1.3（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
 | concurrent-ruby（Rails 経由） | 1.1.9 | Step 1 で 1.3.8（済。Rails 7.0.10 にした後） | 1.3.5 以上は Rails 6.1 と 7.0.8.7 では起動しない（LOG.md の Step 0-a、Step 0-d-1）。7.0.10 は activesupport が logger を require する（rails/rails#54264）。advisory は 1.3.7 で解消する |
 | benchmark / securerandom / drb / mutex_m（activesupport 7.0.10 経由） | — | Step 1 で一時固定（済。0.3.0 / 0.3.0 / 2.1.0 / 0.1.1。drb の依存の ruby2_keywords 0.0.5 も lock に入った）→ Step 2 で drb 2.1.1・mutex_m 0.1.2（済。benchmark・securerandom は 0.3.0、ruby2_keywords は 0.0.5 のまま）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | activesupport 7.0.10 の依存。drb・mutex_m は Ruby 3.1.7 の default gem と同じ版。benchmark・securerandom は `>= 0.3` を要求し、default gem（どちらも 0.2.0。Ruby 3.2.11 は 0.2.1・0.2.2）では満たせないので、要件を満たす最小の版にした |
-| zeitwerk（railties 経由） | 2.4.2 | Step 1 で 2.6.18（済）→ 2.7 以上は Step 2-b | railties 7.0 は `~> 2.5`。2.7 は Ruby 3.2 以上が必要 |
+| zeitwerk（railties 経由） | 2.4.2 | Step 1 で 2.6.18（済）→ Step 2-b で 2.7.5 → 2.8.3 | railties 7.0 は `~> 2.5`。2.7 は Ruby 3.2 以上が必要。Rails v7.0.10 自身の lock は 2.7.3（Step 2-b の着手時） |
+| reline / io-console（byebug 13 経由） | — | Step 2-b で reline 0.6.0・io-console 0.6.0 を一時固定 → Ruby を上げる各 Step で見直す（8 章の 4） | byebug 13 は `reline >= 0.6.0` に依存し、Ruby 3.2.11 の default gem の reline 0.3.2 では満たせない。reline は要件を満たす最小の版（Step 1 の benchmark・securerandom と同じ扱い）、io-console は default gem と同じ版にした。固定しないと reline 0.7.0 と io-console 0.9.4（C 拡張）が入る。lock の reline は、`bin/rails c` の irb（default gem）も読む |
 | rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / bcrypt | — | 0-d-3（済） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられた。上げた版は LOG.md の Step 0-d-3（mail・msgpack・faraday・puma は上の行） |
 | logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Step 2 で 1.5.3（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
 | base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | Step 2 は同じ版（0.1.1）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
