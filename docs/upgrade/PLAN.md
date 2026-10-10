@@ -435,13 +435,27 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 
 1-b-3-2（ブランチ `upgrade/step1b-doorkeeper`。1-b-3-1 が epic に入ってから始める）:
 
-- [ ] 先にテストを足す（下の「1-b-3-2 の着手時の作業計画で決めたこと」の表）
-- [ ] doorkeeper-openid_connect 1.8.9 → 1.8.11（一時固定。ostruct は 0.5.2 に一時固定）→ doorkeeper 5.7.1 → 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（どの段も 1 gem だけを動かす）
-- [ ] OP・RP・RS の間のやり取りが変わるもの（下の「B の候補」の表）は B として段ごとに止まって確かめ、設定で戻せないものは「意図的な仕様変更」にする
-- [ ] doorkeeper・doorkeeper-openid_connect の initializer を、上げた版の雛形に合わせる（独自の設定は残す）
-- [ ] doorkeeper・doorkeeper-openid_connect のロケールと、上書きしているビューを雛形に合わせる（IMP-008。nonce の hidden field は残す）
+- [x] 先にテストを足す（下の「1-b-3-2 の着手時の作業計画で決めたこと」の表）
+- [x] doorkeeper-openid_connect 1.8.9 → 1.8.11（一時固定。ostruct は 0.5.2 に一時固定）→ doorkeeper 5.7.1 → 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（どの段も 1 gem だけを動かした）。GHSA-h5m9-42h9-vcq6 を解消した
+- [x] OP・RP・RS の間のやり取りが変わるもの（下の「B の候補」の表）は B として段ごとに止まって確かめ、設定で戻せないものは「意図的な仕様変更」にする（下の「1-b-3-2 の意図的な仕様変更」）
+- [x] 応答のスナップショットのヘルパーで、JSON として読めない本文をテキストとして扱う（3 アプリ。作業の途中で人間が承認）
+- [x] doorkeeper・doorkeeper-openid_connect の initializer を、上げた版の雛形に合わせる（独自の設定は残す。DEF-7.0-43・44）
+- [x] doorkeeper・doorkeeper-openid_connect のロケールと、上書きしているビューを雛形に合わせる（IMP-008。nonce の hidden field は残す。DEF-7.0-45〜47）
 - [x] `response_mode=form_post` で拒否したときに OP のビューが落ちるか（調査での推測）を確かめる（着手時。5.7.1 でも落ちる元からの挙動。下の表）
-- [ ] ブラウザで手動確認（雛形に合わせた後に、introspection の流れまで 1 回）
+- [x] ブラウザで手動確認（雛形に合わせた後に、introspection の流れまで 1 回）
+
+1-b-3-2 の意図的な仕様変更（設定では戻せない。段ごとに人間が承認。経緯と確かめ方は LOG.md の Step 1-b-3-2「意図的な仕様変更」）:
+
+- 認可要求の `max_age=0` で再認証する（doorkeeper-openid_connect 1.8.11）
+- トークン要求の成功の応答に `Pragma: no-cache` が戻る（doorkeeper 5.8.0。0-f-3 では消えたことを記録だけにしていた）
+- 認証のない introspect の `error_description` が `request_not_authorized` の文言になる（doorkeeper 5.8.0）
+- userinfo の JSON のキーの順が `email, sub` になる（doorkeeper-openid_connect 1.10.0）
+- Webfinger が落ちずに、issuer を `href` にした 200 を返す（doorkeeper-openid_connect 1.10.0）
+- `prompt=select_account` が `account_selection_required`、`prompt=none` と `max_age` が `login_required` のエラーになる（doorkeeper-openid_connect 1.10.0）
+- introspect のキーの順が `iat, exp` になる（doorkeeper 5.9.1）
+- クライアント認証を 2 重に使うトークン要求を 400、トークンを 2 つの方法で渡す要求を 401 で拒む（doorkeeper 5.9.5〜5.9.7）
+- scope の足りないトークンの 403 に `insufficient_scope` の `WWW-Authenticate` が付く（doorkeeper 5.9.1）
+- `response_mode=form_post` で拒否すると、落ちずに `error=access_denied` を POST するフォームを返す（ビューを雛形に合わせた）
 
 着手時の作業計画で決めたこと（人間が承認）:
 
@@ -569,7 +583,7 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（済。同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
 | faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（済。oauth2 の後。RP は Gemfile に明記） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
 | faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Ruby を上げる各 Step で見直す | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない |
-| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9 → doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2 の後に上げる。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
+| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（済。initializer・ロケール・ビューを雛形に合わせた）→ doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2 の後に上げる。doorkeeper 6.0 では、トークンを 2 つの方法で渡す要求が 401 から 400 `invalid_request` になる（5.9.7 の CHANGELOG）ので、6.0 に上げるときに `userinfo_bearer_and_param` のスナップショットを見る。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
 | devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ 1-b-3-1 で 5.0.4（済。advisory 2 件を解消。initializer を雛形に合わせた） | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認）。initializer の `config.responder.error_status = :unprocessable_entity` は、Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`）。Rack を 3.1 以上にする Step で、雛形に合わせ直す（テストの `assert_response :unprocessable_entity` も） |
 | dotenv-rails | 2.7.6 | 0-f-1 で 3.2.0（済） | 読むファイルの順番と、既にある環境変数を上書きしないことは 2.x と同じ。3.x はテストのたびに ENV を戻し、Rails のログに変数名を出す |
 | puma | 5.4 | 0-d-3 で 5.6.9（済）→ 0-f-1 で 6.6.1（済）→ 7.2.1 以上 | 7 系に上げる時期は後の Step で判断。5.5.0 以降（6.6.1 も）は PROXY protocol v1 の advisory 2 件（CVE-2026-47736 / 47737）の対象で、修正版は 7.2.1 / 8.0.2 だけ。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない（無視リストに入れた） |
@@ -594,7 +608,7 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 | logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
 | base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
 | cgi（activerecord-session_store 経由、RP） | 0.3.7（0-f-1 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.5.2 が lock に入り、アプリが読む cgi が変わるため、一時固定で 0.3.7 にした |
-| ostruct（doorkeeper-openid_connect 1.8.11 以上経由、OP） | — | 1-b-3-2 で 0.5.2 に一時固定 → Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。固定しないと 0.6.3 が lock に入り、アプリが読む ostruct が変わる |
+| ostruct（doorkeeper-openid_connect 1.8.11 以上経由、OP） | — | 1-b-3-2 で 0.5.2 に一時固定（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。固定しないと 0.6.3 が lock に入り、アプリが読む ostruct が変わる |
 
 ## 8. 各 Step 共通の手順
 
