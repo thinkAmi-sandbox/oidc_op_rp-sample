@@ -600,3 +600,29 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 扱い: 追随
 - 出典: `doorkeeper-openid_connect-1.10.1/config/locales/en.yml`、doorkeeper-openid_connect の CHANGELOG（1.10.0 の #267、1.10.1 の #299）。Rails ガイドに該当の節はない
 - コミット: OP（`follow the doorkeeper 5.9.9 locale and view templates`）
+
+## 周辺 gem（Step 2-b）
+
+Ruby 3.2 以上を必要とする周辺 gem を上げたときに起きた、gem の既定値・雛形の変化。上げた版と順番は [PLAN.md](../PLAN.md) の Step 2-b。
+
+### DEF-7.0-48: doorkeeper-openid_connect の initializer を 1.10.5 の雛形に合わせる
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.5 の `lib/generators/doorkeeper/openid_connect/templates/initializer.rb`）/ 対象: OP
+- 何が変わるか: `config/initializers/doorkeeper_openid_connect.rb` に、雛形の 1.10.1 → 1.10.5 の差分を当てる。「変更開始」〜「変更終了」の印で囲んだ独自の設定と雛形との差分は、前後で同じ
+  - コメントアウトされた設定の例が増える: `auth_time_from_access_token`（grant ごとの `auth_time`）、`authorize_dynamic_client_registration`、`apply_prompt_to_non_oidc_requests`、`end_session_endpoint`、`discovery_url_options`、印の中に残している claims の例の `response:` を付けた `_baz_`
+  - `select_account_for_resource_owner` のブロックの第 1 引数の名前が `resource_owner` から `resource_owner_or_nil` になり、例のコメントが `if resource_owner_or_nil` で囲まれる。ブロックの中身は空のまま
+- なぜ: 1.10.2 で、ログインしていなくても account selection を実行し、ブロックに `nil` を渡しうるようになった（#303）。同じ 1.10.2 で grant ごとの `auth_time` が選べるようになり（#304）、1.10.5 で文書になかった設定の例が雛形に足された（#327。CHANGELOG に「No behavior change」）。gem の generator の雛形にも追随すると人間が決めた（[PLAN.md](../PLAN.md) の 3 章の 2 の境目の 1）
+- 3 アプリへの影響: 設定の値は変わらない。ブロックは空なので、引数の名前を変えても動きは同じ。ログインしていない状態では、OP の `resource_owner_authenticator`（warden）が devise のログイン画面へ送るので、ブロックまで来ない（ソースを読んでの判断）。OP の minitest（`CI=1` も）・E2E が通り、応答のスナップショット（`authorize_prompt_select_account` を含む）は前後で同じ
+- 扱い: 追随
+- 出典: `doorkeeper-openid_connect-1.10.5/lib/generators/doorkeeper/openid_connect/templates/initializer.rb`、doorkeeper-openid_connect の CHANGELOG（1.10.2 の #303・#304、1.10.5 の #327）。Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper-openid_connect 1.10.5 initializer template`）
+
+### DEF-7.0-49: doorkeeper-openid_connect のロケールを 1.10.5 の雛形に合わせる
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.5 の `config/locales/en.yml`）/ 対象: OP
+- 何が変わるか: `config/locales/doorkeeper_openid_connect.en.yml` を 1.10.5 の gem の `en.yml` と同じにする。増えるのは `missing_required_claim`（``Required ID Token claim `%{claim}` is missing or blank``）とコメントの 1 行だけ
+- なぜ: 1.10.2 で、ID トークンの必須の claim（`iss`・`sub`・`aud`・`exp`・`iat`）が空のとき、黙って省かずに `MissingRequiredClaim` を出すようになった（#312）。その文言
+- 3 アプリへの影響: 今の設定（`issuer` は固定値、`sub` は `resource_owner.id`、`aud` はアプリの uid）では出ない。gem の engine のロケールにも同じキーと文言があるので、足す前後で `I18n.t` の結果は同じ。応答のスナップショットの差分はない
+- 扱い: 追随
+- 出典: `doorkeeper-openid_connect-1.10.5/config/locales/en.yml`、doorkeeper-openid_connect の CHANGELOG（1.10.2 の #312）。Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper-openid_connect 1.10.5 locale template`）
