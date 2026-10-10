@@ -19,7 +19,8 @@ concurrency:
 jobs:
   rails:
     name: rails (${{ matrix.app }})
-    # Ruby 3.1.7 のビルド済みのものは ubuntu-26.04 にないので、ubuntu-latest は使わない
+    # ランナーの版は固定し、ubuntu-latest は使わない。ubuntu-latest の版が変わると、ビルド済みの Ruby がない版になりうる
+    # （Step 0-g の時点の Ruby 3.1.7 は、ubuntu-26.04 のものがなかった）
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:

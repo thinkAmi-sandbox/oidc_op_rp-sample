@@ -66,7 +66,8 @@
 | 0-g | 3.1 | 6.1 | CI（GitHub Actions）。仕上げから前倒し |
 | 1 | 3.1 | **7.0.x** | annotate 3.2.0、`app:update`、`load_defaults 7.0`、concurrent-ruby 1.3.7 |
 | 1-b | 3.1 | 7.0 | 起動の途中の読み込みを CI で検出する（1-b-1。a-nti_manner_kick_course）、3 アプリの応答のスナップショットのテスト（1-b-2）、Rails 7.0 以上を必要とする周辺 gem（1-b-3-1: jbuilder・activerecord-session_store・omniauth-rails_csrf_protection・devise 5.x、1-b-3-2: doorkeeper 5.9・doorkeeper-openid_connect 1.10） |
-| 2 | **3.2** | 7.0 | Ruby のみ |
+| 2 | **3.2** | 7.0 | Ruby、nokogiri 1.19（advisory の解消） |
+| 2-b | 3.2 | 7.0 | Ruby 3.2 以上を必要とする周辺 gem（doorkeeper-openid_connect 1.10.5、byebug 13、rack-mini-profiler 5、simplecov 1.2、zeitwerk、brakeman 8） |
 | スキル化 | 3.2 | 7.0 | `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（13 章） |
 | 3 | 3.2 | **7.1.x** | `app:update`、`autoload_lib_once`（RP の独自ストラテジー対応） |
 | 4 | **3.3** | 7.1 | Ruby のみ |
@@ -535,11 +536,62 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 - 手動確認は、雛形に合わせた後に 1 回（introspection の流れまで）
 - ダウンロードは doorkeeper-openid_connect 1.8.11・1.10.1、doorkeeper 5.8.2・5.9.9（サイズは上の表）。ostruct 0.5.2 は default gem なので落とさない見込み
 
+### Step 2: Ruby 3.2
+
+「8. 各 Step 共通の手順」の 4 に従い、Rails 7.0.10 のまま Ruby を 3.1.7 から 3.2.11 に上げる。Ruby だけを上げる最初の Step。着手時の作業計画で決めたこと（人間が承認。経緯は LOG.md の Step 2）:
+
+- [x] Ruby 3.1.7 → 3.2.11（RS → RP → OP の順に、アプリごとのコミット）。`.ruby-version`・Gemfile の `ruby`・lock の `RUBY VERSION`・`BUNDLED WITH`（2.4.19）と、lock の default gem を同じコミットで合わせ直す
+- [x] ci.yml の `runs-on` のコメントを、ランナーを固定する理由に直す（ランナーは ubuntu-24.04 のまま）
+- [x] ブラウザで手動確認（3 アプリの Ruby を上げた後に、introspection の流れまで 1 回）
+- [x] RuboCop の `TargetRubyVersion` を 3.2 にする（新しい指摘なし）
+- [x] nokogiri 1.18.10 → 1.19.4（RS → RP → OP）。無視リストから nokogiri の advisory 12 件を消す
+- 決めたこと
+  - 版は 3.2 系の最新の 3.2.11。3.2 は EOL だが、マイナーを飛ばさない（3 章の 1）
+  - lock の default gem は、3.2.11 の default gem の版に合わせ直す（json 2.6.3・bigdecimal 3.1.3・logger 1.5.3・drb 2.1.1・mutex_m 0.1.2、OP の ostruct 0.5.5）。base64 0.1.1・cgi 0.3.7・ruby2_keywords 0.0.5 は 3.2.11 でも同じ版。benchmark・securerandom は 0.3.0 のまま（3.2.11 の default gem の 0.2.1・0.2.2 は activesupport 7.0.10 の `>= 0.3` を満たさない）。合わせ直さないと、旧版の gem を rubygems から落としてビルドすることになるので、Ruby を上げるコミットに入れる
+  - `BUNDLED WITH` は 3.2.11 の Bundler（2.4.19）にする。2.3.27 のままだと、Bundler 2.4.19 と setup-ruby が bundler 2.3.27 を落として使う。Step 0-a で Ruby に付属の Bundler の版になったのと同じ扱い
+  - gem は `vendor/bundle/ruby/3.2.0` に入れ直しになる。今のキャッシュ（`vendor/bundle/ruby/3.1.0/cache` の `.gem`）を `ruby/3.2.0/cache` にコピーして `bundle install --local` にし、gem のダウンロードを避ける
+  - Step 2 の PR に入れるのは、Ruby・`TargetRubyVersion`・nokogiri だけ。nokogiri は advisory の修正（3 章の 3）で、Ruby を上げるコミットとは分ける
+  - ほかの Ruby 3.2 以上を必要とする gem（doorkeeper-openid_connect 1.10.5、byebug 13、rack-mini-profiler 5、simplecov 1.2、zeitwerk 2.7 以上、brakeman 8）は、サブステップ 2-b として別の PR にする。Step 2 が epic に入ってから調べて作業計画を出す（1-b-3 と同じ形）。スキル化（13 章）は 2-b の後
+  - CVE-2026-41316（erb）は、この Step では gem を足さずに記録し、扱いを記録と一緒に人間と決める（下の「調べたこと」の erb の行。決めた内容は次の「着手後に決めたこと」）
+  - 着手後に決めたこと（人間が承認）: gem の入れ直しは `bundle install --local --no-cache` にする（`--no-cache` がないと、キャッシュにない default gem の `.gem` を rubygems.org から落とす。RS・RP で起きた。LOG.md の Step 2「遭遇した問題」）。CVE-2026-41316 は、3 アプリに信頼できないデータを `Marshal.load` する経路がないので記録だけにし、default gem の erb が修正版になる Step 4（Ruby 3.3.12 の erb は 4.0.3.1）で解消を確かめる（7 章の erb の行）
+  - 手動確認は、3 アプリの Ruby を上げた後に 1 回（introspection の流れまで）
+
+調べたこと（着手時の 2026-10-10。サブエージェント 3 つで調べ、要点は自分で確かめた）:
+
+| 項目 | 分かったこと |
+|---|---|
+| 版 | 3.2 系の最新は 3.2.11（2026-03-27）。3.2.10 は 2026-01-14。3.2.11 の告知は 3.2 の最後のリリースと明記し、3.2 は EOL（ruby-lang.org の branches のページでは 2026-04-01）。`ruby-3.2.11.tar.gz` は 19,984,344 B |
+| mise | mise 2026.5.10 は既定で ruby-build でソースからビルドする（precompiled が既定になるのは 2026.8.0 から）。手元の ruby-build 20260924 は 3.2.11 の定義を持ち、Homebrew の openssl@3・libyaml があれば OpenSSL のソースを落とさない。手元の Ruby 3.2.3 には別に入れた Bundler 4.0.6 があり、素の `bundle` が 4.0.6 で動くので、試行には使わない |
+| CI | `ruby/setup-ruby` v1.325.0（固定中のコミット）の `ruby-builder-versions.json` に 3.2.11 がある。ruby-builder に `ruby-3.2.11-ubuntu-24.04-x64.tar.gz` があり、ubuntu-26.04 版もある。setup-ruby は lock の `BUNDLED WITH` の版を `gem install` する |
+| Bundler | 3.2.11 の default は Bundler 2.4.19・RubyGems 3.4.19。lock の `BUNDLED WITH` が実行中の版と違うと、`bundle install` は lock の版を落として切り替える（Bundler 2.3.0 から。`BUNDLER_VERSION` を付けると切り替えない） |
+| default gem（3.1.7 → 3.2.11） | json 2.6.1→2.6.3、bigdecimal 3.1.1→3.1.3（default gem のまま）、logger 1.5.0→1.5.3、ostruct 0.5.2→0.5.5、drb 2.1.0→2.1.1（ruby2_keywords に依存したまま）、mutex_m 0.1.1→0.1.2、benchmark 0.2.0→0.2.1、securerandom 0.2.0→0.2.2、net-http 0.3.0.1→0.4.1、uri 0.12.4→0.12.5、erb 2.2.3→4.0.2、psych 4.0.4→5.0.1。base64・cgi・ruby2_keywords は同じ |
+| lock の解決 | lock のコピーで、Ruby 3.2.11・Bundler 2.4.19 の下で、Gemfile の `ruby` を変えて default gem を固定して `bundle lock` → 固定を外して `bundle lock --local` すると、3 アプリとも動くのは default gem の 5 つ（OP は ostruct も）と `RUBY VERSION`（`ruby 3.2.11p268`）・`BUNDLED WITH`（2.4.19）だけ。`PLATFORMS` は変わらない。続けて `bundle lock --update nokogiri --conservative` を試すと、nokogiri の 3 つのプラットフォームの行だけが 1.19.4 になる |
+| 3.2 で動かない gem | lock の全 124 項目（3 アプリの和）で、required_ruby_version が 3.2.11 を外すものはない（nokogiri 1.18.10 は `< 3.5.dev`、sqlite3 1.7.3 は `< 3.4.dev`）。nokogiri・sqlite3 の arm64-darwin 版は 3.2 のバイナリを含む。x86_64 版は rubygems.org の情報だけ |
+| ソースからビルドする gem | bootsnap・byebug・date・msgpack・nio4r・prism・puma・racc・websocket-driver（3 アプリ）、bindex（RP・OP）、bcrypt（OP） |
+| 消えた API | Ruby 3.2 で `File.exists?`・`Dir.exists?`・`Kernel#=~`・`taint` 系・`Fixnum`・`Bignum`・`Random::DEFAULT` などが消えた（NEWS for 3.2.0）。アプリ（app・lib・config・test・db・bin、scripts、e2e/scripts）にはない。gem の該当箇所（tzinfo 2.0.4・bootsnap の `untaint`、hashie・msgpack の `Fixnum` など）は版の判定で守られている。gem の中の `Kernel#=~` は grep では探せないので、テストで確かめる |
+| RuboCop | `TargetRubyVersion: 3.2` にした設定のコピーで 3 アプリを流すと、新しい指摘はない（3.2 でだけ通る構文のファイルで、設定が効くことを確かめた） |
+| brakeman | 7.1.1 は Ruby 3.2 の EOL を 2026-03-31 として持つ。fingerprint にメッセージは含まれないので、無視リストの EOLRuby の項目に当たり続ける見込み |
+| Ruby の版に依存する箇所 | `.ruby-version`・Gemfile の `ruby`・lock（3 アプリ）、`.rubocop.yml` の `TargetRubyVersion`、ci.yml のコメント、TIPS.md の `mise where ruby@3.1.7`。`mise.toml`・`.claude/launch.json`・`e2e/scripts/start-server.sh` は版を持たない |
+| nokogiri 1.19.4 | 2026-06-18。Ruby `>= 3.2`。無視リストの nokogiri の 12 件は 1.19.1〜1.19.4 で直る。1.19.0 は対応する Ruby の変更だけ。arm64-darwin の `.gem` は 6,547,456 B |
+| erb（CVE-2026-41316） | 2026-04-21 公表。erb `<= 6.0.3` で、信頼できないデータを `Marshal.load` すると、erb と activesupport を読み込んだプロセスでガジェットになる。修正版は erb 4.0.3.1・4.0.4.1・6.0.1.1・6.0.4 以上。3.2.11 の erb 4.0.2 も 3.1.7 の erb 2.2.3 も対象で、Ruby を上げて増えるものではない。default gem の erb は lock になく、bundler-audit は検出しない。修正版を使うには Gemfile に erb を足す必要がある。3 アプリは Cookie を JSON で直列化し（DEF-7.0-16）、RP のセッションも JSON |
+
+Ruby 3.2 以上を必要とする gem（2-b の候補。2-b の着手時に確かめ直す）:
+
+| gem | 今 → 候補 | 分かったこと |
+|---|---|---|
+| doorkeeper-openid_connect | 1.10.1 → 1.10.5（2026-07-09） | GHSA-8r7r-wh7x-27ff は 1.10.4 で修正（DCR は無効なので影響しない）。1.10.2 で空の必須 claim が例外になり、grant ごとの `auth_time` が入る。2.0.0 はマイグレーションが要る |
+| byebug | 12.0.0 → 13.0.0 | reline `>= 0.6` を依存に足す（3.2.11 の default は 0.3.2） |
+| web-console | 4.2.1 → 4.3.0 | actionview・railties `>= 8.0` が必要。Step 6 まで上げられない |
+| rack-mini-profiler | 4.0.1 → 5.0.0 | Gemfile の `~> 4.0` を変える必要がある。development の既定値が変わる |
+| simplecov | 0.22.0 → 1.2.0 | 1.3 は Ruby 3.3 以上。1.0 で `test/` を集計から外すなど、出力が変わる |
+| zeitwerk | 2.6.18 → 2.7.5 / 2.8.3 | Ruby `>= 3.2`。Rails 7.0 での動作は未確認 |
+| brakeman | 7.1.1 → 8.0.6 | 警告の種類が変わりうる |
+| faraday-net_http | 3.0.2（一時固定） | 3.4.x は net-http `~> 0.5` で、3.2.11 の default の 0.4.1 では満たせない。3.1〜3.3 は `net-http >= 0` で、lock に net-http が増える |
+
 ### Step 2〜9
 
 「8. 各 Step 共通の手順」に従う。Step 固有の作業はロードマップの表のとおり。補足:
 
-- **Step 2（Ruby 3.2）**: nokogiri を 1.19 系の最新に上げ、1.18 系に残る advisory（GHSA-c4rq-3m3g-8wgx ほか）を解消する。1.19 系は Ruby 3.2 以上が必要なため 0-a では上げられなかった
 - **Step 3（Rails 7.1）**: RP の独自ストラテジーを Zeitwerk に載せる（案 B）
   - `rails_relying_party_of_backend/config/application.rb` に以下を追加し、`app:update` が提案する `config.autoload_lib` は採用しない
     ```ruby
@@ -575,20 +627,20 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 | gem | 現在 | 時期 | 注意点 |
 |---|---|---|---|
 | mail | 2.7.1 | 0-a で 2.8.1（済）→ 0-d-3 で 2.9.1（済） | 0-a は Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした。0-d-3 は advisory の修正 |
-| nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19 系最新 | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
+| nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19.4（済。advisory 12 件を解消） | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
 | jwt（RP は直接使う。RS は oauth2 経由の間接依存。OP はテストが直接使い、doorkeeper-openid_connect 1.8.4 以上の依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま）→ 0-f-3 で OP に 2.10.3（済。test グループに明記。一時固定で入れた） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる |
 | json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f-3 で外れた（済） | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だったが、OP は署名だけで decode しないため影響なし。doorkeeper-openid_connect 1.8.4 で jwt に置き換わった。OP の minitest は、0-f-3 で gem を上げる前に ruby-jwt に書き直した |
 | nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済）。msgpack は 0-d-3 で 1.8.5（済） | 0-a は clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新。0-d-3 は advisory の修正 |
 | thor（railties 経由） | 1.1.0 | 0-f-1 で 1.5.0（済） | 1.1.0 は Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし）。1.2.0 で出なくなった。railties 6.1 は `~> 1.0` |
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（済。同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
 | faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（済。oauth2 の後。RP は Gemfile に明記） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
-| faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Ruby を上げる各 Step で見直す | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない |
-| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（済。initializer・ロケール・ビューを雛形に合わせた）→ doorkeeper-openid_connect 1.10.2 以上は Step 2 の後 | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2 の後に上げる。doorkeeper 6.0 では、トークンを 2 つの方法で渡す要求が 401 から 400 `invalid_request` になる（5.9.7 の CHANGELOG）ので、6.0 に上げるときに `userinfo_bearer_and_param` のスナップショットを見る。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
+| faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Step 2 で見直し、3.0.2 のまま → Step 8（Ruby 3.4）で見直す（Ruby 3.3.12 の default gem の net-http は 0.4.1、3.4.11 は 0.6.0 で、3.4.x の `~> 0.5` を満たすのは 3.4 から。Step 2 のコードレビューで確かめた） | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない。3.4.x は net-http `~> 0.5` で、Ruby 3.2.11 の default gem の net-http 0.4.1 では満たせない（Step 2）。3.1〜3.3 は `net-http >= 0` で、lock に net-http が増える |
+| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（済。initializer・ロケール・ビューを雛形に合わせた）→ doorkeeper-openid_connect 1.10.5 は Step 2-b | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2-b で上げる。doorkeeper 6.0 では、トークンを 2 つの方法で渡す要求が 401 から 400 `invalid_request` になる（5.9.7 の CHANGELOG）ので、6.0 に上げるときに `userinfo_bearer_and_param` のスナップショットを見る。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
 | devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ 1-b-3-1 で 5.0.4（済。advisory 2 件を解消。initializer を雛形に合わせた） | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認）。initializer の `config.responder.error_status = :unprocessable_entity` は、Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`）。Rack を 3.1 以上にする Step で、雛形に合わせ直す（テストの `assert_response :unprocessable_entity` も） |
 | dotenv-rails | 2.7.6 | 0-f-1 で 3.2.0（済） | 読むファイルの順番と、既にある環境変数を上書きしないことは 2.x と同じ。3.x はテストのたびに ENV を戻し、Rails のログに変数名を出す |
 | puma | 5.4 | 0-d-3 で 5.6.9（済）→ 0-f-1 で 6.6.1（済）→ 7.2.1 以上 | 7 系に上げる時期は後の Step で判断。5.5.0 以降（6.6.1 も）は PROXY protocol v1 の advisory 2 件（CVE-2026-47736 / 47737）の対象で、修正版は 7.2.1 / 8.0.2 だけ。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない（無視リストに入れた） |
 | spring | 2.1.1 | 0-f-1 で削除（済） | Rails 7 から標準で入らない。`bin/spring`・`config/spring.rb` も消し、`bin/rails`・`bin/rake` を Rails 7.0 の雛形の形にした |
-| byebug / web-console / listen / rack-mini-profiler | — | 0-f-1 で 12.0.0 / 4.2.1 / 3.10.1 / 4.0.1（済）→ listen は Step 1 で外した（済）→ Step 2 の後に byebug 13・web-console 4.3・rack-mini-profiler 5 | 次の版は Ruby 3.2 以上が必要。listen の `EventedFileUpdateChecker` の finalizer の `ThreadError` の警告（LOG.md の Step 0-b）は、3.10.1 でも出る（listen 側も未修正）。Rails 7.0 の development.rb の雛形には `file_watcher` の行がない。Step 1 で雛形に合わせて行を消し、使われなくなる listen を Gemfile から外す（人間が判断）。Step 1 の手動確認で警告が出なくなったことを確かめた。web-console 4.2.1 は development で `ActionDispatch::Request` を initializer より前に読み込む（4.3.0 も同じ。docs/upgrade/defaults/rails-7.0.md の「補足」） |
+| byebug / web-console / listen / rack-mini-profiler | — | 0-f-1 で 12.0.0 / 4.2.1 / 3.10.1 / 4.0.1（済）→ listen は Step 1 で外した（済）→ Step 2-b で byebug 13・rack-mini-profiler 5 → web-console 4.3 は Step 6 | 次の版は Ruby 3.2 以上が必要。web-console 4.3.0 は actionview・railties 8.0 以上も必要（Step 2 の着手時）。byebug 13 は reline `>= 0.6` を依存に足す。rack-mini-profiler 5 は Gemfile の `~> 4.0` を変える必要がある。listen の `EventedFileUpdateChecker` の finalizer の `ThreadError` の警告（LOG.md の Step 0-b）は、3.10.1 でも出る（listen 側も未修正）。Rails 7.0 の development.rb の雛形には `file_watcher` の行がない。Step 1 で雛形に合わせて行を消し、使われなくなる listen を Gemfile から外す（人間が判断）。Step 1 の手動確認で警告が出なくなったことを確かめた。web-console 4.2.1 は development で `ActionDispatch::Request` を initializer より前に読み込む（4.3.0 も同じ。docs/upgrade/defaults/rails-7.0.md の「補足」） |
 | sprockets-rails | 3.2.2（間接） | Step 1 で lock から外れた（済。Gemfile には足さない） | Rails 7.0 から rails gem の依存から外れる。3 アプリとも `sprockets/railtie` を読み込んでいない。Gemfile に足すと `Bundler.require` で `sprockets/railtie` が読み込まれ、アセットパイプラインが有効になるので足さない（Step 1） |
 | sqlite3 | 1.4.2 | 0-a で 1.7.3（済。clang 17 で 1.4 系がビルドできないため 0-f から前倒し）→ Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
 | annotate | 3.1.1 | Step 1 で 3.2.0（済）→ Step 5 で annotaterb に置換 | 3.1.1 は `activerecord < 7.0` で、Rails 7.0 にするには 3.2.0 が要る。3.2.0 も `activerecord < 8.0` で、Rails 8 に対応しない（0-f で gemspec を確認）。当初は「注釈の出力が変わるので 3.2.0 には上げない」としたが、Step 1 の調査で、OP の注釈に関わる差分はないと分かった。annotaterb の 4.23 以上は CI で Ruby 3.3 以上だけを試すので、置き換えは Step 5 のまま |
@@ -597,18 +649,19 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
 | a-nti_manner_kick_course | — | 1-b-1 で 0.5.0 を足す → Rails 8.2 以上で外すかを判断（今回の目標の外なので、epic の間は残す） | development・test だけ。Gemfile の先頭に置く。Rails 8.2 で入る Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない。README によると、Rails 7.2 以上は `rails runner 1` の代わりに `rails boot` で起動できる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |
-| brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初 | brakeman 8 系は Ruby 3.1 では入らない |
-| simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初 | simplecov 1.x は Ruby 3.2 以上が必要（Step 2 の後に上げられる） |
-| json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
-| bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
+| brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初（brakeman 8 系は Step 2-b） | brakeman 8 系は Ruby 3.1 では入らない |
+| simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初（simplecov 1.2 は Step 2-b） | simplecov 1.x は Ruby 3.2 以上が必要。1.3 は Ruby 3.3 以上（Step 2 の着手時） |
+| json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | Step 2 で 2.6.3（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
+| bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | Step 2 で 3.1.3（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
 | concurrent-ruby（Rails 経由） | 1.1.9 | Step 1 で 1.3.8（済。Rails 7.0.10 にした後） | 1.3.5 以上は Rails 6.1 と 7.0.8.7 では起動しない（LOG.md の Step 0-a、Step 0-d-1）。7.0.10 は activesupport が logger を require する（rails/rails#54264）。advisory は 1.3.7 で解消する |
-| benchmark / securerandom / drb / mutex_m（activesupport 7.0.10 経由） | — | Step 1 で一時固定（済。0.3.0 / 0.3.0 / 2.1.0 / 0.1.1。drb の依存の ruby2_keywords 0.0.5 も lock に入った）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | activesupport 7.0.10 の依存。drb・mutex_m は Ruby 3.1.7 の default gem と同じ版。benchmark・securerandom は `>= 0.3` を要求し、default gem（どちらも 0.2.0）では満たせないので、要件を満たす最小の版にした |
-| zeitwerk（railties 経由） | 2.4.2 | Step 1 で 2.6.18（済） | railties 7.0 は `~> 2.5`。2.7 は Ruby 3.2 以上が必要 |
+| benchmark / securerandom / drb / mutex_m（activesupport 7.0.10 経由） | — | Step 1 で一時固定（済。0.3.0 / 0.3.0 / 2.1.0 / 0.1.1。drb の依存の ruby2_keywords 0.0.5 も lock に入った）→ Step 2 で drb 2.1.1・mutex_m 0.1.2（済。benchmark・securerandom は 0.3.0、ruby2_keywords は 0.0.5 のまま）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | activesupport 7.0.10 の依存。drb・mutex_m は Ruby 3.1.7 の default gem と同じ版。benchmark・securerandom は `>= 0.3` を要求し、default gem（どちらも 0.2.0。Ruby 3.2.11 は 0.2.1・0.2.2）では満たせないので、要件を満たす最小の版にした |
+| zeitwerk（railties 経由） | 2.4.2 | Step 1 で 2.6.18（済）→ 2.7 以上は Step 2-b | railties 7.0 は `~> 2.5`。2.7 は Ruby 3.2 以上が必要 |
 | rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / bcrypt | — | 0-d-3（済） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられた。上げた版は LOG.md の Step 0-d-3（mail・msgpack・faraday・puma は上の行） |
-| logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
-| base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
-| cgi（activerecord-session_store 経由、RP） | 0.3.7（0-f-1 で lock に入った） | Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.5.2 が lock に入り、アプリが読む cgi が変わるため、一時固定で 0.3.7 にした |
-| ostruct（doorkeeper-openid_connect 1.8.11 以上経由、OP） | — | 1-b-3-2 で 0.5.2 に一時固定（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。固定しないと 0.6.3 が lock に入り、アプリが読む ostruct が変わる |
+| logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Step 2 で 1.5.3（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
+| base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | Step 2 は同じ版（0.1.1）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
+| cgi（activerecord-session_store 経由、RP） | 0.3.7（0-f-1 で lock に入った） | Step 2 は同じ版（0.3.7）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.5.2 が lock に入り、アプリが読む cgi が変わるため、一時固定で 0.3.7 にした |
+| ostruct（doorkeeper-openid_connect 1.8.11 以上経由、OP） | — | 1-b-3-2 で 0.5.2 に一時固定（済）→ Step 2 で 0.5.5（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。固定しないと 0.6.3 が lock に入り、アプリが読む ostruct が変わる |
+| erb（default gem。lock にない） | — | Step 4 で CVE-2026-41316 の解消を確かめる | CVE-2026-41316（erb `<= 6.0.3`）は、Ruby 3.1.7 の erb 2.2.3 も 3.2.11 の 4.0.2 も対象。3 アプリに信頼できないデータを `Marshal.load` する経路はないので、Gemfile に足さずに記録だけにした（Step 2 で人間が判断）。Ruby 3.3.12 の default gem は 4.0.3.1、3.4.11 は 4.0.4.1（どちらも修正版）。lock にないので bundler-audit は検出しない |
 
 ## 8. 各 Step 共通の手順
 
@@ -621,7 +674,7 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
    - `new_framework_defaults_X_Y.rb` を 1 つずつ有効化してテスト → 全部有効になったら `load_defaults` を上げてファイルを削除
    - RuboCop の `TargetRailsVersion` を上げ、新しい指摘は別コミットで直す
 4. **Ruby を上げる場合**: Ruby を上げてコミット → `TargetRubyVersion` を上げて新しい指摘を直す（別コミット）
-   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi）を、新しい Ruby の default gem の版に一時固定で合わせ直す。その Ruby で default gem でなくなったものは 7 章の表に従う
+   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords）を、新しい Ruby の default gem の版に一時固定で合わせ直す。Ruby を上げるコミットに入れ、`BUNDLED WITH` もその Ruby の Bundler の版にする（Step 2）。その Ruby で default gem でなくなったものは 7 章の表に従う。手順は TIPS.md の「Ruby を上げる」
 5. **確認**: 「10. 完了条件」
 6. **記録**: LOG.md を更新 → `/code-review` → PR（向き先は epic）
 
@@ -681,7 +734,7 @@ oxlint / oxfmt の導入条件:
 
 ## 13. スキル化の計画
 
-1-b-3 と Step 2（Ruby 3.2）を手作業で通した後に、`/rails-upgrade` を入口とする 1 つのスキルを作る（作業名を引数で渡し、中身は参照用の別ファイルに分ける）。gem の手順と Ruby の手順も一度手作業で確かめてからまとめるため。スキルと、下の 4 の「スキルを作る PR」のスクリプトを 1 つの PR にし、Step 3 の前に epic に入れる。当初は Step 1 の後に作る計画だったが、Step 1 の後の振り返り（2026-10-09）で、振り分けの基準・作業の分け方・作る時期を見直した。
+1-b-3 と Step 2（Ruby 3.2）・2-b を手作業で通した後に、`/rails-upgrade` を入口とする 1 つのスキルを作る（作業名を引数で渡し、中身は参照用の別ファイルに分ける）。gem の手順と Ruby の手順も一度手作業で確かめてからまとめるため。スキルと、下の 4 の「スキルを作る PR」のスクリプトを 1 つの PR にし、Step 3 の前に epic に入れる。当初は Step 1 の後に作る計画だったが、Step 1 の後の振り返り（2026-10-09）で、振り分けの基準・作業の分け方・作る時期を見直した。
 
 ### 1. 振り分けの基準
 
