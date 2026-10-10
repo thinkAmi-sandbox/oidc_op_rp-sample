@@ -69,6 +69,18 @@ Doorkeeper::OpenidConnect.configure do
   #   session[:auth_time]
   # end
 
+  # Advanced:
+  # If you store `auth_time` in a custom authentication context record linked
+  # to the access token, you can configure a block like below to derive it
+  # from the access token instead of `auth_time_from_resource_owner`.
+  #
+  # This allows you to track `auth_time` per grant instead of per user,
+  # but requires more custom implementation on your part.
+  #
+  # auth_time_from_access_token do |access_token|
+  #   access_token.your_custom_authentication_context_record.auth_time
+  # end
+
   # =======> 変更開始
   reauthenticate_resource_owner do |resource_owner, return_to|
     store_location_for resource_owner, return_to
@@ -83,9 +95,11 @@ Doorkeeper::OpenidConnect.configure do
   # end
   # <======= 変更終了
 
-  select_account_for_resource_owner do |resource_owner, return_to|
+  select_account_for_resource_owner do |resource_owner_or_nil, return_to|
     # Example implementation:
-    # store_location_for resource_owner, return_to
+    # if resource_owner_or_nil
+    #   store_location_for resource_owner_or_nil, return_to
+    # end
     # redirect_to account_select_url
   end
 
@@ -113,6 +127,55 @@ Doorkeeper::OpenidConnect.configure do
 
   # Enable dynamic client registration (default false)
   # dynamic_client_registration true
+
+  # Gate the dynamic client registration endpoint (RFC 7591 §3.1). Leave unset
+  # (default `nil`) to keep the endpoint open once `dynamic_client_registration`
+  # is enabled. Set a block to require authorization: it is evaluated in the
+  # controller scope (so it can read `request`, `params`, `request.headers`,
+  # etc.) and a falsy return rejects the request with `401 invalid_token`.
+  #
+  # authorize_dynamic_client_registration do
+  #   # Example: require an Initial Access Token in the Authorization header.
+  #   # Fail closed when the token isn't configured, so an unset env var can't
+  #   # leave the endpoint open. Compare in constant time to avoid leaking the
+  #   # token via timing; digesting first keeps the comparison fixed-length so
+  #   # the token's length isn't leaked either.
+  #   expected = ENV["DCR_INITIAL_ACCESS_TOKEN"].to_s
+  #   next false if expected.empty?
+  #
+  #   provided = request.headers["Authorization"].to_s
+  #   ActiveSupport::SecurityUtils.secure_compare(
+  #     Digest::SHA256.hexdigest(provided),
+  #     Digest::SHA256.hexdigest("Bearer #{expected}"),
+  #   )
+  # end
+
+  # By default the `prompt` parameter (`none`, `login`, `consent`,
+  # `select_account`) is only honored for OIDC requests (those carrying the
+  # `openid` scope). Enable this to also honor `prompt` on non-OIDC
+  # authorization requests. `max_age` stays OIDC-only, as it is defined by
+  # OIDC Core.
+  #
+  # apply_prompt_to_non_oidc_requests true
+
+  # End-session endpoint advertised in the discovery document
+  # (`end_session_endpoint`). The block is evaluated in the controller scope;
+  # return the absolute URL of your RP-initiated logout endpoint. Defaults to
+  # `nil`, which omits the member from the discovery document.
+  #
+  # end_session_endpoint do
+  #   end_session_url
+  # end
+
+  # Per-endpoint overrides for the URLs generated in the discovery document
+  # (e.g. to advertise a different host or force HTTPS). The block receives the
+  # current `request` and returns a hash keyed by endpoint name.
+  #
+  # discovery_url_options do |request|
+  #   {
+  #     authorization: { protocol: request.ssl? ? :https : :http },
+  #   }
+  # end
 
   # You can use your own model class if you need to extend (or even override) the default
   # Doorkeeper::OpenidConnect::Request model (e.g. to use a different database connection).
@@ -148,6 +211,14 @@ Doorkeeper::OpenidConnect.configure do
 
   #   normal_claim :_bar_ do |resource_owner|
   #     resource_owner.bar
+  #   end
+
+  #   # By default a claim is only returned from the UserInfo endpoint
+  #   # (`response: [:user_info]`). Pass `response:` to control where it
+  #   # appears — the ID Token, UserInfo, or both. `scope:` restricts the
+  #   # claim to grants that include the given scope.
+  #   normal_claim :_baz_, scope: :profile, response: %i[id_token user_info] do |resource_owner|
+  #     resource_owner.baz
   #   end
   # end
   # <======= 変更終了
