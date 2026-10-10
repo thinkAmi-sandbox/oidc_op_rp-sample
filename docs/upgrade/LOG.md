@@ -1591,7 +1591,7 @@ devise を上げ、initializer を雛形に合わせた後に、`.claude/launch.
 
 ### 作業計画からの変更点
 
-- 応答のスナップショットのヘルパー（`test/support/response_snapshot_helper.rb`）を、3 アプリで直した（人間が承認）。doorkeeper-openid_connect は OIDC のエラーをリダイレクトで返すとき、エラー応答のヘッダー（`Content-Type: application/json`・`WWW-Authenticate`・`Cache-Control: no-store`）を足したまま `redirect_to` するので、302 の本文は Rails のリダイレクトの HTML なのに `application/json` を名乗る。ヘルパーは `Content-Type` で JSON かどうかを決めて `JSON.parse` していたので、1.10.1 で `prompt=select_account` などがこの経路を通るようになると、比べる前に落ちた。JSON として読めない本文はテキストとして扱うようにした（下の「OIDC のエラーのリダイレクトのヘッダー」）。1.10.1 の lock の変更を退避し、1.8.11・5.8.2 の状態で 3 アプリの検査と E2E を流してからコミットした
+- 応答のスナップショットのヘルパー（`test/support/response_snapshot_helper.rb`）を、3 アプリで直した（人間が承認）。doorkeeper-openid_connect は OIDC のエラーをリダイレクトで返すとき、エラー応答のヘッダー（`Content-Type: application/json`・`WWW-Authenticate`・`Cache-Control: no-store`）を足したまま `redirect_to` するので、302 の本文は Rails のリダイレクトの HTML なのに `application/json` を名乗る。ヘルパーは `Content-Type` で JSON かどうかを決めて `JSON.parse` していたので、1.10.1 で `prompt=select_account` などがこの経路を通るようになると、比べる前に落ちた。JSON として読めない本文はテキストとして扱うようにした（下の「OIDC のエラーのリダイレクトのヘッダー」。コードレビューの後に、リダイレクトの応答だけに絞った）。1.10.1 の lock の変更を退避し、1.8.11・5.8.2 の状態で 3 アプリの検査と E2E を流してからコミットした
 - 先に足した例外のテスト 2 本は、変化を起こしたコミットで置き換えた。Webfinger は 1.10.1 のコミットでスナップショット `webfinger` に、form_post での拒否はロケールとビューのコミットで、フォームを返すテストとスナップショット `authorize_form_post_deny` に
 - 既存のテスト「登録されていない redirect_uri では、エラーの説明を 400 で表示する」を、前後の空白を除いて比べるように直した。雛形のエラー画面は `<pre>` の中で説明の前後を改行・字下げするので、`assert_select` の `text:` では一致しない（DEF-7.0-45）
 - 残した nonce の hidden field にも、雛形にならって `id: nil` を付けた（DEF-7.0-45）
@@ -1638,7 +1638,7 @@ devise を上げ、initializer を雛形に合わせた後に、`.claude/launch.
 
 ### テストの追加
 
-gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で 1 本を置き換え、1 本を足した（69 runs）。
+gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で、例外を記録した 2 本を置き換え、form_post での拒否のスナップショットを 1 本足した（69 runs）。
 
 | テスト | 足したときの挙動 | 変わった段 |
 |---|---|---|
@@ -1658,7 +1658,7 @@ gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で 
 
 上の「作業計画からの変更点」のヘルパーの修正の前に、人間の求めで調べた。
 
-- doorkeeper-openid_connect の `handle_oidc_error!` は、1.2〜1.7.5 では `render json: error_response.body, status: :found, location: ...` で JSON の本文を返していたので、`Content-Type: application/json` と本文が合っていた。1.8.0 のコミット `d07ba31`（PR #138。doorkeeper 5.5 の form_post に対応するため、doorkeeper の `redirect_or_render` を使うようにした）で HTML のリダイレクトになったが、その前の `response.headers.merge!(error_response.headers)` が残った
+- doorkeeper-openid_connect の `handle_oidc_error!` は、確かめたタグ（v1.2.0・v1.4.0・v1.5.0・v1.6.0・v1.7.0・v1.7.5）では `render json: error_response.body, status: :found, location: ...` で JSON の本文を返していたので、`Content-Type: application/json` と本文が合っていた。1.8.0 のコミット `d07ba31`（PR #138。doorkeeper 5.5 の form_post に対応するため、doorkeeper の `redirect_or_render` を使うようにした）で HTML のリダイレクトになったが、その前の `response.headers.merge!(error_response.headers)` が残った
 - 1.10.5・2.0.0・master（2026-08-23 の a9ff52b まで）でも同じで、doorkeeper の `ErrorResponse#headers` も 5.9.9・6.0.0.rc2 で同じ。両方のリポジトリに、この件の issue・PR は見つからなかった
 - OpenID Connect Core 1.0 の 3.1.2.6（Authentication Error Response）と RFC 6749 の 4.1.2.1 は、リダイレクトで `error`・`state` をクエリに付けることを決めているだけで、ヘッダーは決めていない。`WWW-Authenticate` は RFC 6750 の 3 章で保護されたリソースへのリクエストを拒むときのもので、`Content-Type` は RFC 9110 の 8.3 で本文のメディアタイプを示す。エラーの返し方と値は仕様どおりで、足されるヘッダーは仕様にないもの（`Content-Type` は本文と合わない）
 - doorkeeper 本体の拒否のリダイレクト（スナップショット `authorize_deny`）は `text/html` で、`WWW-Authenticate` はない
@@ -1692,3 +1692,17 @@ gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で 
 - 応答のスナップショットの変化は、上の「意図的な仕様変更」と DEF-7.0-45・46 だけ。どれも人間に確かめてから作り直した
 - `bin/rails s` は手動確認で 3 アプリとも起動した
 - 手動確認用の環境: 上の「手動確認」
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| DEF-7.0-45 が、エラー画面の雛形がローカル変数 `error_response` を読み、`<pre>` の中で改行するようになった版を 5.6.7（#1676）・5.7.0（#1702）としているが、doorkeeper のタグのソースでは 5.6.5 から（5.6.4 までは 1 行） | DEF-7.0-45 を直した。5.7.0 の #1702 は `respond_to?` を `local_assigns` にした変更。v5.6.4・v5.6.5 のタグで確かめた |
+| エラー画面のテストのコメントの「doorkeeper 5.7.0 からの雛形は」も同じ誤り | 5.6.5 に直した |
+| 応答のスナップショットのヘルパーが、JSON の `Content-Type` のどの応答でも、読めない本文をテキストとして扱う。トークン応答などが壊れた JSON を返すようになると、JSON のキーで伏せる処理が効かないまま、`UPDATE_SNAPSHOTS` で本物のトークンがファイルに書かれうる | テキストとして扱うのをリダイレクト（`response.redirect?`）の応答だけに絞った（人間が承認。3 アプリ）。リダイレクト以外の応答で壊れた JSON を返すと `JSON::ParserError` で落ちることを、一時的なテストで確かめた（確かめた後で消した） |
+| 上の「テストの追加」の「後で 1 本を置き換え」は、置き換えたのが 2 本（Webfinger・form_post での拒否） | 直した |
+| 上の「OIDC のエラーのリダイレクトのヘッダー」の「1.2〜1.7.5」は、確かめたタグの範囲を超えている | 確かめたタグ（v1.2.0・v1.4.0・v1.5.0・v1.6.0・v1.7.0・v1.7.5）を書いた |
+| DEF-7.0-45・46 を記録したコミット（a7738c6）が、その時点ではまだない LOG.md の Step 1-b-3-2 の節を指している（CLAUDE.md の「まだ存在しないものを現在形で書かない」） | 直さない。この PR の docs のコミットで節ができたので、PR の時点では参照先がある。履歴は書き換えない。今後は、参照する LOG.md の節を先に書く |
+| ヘルパーが本文を 2 回 `JSON.parse` する（判定と整形） | 直さない（人間が承認）。応答 1 件ごとの小さな手間で、判定を分けたほうが読みやすい |
+
+コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通ることを確かめた。

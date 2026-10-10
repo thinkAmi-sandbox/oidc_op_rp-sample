@@ -568,13 +568,13 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 種類: 周辺 gem の雛形（doorkeeper 5.9.9 の `app/views/doorkeeper/`）/ 対象: OP
 - 何が変わるか: `app/views/doorkeeper/` のうち雛形と違っていた 5 ファイルを、5.9.9 の雛形と同じにする。`authorizations/new.html.erb` だけは、nonce の hidden field 2 つを「追加開始」「追加終了」の印の中に残す（雛形にならって `id: nil` を付けた）。ほかの 9 ファイルと 2 つのレイアウトは元から雛形と同じ
   - `authorizations/new.html.erb`: 同意と拒否の 2 つのフォームの hidden field に `id: nil` が付き、同じ `id` が 2 回出なくなる。`able_to` の後の `:` がロケールに移る
-  - `authorizations/error.html.erb`: ローカル変数 `error_response` を先に読む。説明の前後が `<pre>` の中で改行・字下げされる
+  - `authorizations/error.html.erb`: ローカル変数 `error_response` を先に読む。説明の前後が `<pre>` の中で改行・字下げされる（タグのソースでは、どちらも 5.6.5 の雛形から。5.7.0 の #1702 で `respond_to?` が `local_assigns` になった）
   - `authorizations/form_post.html.erb`: ローカル変数 `auth` を読む。拒否の経路で落ちなくなる（意図的な仕様変更。[LOG.md](../LOG.md) の Step 1-b-3-2）
   - `applications/show.html.erb`・`authorizations/show.html.erb`: 見出しの `:` がロケールに移る（DEF-7.0-46 と合わせて表示は同じ）
 - なぜ: 上書きしていたビューは 5.5.2 の雛形のコピーだった。docs/IMPROVEMENTS.md の IMP-008 で新しい雛形に合わせるとしていたものを、gem の generator の雛形にも追随する方針（[PLAN.md](../PLAN.md) の 3 章の 2 の境目の 1）で、1-b-3-2 で行った
 - 3 アプリへの影響: OP だけ。同意画面の応答のスナップショット（`authorize_consent`）は hidden field の `id` が 18 か所なくなるだけで、送る項目と値は同じ。エラー画面（`authorize_error`）は `<pre>` の中に改行と字下げが入り、ブラウザでは説明の前に字下げの空白が見える。E2E のログイン（同意画面で Authorize を押す）は通る。テスト「登録されていない redirect_uri では、エラーの説明を 400 で表示する」は、前後の空白を除いて比べるように直した
 - 扱い: 追随
-- 出典: `doorkeeper-5.9.9/app/views/doorkeeper/authorizations/` の各ファイル、doorkeeper の CHANGELOG（5.6.0.rc1 の #1552、5.6.7 の #1676、5.7.0 の #1702、5.9.1 の #1784）。doorkeeper は Rails の外の gem なので、Rails ガイドに該当の節はない
+- 出典: `doorkeeper-5.9.9/app/views/doorkeeper/authorizations/` の各ファイル、doorkeeper の CHANGELOG（5.6.0.rc1 の #1552、5.7.0 の #1702、5.9.1 の #1784）、doorkeeper の v5.6.4・v5.6.5 のタグの `app/views/doorkeeper/authorizations/error.html.erb`。doorkeeper は Rails の外の gem なので、Rails ガイドに該当の節はない
 - コミット: OP（`follow the doorkeeper 5.9.9 locale and view templates`）
 
 ### DEF-7.0-46: doorkeeper のロケールを 5.9.9 の雛形に合わせる
