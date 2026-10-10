@@ -1709,7 +1709,7 @@ gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で�
 
 ## Step 2: Ruby 3.2（2026-10-10）
 
-- ブランチ / PR: `upgrade/step2-ruby32` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step2-ruby32` / [#26](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/26)
 - バージョン: Ruby 3.1.7 → 3.2.11 / Rails 7.0.10（変更なし）。Bundler 2.3.27 → 2.4.19（`BUNDLED WITH`）。lock の default gem を 3.2.11 の版に合わせ直した。nokogiri 1.18.10 → 1.19.4
 - Ruby だけを上げる最初の Step。分かった手順は TIPS.md の「Ruby を上げる」にまとめた（スキル化の材料。PLAN.md の 13 章）
 - 既定値への追随（A）と業務的な挙動の変化（B）は、どちらも起きなかった（下の「前後の比較」）。defaults/ への記録はない
