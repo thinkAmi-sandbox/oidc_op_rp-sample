@@ -110,7 +110,7 @@ GEM
       responders
       warden (~> 1.2.3)
     docile (1.4.1)
-    doorkeeper (5.8.2)
+    doorkeeper (5.9.9)
       railties (>= 5)
     doorkeeper-openid_connect (1.10.1)
       doorkeeper (>= 5.5, < 6.0)

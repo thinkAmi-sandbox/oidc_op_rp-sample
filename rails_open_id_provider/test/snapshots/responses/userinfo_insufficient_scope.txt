@@ -3,6 +3,7 @@ cache-control: no-store
 content-length: <CONTENT_LENGTH>
 content-type: text/html
 referrer-policy: strict-origin-when-cross-origin
+www-authenticate: Bearer realm="Doorkeeper", error="insufficient_scope", error_description="Access to this resource requires scope _openid_."
 x-content-type-options: nosniff
 x-download-options: noopen
 x-frame-options: SAMEORIGIN

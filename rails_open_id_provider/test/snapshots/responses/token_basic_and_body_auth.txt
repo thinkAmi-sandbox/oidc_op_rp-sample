@@ -1,10 +1,9 @@
-HTTP 200
+HTTP 400
 cache-control: no-store
 content-length: <CONTENT_LENGTH>
 content-type: application/json; charset=utf-8
-etag: <ETAG>
-pragma: no-cache
 referrer-policy: strict-origin-when-cross-origin
+www-authenticate: Bearer realm="Doorkeeper", error="invalid_request", error_description="The request utilizes more than one mechanism for authenticating the client."
 x-content-type-options: nosniff
 x-download-options: noopen
 x-frame-options: SAMEORIGIN
@@ -14,9 +13,6 @@ x-runtime: <RUNTIME>
 x-xss-protection: 0
 
 {
-  "access_token": "<ACCESS_TOKEN:string>",
-  "token_type": "Bearer",
-  "expires_in": 600,
-  "scope": "introspection",
-  "created_at": 1767225600
+  "error": "invalid_request",
+  "error_description": "The request utilizes more than one mechanism for authenticating the client."
 }

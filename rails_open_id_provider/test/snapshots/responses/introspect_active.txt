@@ -17,6 +17,6 @@ x-xss-protection: 0
   "scope": "openid",
   "client_id": "test-dummy-rp-my-op-client-id",
   "token_type": "Bearer",
-  "exp": 1767226200,
-  "iat": 1767225600
+  "iat": 1767225600,
+  "exp": 1767226200
 }
