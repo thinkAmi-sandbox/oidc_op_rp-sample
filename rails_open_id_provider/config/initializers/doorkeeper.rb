@@ -5,6 +5,21 @@ Doorkeeper.configure do
   # Check the list of supported ORMs here: https://github.com/doorkeeper-gem/doorkeeper#orms
   orm :active_record
 
+  # Enable support for multiple database configurations with read replicas.
+  # When enabled, Doorkeeper will wrap database write operations to ensure they
+  # use the primary (writable) database when automatic role switching is enabled.
+  #
+  # For ActiveRecord (Rails 6.1+), this uses `ActiveRecord::Base.connected_to(role: :writing)`.
+  # Other ORM extensions can implement their own primary database targeting logic.
+  #
+  # enable_multiple_database_roles
+  #
+  # This prevents `ActiveRecord::ReadOnlyError` when using read replicas with Rails
+  # automatic role switching. Enable this if your application uses multiple databases
+  # with automatic role switching for read replicas.
+  #
+  # See: https://guides.rubyonrails.org/active_record_multiple_databases.html#activating-automatic-role-switching
+
   # =======> 変更開始
   # This block will be called to check whether the resource owner is authenticated or not.
   resource_owner_authenticator do
@@ -43,7 +58,7 @@ Doorkeeper.configure do
   # You can use your own model classes if you need to extend (or even override) default
   # Doorkeeper models such as `Application`, `AccessToken` and `AccessGrant.
   #
-  # Be default Doorkeeper ActiveRecord ORM uses it's own classes:
+  # By default Doorkeeper ActiveRecord ORM uses its own classes:
   #
   # access_token_class "Doorkeeper::AccessToken"
   # access_grant_class "Doorkeeper::AccessGrant"
@@ -105,7 +120,10 @@ Doorkeeper.configure do
   # access_token は一般的な長さの10分で失効させる（E2E のデバッグ中に期限切れにならないようにするため）
   access_token_expires_in 10.minutes
   # Access token expiration time (default: 2 hours).
-  # If you want to disable expiration, set this to `nil`.
+  # If you set this to `nil` Doorkeeper will not expire the token and omit expires_in in response.
+  # It is RECOMMENDED to set expiration time explicitly.
+  # Prefer access_token_expires_in 100.years or similar,
+  # which would be functionally equivalent and avoid the risk of unexpected behavior by callers.
   #
   # access_token_expires_in 2.hours
   # <======= 変更終了
@@ -141,9 +159,10 @@ Doorkeeper.configure do
 
   # Reuse access token for the same resource owner within an application (disabled by default).
   #
-  # This option protects your application from creating new tokens before old valid one becomes
-  # expired so your database doesn't bloat. Keep in mind that when this option is `on` Doorkeeper
-  # doesn't updates existing token expiration time, it will create a new token instead.
+  # This option protects your application from creating new tokens before old **valid** one becomes
+  # expired so your database doesn't bloat. Keep in mind that when this option is enabled Doorkeeper
+  # doesn't update existing token expiration time, it will create a new token instead if no active matching
+  # token found for the application, resources owner and/or set of scopes.
   # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/383
   #
   # You can not enable this option together with +hash_token_secrets+.
@@ -177,6 +196,17 @@ Doorkeeper.configure do
   # multiple machines and/or processes).
   #
   # revoke_previous_client_credentials_token
+
+  # Only allow one valid access token obtained via authorization code
+  # per client. If a new access token is obtained before the old one
+  # expired, the old one gets revoked (disabled by default)
+  #
+  # revoke_previous_authorization_code_token
+
+  # Require non-confidential clients to use PKCE when using an authorization code
+  # to obtain an access_token (disabled by default)
+  #
+  # force_pkce
 
   # Hash access and refresh tokens before persisting them.
   # This will disable the possibility to use +reuse_access_token+
@@ -272,6 +302,14 @@ Doorkeeper.configure do
   # Check out https://github.com/doorkeeper-gem/doorkeeper/wiki/Changing-how-clients-are-authenticated
   # for more information on customization
   #
+  # NOTE: configuring a callable extractor opts the request out of the RFC 6749
+  # §2.3 checks that reject a request authenticating the client with more than
+  # one method, or presenting more than one client identity. A callable may
+  # legitimately overlap the built-in extractors, and the extractors after the
+  # matching one are never called, so what they would have returned is unknown.
+  # Prefer the symbol extractors unless you need something they cannot express;
+  # a callable has to reject such a request itself.
+  #
   # client_credentials :from_basic, :from_params
 
   # Change the way access token is authenticated from the request object.
@@ -295,12 +333,15 @@ Doorkeeper.configure do
   # force_ssl_in_redirect_uri { |uri| uri.host != 'localhost' }
 
   # Specify what redirect URI's you want to block during Application creation.
-  # Any redirect URI is whitelisted by default.
+  # Any redirect URI is allowed by default.
   #
-  # You can use this option in order to forbid URI's with 'javascript' scheme
+  # Redirect URIs with a script scheme (`javascript`, `vbscript`, `data`) are
+  # always rejected, regardless of this option.
+  #
+  # You can use this option in order to forbid URI's of a particular host
   # for example.
   #
-  # forbid_redirect_uri { |uri| uri.scheme.to_s.downcase == 'javascript' }
+  # forbid_redirect_uri { |uri| uri.host == 'example.com' }
 
   # Allows to set blank redirect URIs for Applications in case Doorkeeper configured
   # to use URI-less OAuth grant flows like Client Credentials or Resource Owner
@@ -330,6 +371,12 @@ Doorkeeper.configure do
   #   Doorkeeper::Errors::TokenRevoked, Doorkeeper::Errors::TokenUnknown
   #
   # handle_auth_errors :raise
+  #
+  # If you want to redirect back to the client application in accordance with
+  # https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1, you can set
+  # +handle_auth_errors+ to :redirect
+  #
+  # handle_auth_errors :redirect
 
   # Customize token introspection response.
   # Allows to add your own fields to default one that are required by the OAuth spec
@@ -362,8 +409,8 @@ Doorkeeper.configure do
   #
   # implicit and password grant flows have risks that you should understand
   # before enabling:
-  #   http://tools.ietf.org/html/rfc6819#section-4.4.2
-  #   http://tools.ietf.org/html/rfc6819#section-4.4.3
+  #   https://datatracker.ietf.org/doc/html/rfc6819#section-4.4.2
+  #   https://datatracker.ietf.org/doc/html/rfc6819#section-4.4.3
   #
   # grant_flows %w[authorization_code client_credentials]
 
@@ -403,11 +450,28 @@ Doorkeeper.configure do
   # true in case resource owner authorized for the specific application or false in other
   # cases.
   #
-  # Be default all Resource Owners are authorized to any Client (application).
+  # By default all Resource Owners are authorized to any Client (application).
   #
   # authorize_resource_owner_for_client do |client, resource_owner|
-  #   resource_owner.admin? || client.owners_whitelist.include?(resource_owner)
+  #   resource_owner.admin? || client.owners_allowlist.include?(resource_owner)
   # end
+
+  # Allows additional data fields to be sent while granting access to an application,
+  # and for this additional data to be included in subsequently generated access tokens.
+  # The 'authorizations/new' page will need to be overridden to include this additional data
+  # in the request params when granting access. The access grant and access token models
+  # will both need to respond to these additional data fields, and have a database column
+  # to store them in.
+  #
+  # Example:
+  # You have a multi-tenanted platform and want to be able to grant access to a specific
+  # tenant, rather than all the tenants a user has access to. You can use this config
+  # option to specify that a ':tenant_id' will be passed when authorizing. This tenant_id
+  # will be included in the access tokens. When a request is made with one of these access
+  # tokens, you can check that the requested data belongs to the specified tenant.
+  #
+  # Default value is an empty Array: []
+  # custom_access_token_attributes [:tenant_id]
 
   # Hook into the strategies' request & response life-cycle in case your
   # application needs advanced customization or logging:
