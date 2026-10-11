@@ -49,6 +49,11 @@
 | DEF-7.1-39 | 既定の応答ヘッダーから `X-Download-Options` がなくなる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-40 | `MessageVerifier`・`MessageEncryptor` の既定の serializer が `:json_allow_marshal` になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-41 | メッセージのデータとメタデータをまとめて直列化する | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ（効くのは OP） | 追随 |
+| DEF-7.1-42 | アプリの autoload のパスを `$LOAD_PATH` に入れない | Rails の既定値（`load_defaults 7.1`） | 3 アプリ | 追随 |
+| DEF-7.1-43 | キャッシュの形式が 7.1 になる | Rails の既定値（`load_defaults 7.1`） | 3 アプリ | 追随 |
+| DEF-7.1-44 | development・test のログを 100 MB で切り替える | Rails の既定値（`load_defaults 7.1`） | 3 アプリ（development・test） | 追随 |
+| DEF-7.1-45 | Action View の sanitizer が HTML5 になる | Rails の既定値（`load_defaults 7.1`） | 3 アプリ | 追随 |
+| DEF-7.1-46 | Action Text の sanitizer が HTML5 になる | Rails の既定値（`load_defaults 7.1`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -499,3 +504,59 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: rails/rails#46848、`activesupport-7.1.6/lib/active_support/messages/metadata.rb`、`actionpack-7.1.6/lib/action_dispatch/middleware/cookies.rb`、`new_framework_defaults_7_1.rb` の雛形のコメント、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.14.10「config.active_support.use_message_serializer_for_metadata」
 - コミット: RS・RP・OP（`enable the message format defaults of Rails 7.1`）
+
+## `load_defaults 7.1`
+
+3 アプリを `config.load_defaults 7.1` にし、`new_framework_defaults_7_1.rb` を消した。前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べると、違うのは `new_framework_defaults_7_1.rb` で有効にせずに `load_defaults 7.1` に任せた 5 つの設定（DEF-7.1-42〜46）だけで、6 つの書き出しで同じ違いだった。`new_framework_defaults_7_1.rb` で有効にしていた 22 の設定の値と、起動の途中に読み込み済みの部品は変わらない。5 つの設定が効く先を書き出すため、比べる前に `scripts/lib/dump_config.rb` に値を足した。3 アプリの検査と E2E の件数、応答のスナップショット、development の eager load の警告（0 件）は前と同じ。
+
+7.1.6 の雛形の initializer は 7.0.10 と同じ 7 つで、7.1 で雛形から消えたものはない。雛形にない `config/initializers/backtrace_silencers.rb` は 3 アプリとも残す。`BACKTRACE` 環境変数でバックトレースの絞り込みを外す処理は `railties-7.1.6/lib/rails/backtrace_cleaner.rb` になく（railties が扱うのは 7.2 から）、このファイルだけが担う。Step 5 で見直す（DEF-7.0-37 の続き）。次の `app:update` で判断をし直さないよう、ファイルの先頭に残す理由のコメントを足した（人間が承認）。
+
+### DEF-7.1-42: アプリの autoload のパスを `$LOAD_PATH` に入れない
+
+- 種類: Rails の既定値（`load_defaults 7.1`）/ 対象: RS・RP・OP
+- 何が変わるか: `config.add_autoload_paths_to_load_path` が true → false。`$LOAD_PATH` に入るアプリのディレクトリが、`app/*` の 7〜8 個と `lib`・`vendor` から、`lib`・`vendor` だけになる（設定の値の比較で確かめた）
+- なぜ: Zeitwerk だけが autoloader になったので、autoload のパスを `$LOAD_PATH` に入れておく理由がなくなった。`$LOAD_PATH` が短くなると `require` が速くなり、bootsnap のキャッシュも小さくなる（rails/rails#44133）
+- 3 アプリへの影響: アプリのコードの `require` はすべて gem か `test_helper` を読み（`test` は `bin/rails test` が `$LOAD_PATH` に足す）、`app/*` のファイルを `require` で読むものはない。RP の独自ストラテジーは once のローダーで読み（DEF-7.1-10）、`lib` は `$LOAD_PATH` に残る。`zeitwerk:check`・minitest・E2E が通った
+- 扱い: 追随
+- 出典: rails/rails#44133、`railties-7.1.6/CHANGELOG.md`（「No longer add autoloaded paths to `$LOAD_PATH`」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.2.1「config.add_autoload_paths_to_load_path」、「Rails アップグレードガイド」の 2.2「自動読み込みされるパスが$LOAD_PATHに含まれなくなった」
+- コミット: RS・RP・OP（`switch to load_defaults 7.1`）
+
+### DEF-7.1-43: キャッシュの形式が 7.1 になる
+
+- 種類: Rails の既定値（`load_defaults 7.1`）/ 対象: RS・RP・OP
+- 何が変わるか: `ActiveSupport::Cache.format_version` が 7.0 → 7.1。キャッシュストアの coder の serializer が `Marshal70WithFallback` → `Marshal71WithFallback` になり、legacy の形式を使わなくなる（設定の値の比較で確かめた）
+- なぜ: ビューの断片のような素の文字列を、Marshal を通さずに保存して速くした。7.1 の形式でも、6.1・7.0 の形式で書いたエントリは読める（rails/rails#48122・#48660）
+- 3 アプリへの影響: キャッシュストアは test・development とも `null_store`（development の `tmp/caching-dev.txt` は 3 アプリともない）で、何も保存しない。アプリのコードは `Rails.cache` を使っていない。`new_framework_defaults_7_1.rb` では効かない設定なので、`load_defaults` に任せた
+- 扱い: 追随
+- 出典: rails/rails#48122・#48660、`activesupport-7.1.6/CHANGELOG.md`（「A new `7.1` cache format is available」）、`activesupport-7.1.6/lib/active_support/cache.rb` の `default_serializer`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.14.11「config.active_support.cache_format_version」
+- コミット: RS・RP・OP（`switch to load_defaults 7.1`）
+
+### DEF-7.1-44: development・test のログを 100 MB で切り替える
+
+- 種類: Rails の既定値（`load_defaults 7.1`。`Rails.env.local?` のときだけ）/ 対象: RS・RP・OP（development・test）
+- 何が変わるか: `config.log_file_size` が nil → 100 MB。ロガーを `ActiveSupport::Logger.new(ファイル, 1, 100 MB)` で作る。前はローテーションしない設定（`shift_age` が 0）で、ログは際限なく伸びていた。後は 100 MB を超えると `<環境>.log.0` に移し、1 世代だけ残す。設定の値の比較: ロガーの `shift_size` が 1048576 → 104857600（前の 1 MB は `shift_age` が 0 なので使われない値）
+- なぜ: development・test のログが気づかないうちに大きくなるので、既定で上限を設けた（rails/rails#44888）
+- 3 アプリへの影響: ログの中身は変わらない。今のログはどれも 100 MB 未満で、すぐには切り替わらない。ログは手動確認用の環境の守るファイルに入っていない。グループ 4 で、`new_framework_defaults_7_1.rb` では効かないと確かめて、`load_defaults` に任せた
+- 扱い: 追随
+- 出典: rails/rails#44888、`railties-7.1.6/CHANGELOG.md`（「Allow configuration of logger size for local and test environments」）、`railties-7.1.6/lib/rails/application/bootstrap.rb` の `initialize_logger`、Ruby 3.2.11 の `logger/log_device.rb`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.2.40「config.log_file_size」
+- コミット: RS・RP・OP（`switch to load_defaults 7.1`）
+
+### DEF-7.1-45: Action View の sanitizer が HTML5 になる
+
+- 種類: Rails の既定値（`load_defaults 7.1`）/ 対象: RS・RP・OP
+- 何が変わるか: `config.action_view.sanitizer_vendor` が `Rails::HTML4::Sanitizer` → `Rails::HTML5::Sanitizer`。`sanitize`・`strip_tags`・`simple_format` などが、ブラウザと同じ HTML5 の規則で HTML を読む。設定の値の比較: `ActionView::Helpers::SanitizeHelper.sanitizer_vendor` と `ActionView::Base` の 3 つの sanitizer のクラスが HTML4 → HTML5
+- なぜ: HTML4 のパーサーとブラウザの読み方の食い違いを、sanitizer を抜ける手口に使われないようにした（rails/rails#48293）。7.1.6 では、sprockets-rails のないアプリでも HTML5 が選ばれるように直っている（rails/rails#51267）
+- 3 アプリへの影響: sanitizer を通るのは、OP の `rails_open_id_provider/app/views/doorkeeper/applications/index.html.erb` の `simple_format(application.redirect_uri)` だけ。応答のスナップショット（`oauth_applications.txt`。fixtures の 3 つの redirect_uri）は変わらない。手動確認用の DB の 3 つの値（`sqlite3 -readonly` で読んだ）と、`\r\n`・`&`・`<script>` を含む値の計 10 個で、`simple_format` の出力は HTML4 と HTML5 で同じだった（`\r\n` は sanitizer の段階では HTML5 が `\n` にそろえるが、`simple_format` も後で `\n` にそろえる）
+- 扱い: 追随
+- 出典: rails/rails#48293・#51267、`actionview-7.1.6/CHANGELOG.md`（「Add support for HTML5 standards-compliant sanitizers」）、`railties-7.1.6/CHANGELOG.md`（「Fix sanitizer vendor configuration in 7.1 defaults」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.11.21「config.action_view.sanitizer_vendor」
+- コミット: RS・RP・OP（`switch to load_defaults 7.1`）
+
+### DEF-7.1-46: Action Text の sanitizer が HTML5 になる
+
+- 種類: Rails の既定値（`load_defaults 7.1`）/ 対象: RS・RP・OP
+- 何が変わるか: `config.action_text.sanitizer_vendor` が HTML4 → HTML5。設定の値の比較: `ActionText::ContentHelper.sanitizer` が `Rails::HTML4::SafeListSanitizer` → `Rails::HTML5::SafeListSanitizer`
+- なぜ: Action View と同じ理由で、Action Text の本文の表示にも HTML5 の sanitizer を使う（rails/rails#48522）
+- 3 アプリへの影響: 3 アプリとも Action Text を読み込むが、`has_rich_text` もリッチテキストの表示もない
+- 扱い: 追随
+- 出典: rails/rails#48522、`actiontext-7.1.6/CHANGELOG.md`、`actiontext-7.1.6/lib/action_text/engine.rb`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.18.2「config.action_text.sanitizer_vendor」
+- コミット: RS・RP・OP（`switch to load_defaults 7.1`）
