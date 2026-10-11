@@ -1985,7 +1985,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 ## Step 3: Rails 7.1（2026-10-11〜）
 
 - ブランチ / PR: `upgrade/step3-rails71` / （PR 作成後に記入）
-- バージョン: Ruby 3.2.11（変更なし）/ Rails 7.0.10 → 7.1.6（予定）
+- バージョン: Ruby 3.2.11（変更なし）/ Rails 7.0.10 → 7.1.6
 - `/rails-upgrade` のスキルを実際の作業に使う最初の Step。スキルの手順・型・設定で、足りない・合わない・迷ったところは、作業を止めずに控えて、この節の最後の「スキルについて気づいたこと」に書く（スキルを直すかは人間が判断する）
 
 ### 作業計画で決めたこと
@@ -2018,6 +2018,8 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | jwt | 2.10.3 → 3.3.0 | RP・OP。`bundle update jwt --conservative`。lock で動いたのは jwt だけ。上げる前に、RP の `my_op.rb` の `JWT.decode` まわりを `jwt-2.10.3/lib/jwt` と v3.3.0 のタグで比べた。`algorithm` のキー、鍵を探すブロックの呼び方、iss・aud・sub・exp・nbf の検証は同じで、`verify_iat` に渡していない leeway が増えただけ。変わったのは、構造の壊れたトークンと鍵がないときの例外クラスだけ（どちらも `JWT::DecodeError` のサブクラス）。既存のテストが nonce・kid・署名の鍵・iss・aud・exp の失敗の例外クラスを確かめているので、先に足すテストはなかった。RS は 2.10.3 のまま（下の「作業計画からの変更点」） |
 | puma | 6.6.1 → 8.0.2 | 3 アプリ。Gemfile を `~> 6.0` → `~> 8.0` にして `bundle update puma --conservative`。lock で動いたのは puma だけ（nio4r は 2.5.9 のまま。C 拡張は 3 アプリでビルドした）。無視リストから CVE-2026-47736・47737 を消した。既定値の変化 3 つ（応答ヘッダー名の小文字化、keep-alive の既定値、既定の bind）を解説し、人間の返事を得て追随した（DEF-7.1-01〜03） |
 | omniauth-rails_csrf_protection | 1.0.2 → 2.0.1 | RP。`bundle update omniauth-rails_csrf_protection --conservative`。lock で動いたのはこの gem だけ。入れた 1.0.2 と 2.0.1 の `token_verifier.rb` を比べ、Action Pack 8.1 未満の枝は 1.0.2 と同じ処理（`undef_method` に `defined?` の確かめが付いただけ）なことを確かめた。8.1 用の枝は Step 7 でもう一度確かめる |
+| Rails | 7.0.10 → 7.1.6 | 3 アプリ（rails-lock）。7.0.10 は 7.0 系の最新なので、先に上げるパッチはなかった。`scripts/resolve-lock --gem 'rails=~> 7.1.6' --rails --unpin rails-dom-testing,erubi --pin cgi=0.3.7,irb=1.6.2,connection_pool=2.5.5,tsort=0.2.0` で解決した lock をアプリに持ち込み、Gemfile を `~> 7.1.6` にして `bundle lock`・`bundle install`。動いたのは Rails の構成 gem と rails-dom-testing 2.0.3 → 2.3.0・erubi 1.10.0 → 1.13.1。増えたのは cgi 0.3.7（RS・OP）・irb 1.6.2・tsort 0.2.0・connection_pool 2.5.5・rack-session 1.0.2・rackup 1.0.1・webrick 1.9.2（cgi・irb は default gem と同じ版で、落としていない）。作業計画に書いていなかった変化として、method_source 1.0.0 が lock から消えた（railties 7.0.10 の依存で、7.1.6 の依存にはない）。無視リストから CVE-2025-55193・CVE-2025-24293 を消し、残りのコメントの版を 7.1.6 に直した。7.1 で初めて起動する前に、人間に確かめて 3 アプリの `tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーした（`cmp` で同じ中身。起動後の `Rails.application.secret_key_base` が元のファイルと同じことを確かめた） |
+| activerecord-session_store | 2.2.0 → 2.3.0 | RP。Rails 7.1.6 と同じコミット（人間が判断）。Rails 7.1.6 だけでは、セッション Cookie の Set-Cookie から `SameSite=Lax` が消えた（DEF-7.1-06）。`bundle update activerecord-session_store --conservative` で、動いたのはこの gem だけ。generator の雛形は 2.2.0 と同じ |
 
 - ダウンロードした `.gem` の SHA-256 は、すべて rubygems.org の値と同じ（`scripts/verify-gem-checksums <app> --changed <上げる前のコミット>`）
 
@@ -2048,6 +2050,13 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - omniauth-rails_csrf_protection 2.0.1
   - RP の検査（CSRF の失敗のテストを含む）と E2E が通った。設定の値と起動の途中の読み込み、eager load の警告は前と同じ
 - Rails の前の 4 つの gem を上げた後、手動確認用の環境の 9 ファイルのハッシュは作業の開始時と同じ
+- Rails 7.1.6（rails-lock）
+  - 最初の検査で、RP 6 件・OP 11 件の応答のスナップショットの差分、bundler-audit（解消した 2 件が無視リストに残っていた）、E2E（下の「遭遇した問題」）が落ちた。RS の minitest、3 アプリの `zeitwerk:check`・起動の途中の読み込み・RuboCop・brakeman は通った
+  - スナップショットの差分は、リダイレクトの本文がなくなったこと（RP 4 件・OP 11 件。DEF-7.1-04）、ルーティングの `redirect` の Content-Type に charset が付いたこと（RP 1 件。DEF-7.1-05）、RP のセッション Cookie から `SameSite=Lax` が消えたこと（RP 4 件。activerecord-session_store 2.3.0 で元に戻した。DEF-7.1-06）。解説して人間の返事を得てから、RP・OP のスナップショットを作り直した。作り直した差分は、この 3 つだけ
+  - minitest の件数は同じで、assertion の数が RS 14 → 15・RP 69 → 71・OP 121 → 123 に増えた。activesupport 7.1 の `assert_nothing_raised` が `assert(true)` を数えるようになったため（`activesupport-7.1.6/lib/active_support/testing/assertions.rb`。3 アプリの `test/eager_load_test.rb` で 1 つずつ）。RP・OP のもう 1 つずつは、どの assertion かまで確かめていない
+  - 書き換えた後に、3 アプリの検査と E2E がすべて通った。brakeman の無視した EOL の警告 2 件は、Rails 7.1.6 でも同じ fingerprint で当たる
+  - development だけのヘッダーは、rails-lock の前に書き出した（RS の `/apples/show`、RP のトップ、OP の discovery とログイン画面。E2E 用の DB で `Puma::Server` に通した）。後の比べ方は rails-defaults と verify でまとめて行う
+  - Rails 7.1 は SQLite を WAL で開く（rails/rails#49349）。手動確認用の development の DB は、まだ 7.1 で開いていない（journal mode は `delete` のまま）。verify の手動確認で開くと、DB のファイルが WAL になり、`-wal`・`-shm` のファイルができる見込み
 
 ### 遭遇した問題
 
@@ -2073,3 +2082,12 @@ research:
 gems:
 
 11. 作業計画の中の食い違い（jwt を「3 アプリ」としたことと、論点 4 の「直接の gem だけ」）を、research の出口でも gems の入口でも見つけられず、RS のコミットメッセージを書く段階で気づいた。gems の入口の条件に、上げる gem が作業計画の決まり（方針の範囲）に当たるかを確かめる手順がない
+
+rails-lock:
+
+12. `scripts/resolve-lock` の「消えた gem」は空だったが、アプリに持ち込んで `bundle lock` すると method_source が消えた。resolve-lock は旧 lock の gem をすべて Gemfile に `= 版` で書くので、新しい Rails が依存しなくなった gem も Gemfile の依存として残り、出力に出ない。持ち込んだ後の `git diff` で初めて分かった
+13. rails-lock の手順は「lock の解決 → 照合 → アプリごとのコミット」だけで、次のものを想定していない
+    - 新しい版で初めて起動する前の手動確認用の環境の操作（7.1 の `tmp/local_secret.txt`）
+    - アプリの外の道具（E2E の起動）を直す変更が要ること
+    - 新しい Rails を必要とする gem を、Rails と同じコミットで上げる判断（7 章の「Rails と同時か直後」の「同時」）。今回は、どれも「この手順にないことが要る」で止まって確かめた
+14. 検査が落ちたときの最初の結果（スナップショットの差分が RP 6 件・OP 11 件、bundler-audit、E2E）を、どこまで調べてから止まるかの目安がない。今回は、原因を 3 種類に分けて全体を示し、1 論点ずつ確かめた

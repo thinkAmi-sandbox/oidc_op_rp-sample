@@ -671,8 +671,8 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - [x] gems: jwt 3.3.0（RP・OP。RS は間接の依存なので 2.10.3 のまま。下の「着手後に決めたこと」）
 - [x] gems: puma 8.0.2（3 アプリ。Gemfile `~> 6.0` → `~> 8.0`。DEF-7.1-01〜03）
 - [x] gems: omniauth-rails_csrf_protection 2.0.1（RP）
-- [ ] rails-lock: Rails 7.1.6（3 アプリ）
-- [ ] gems: activerecord-session_store 2.3.0（RP）
+- [x] rails-lock: Rails 7.1.6（3 アプリ。DEF-7.1-04・05）
+- [x] gems: activerecord-session_store 2.3.0（RP。Rails 7.1.6 と同じコミットで上げた。DEF-7.1-06。下の「着手後に決めたこと」）
 - [ ] gems: rack-mini-profiler 5.0.0（RP・OP。Gemfile `~> 4.0` → `~> 5.0`）
 - [ ] rails-app-update
 - [ ] rails-app-update: RP の autoload_lib_once
@@ -719,6 +719,8 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - `new_framework_defaults_7_1.rb` のグループと順は、rails-defaults の関門で決める。記録は `docs/upgrade/defaults/rails-7.1.md`（`DEF-7.1-<連番>`）
 - 手動確認は verify で 1 回にする。途中で前の Cookie やセッションに影響する変化が見つかったら、止まって時期を相談し直す
 - 着手後に決めたこと（人間が判断）
+  - E2E の起動（`e2e/scripts/start-server.sh`）で、`db:drop` と `db:setup`（RS は `db:create`）を別のプロセスで流す。Rails 7.1 では 1 つのプロセスで流すと、作り直した DB にスキーマが入らない。Rails 7.1.6 の lock の前に、別のコミットにした
+  - RP は activerecord-session_store 2.3.0 を Rails 7.1.6 と同じコミットで上げる。2.2.0 のままだと、Rails 7.1 でセッション Cookie から `SameSite=Lax` が消える（CLAUDE.md の「gem が新しい Rails に未対応のとき」の ①。DEF-7.1-06）
   - RS の jwt は 2.10.3 のままにする。作業計画は jwt を「3 アプリ」としていたが、RS の jwt は oauth2 の依存（間接の gem）で、直接の gem の方針の対象外だった（RS のコミットの前に気づいた）
   - 2.10.3 は CVE-2026-45363 の修正版で、ほかの advisory はない。RS は jwt の処理を通らない（oauth2 の assertion のグラントだけが `JWT.encode` を使う）。ruby-jwt の `2-10-stable` はバックポートだけで、将来の修正が戻されないおそれはある。そのため、間接の gem は epic の最後の段階でまとめて上げることを考える（14 章）
 
@@ -801,7 +803,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
 | sprockets-rails | 3.2.2（間接） | Step 1 で lock から外れた（済。Gemfile には足さない） | Rails 7.0 から rails gem の依存から外れる。3 アプリとも `sprockets/railtie` を読み込んでいない。Gemfile に足すと `Bundler.require` で `sprockets/railtie` が読み込まれ、アセットパイプラインが有効になるので足さない（Step 1） |
 | sqlite3 | 1.4.2 | 0-a で 1.7.3（済。clang 17 で 1.4 系がビルドできないため 0-f から前倒し）→ Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
 | annotate | 3.1.1 | Step 1 で 3.2.0（済）→ Step 5 で annotaterb に置換 | 3.1.1 は `activerecord < 7.0` で、Rails 7.0 にするには 3.2.0 が要る。3.2.0 も `activerecord < 8.0` で、Rails 8 に対応しない（0-f で gemspec を確認）。当初は「注釈の出力が変わるので 3.2.0 には上げない」としたが、Step 1 の調査で、OP の注釈に関わる差分はないと分かった。annotaterb の 4.23 以上は CI で Ruby 3.3 以上だけを試すので、置き換えは Step 5 のまま |
-| activerecord-session_store | 2.0.0 | 0-f-1 で 2.1.0（済）→ 1-b-3-1 で 2.2.0（済。multi_json が lock から外れた）→ Step 3 で 2.3.0（Rails 7.1.6 の直後。2.3 は Rails 7.1 以上が必要） | 2.2 以上は Rails 7.0 以上が必要。2.1.0 のまま Rails 7.0.10 で解決する（Step 1 の調査） |
+| activerecord-session_store | 2.0.0 | 0-f-1 で 2.1.0（済）→ 1-b-3-1 で 2.2.0（済。multi_json が lock から外れた）→ Step 3 で 2.3.0（済。Rails 7.1.6 と同じコミット。2.2.0 は Rails 7.1 でセッション Cookie の SameSite を落とす。DEF-7.1-06） | 2.2 以上は Rails 7.0 以上が必要。2.1.0 のまま Rails 7.0.10 で解決する（Step 1 の調査） |
 | bootsnap / jbuilder / omniauth-rails_csrf_protection | 1.7.7 / 2.11.2 / 1.0.0 | 0-f-1 で bootsnap 1.26.0・jbuilder 2.13.0（済）→ 1-b-3-1 で jbuilder 2.15.1・omniauth-rails_csrf_protection 1.0.2（済。後者は一時固定で入れた）→ Step 3 で omniauth-rails_csrf_protection 2.0.1（済。直接の gem の方針で Step 7 から前倒し） | jbuilder 2.14 以上は Rails 7.0 以上が必要。omniauth-rails_csrf_protection 2.0 の変化は Rails 8.1 だけが対象（8.1 未満は 1.0.2 と同じ処理）。Step 7 で 8.1 用の枝に切り替わるときにもう一度確かめる |
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
 | a-nti_manner_kick_course | — | 1-b-1 で 0.5.0 を足す → Rails 8.2 以上で外すかを判断（今回の目標の外なので、epic の間は残す） | development・test だけ。Gemfile の先頭に置く。Rails 8.2 で入る Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない。README によると、Rails 7.2 以上は `rails runner 1` の代わりに `rails boot` で起動できる |
@@ -814,8 +816,8 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
 | benchmark / securerandom / drb / mutex_m（activesupport 7.0.10 経由） | — | Step 1 で一時固定（済。0.3.0 / 0.3.0 / 2.1.0 / 0.1.1。drb の依存の ruby2_keywords 0.0.5 も lock に入った）→ Step 2 で drb 2.1.1・mutex_m 0.1.2（済。benchmark・securerandom は 0.3.0、ruby2_keywords は 0.0.5 のまま）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | activesupport 7.0.10 の依存。drb・mutex_m は Ruby 3.1.7 の default gem と同じ版。benchmark・securerandom は `>= 0.3` を要求し、default gem（どちらも 0.2.0。Ruby 3.2.11 は 0.2.1・0.2.2）では満たせないので、要件を満たす最小の版にした |
 | zeitwerk（railties 経由） | 2.4.2 | Step 1 で 2.6.18（済）→ Step 2-b で 2.7.5 → 2.8.3（済） | railties 7.0 は `~> 2.5`。2.7 は Ruby 3.2 以上が必要。Rails v7.0.10 自身の lock は 2.7.3（Step 2-b の着手時） |
 | reline / io-console（byebug 13 経由） | — | Step 2-b で reline 0.6.0・io-console 0.6.0 を一時固定（済）→ Ruby を上げる各 Step で見直す（8 章の 4） | byebug 13 は `reline >= 0.6.0` に依存し、Ruby 3.2.11 の default gem の reline 0.3.2 では満たせない。reline は要件を満たす最小の版（Step 1 の benchmark・securerandom と同じ扱い）、io-console は default gem と同じ版にした。固定しないと reline 0.7.0 と io-console 0.9.4（C 拡張）が入る。lock の reline は、`bin/rails c` の irb（default gem）も読む |
-| tsort / irb / cgi（railties・actionpack 7.1 経由） | — | Step 3 で tsort 0.2.0・irb 1.6.2・cgi 0.3.7（RS・OP。RP は既にある）に一時固定 → Ruby を上げる各 Step で合わせ直す（8 章の 4） | irb・cgi は Ruby 3.2.11 の default gem と同じ版。固定しないと irb 1.18.0（rdoc・rbs・erb・pp・prettyprint を連れてくる）と cgi 0.5.2 が入る。tsort は railties 7.1 が `>= 0.2` を要求し、default gem の 0.1.1 では満たせないので、要件を満たす最小の版にする（Step 3 の着手時） |
-| connection_pool（activesupport 7.1 経由） | — | Step 3 で 2.5.5 に一時固定 → Step 5（Rails 7.2）で見直す | 固定しないと 3.0.2 が入る。3.0 はキーワード引数だけを受け付け、Rails 7.1.6 の Redis・Memcache のキャッシュストア（位置引数で渡す）が `ArgumentError` になる（rails/rails#56291）。7-1-stable は直らず、7-2-stable は `< 3` に固定した（#56620）。3 アプリは memory_store・null_store だけを使う（Step 3 の着手時） |
+| tsort / irb / cgi（railties・actionpack 7.1 経由） | — | Step 3 で tsort 0.2.0・irb 1.6.2・cgi 0.3.7（RS・OP。RP は既にある）に一時固定（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | irb・cgi は Ruby 3.2.11 の default gem と同じ版。固定しないと irb 1.18.0（rdoc・rbs・erb・pp・prettyprint を連れてくる）と cgi 0.5.2 が入る。tsort は railties 7.1 が `>= 0.2` を要求し、default gem の 0.1.1 では満たせないので、要件を満たす最小の版にする（Step 3 の着手時） |
+| connection_pool（activesupport 7.1 経由） | — | Step 3 で 2.5.5 に一時固定（済）→ Step 5（Rails 7.2）で見直す | 固定しないと 3.0.2 が入る。3.0 はキーワード引数だけを受け付け、Rails 7.1.6 の Redis・Memcache のキャッシュストア（位置引数で渡す）が `ArgumentError` になる（rails/rails#56291）。7-1-stable は直らず、7-2-stable は `< 3` に固定した（#56620）。3 アプリは memory_store・null_store だけを使う（Step 3 の着手時） |
 | rack | 2.2.24（間接） | 3.x は時期未定 | Rails 7.1 から rack 3 を使える。間接の gem なので Step 3 では動かさない。Rails 7.1 が足す rack-session・rackup は rack 2 用の 1.x（Step 3 の着手時） |
 | rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / bcrypt | — | 0-d-3（済） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられた。上げた版は LOG.md の Step 0-d-3（mail・msgpack・faraday・puma は上の行） |
 | logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Step 2 で 1.5.3（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
@@ -837,7 +839,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
    - `new_framework_defaults_X_Y.rb` を 1 つずつ有効化してテスト → 全部有効になったら `load_defaults` を上げてファイルを削除
    - RuboCop の `TargetRailsVersion` を上げ、新しい指摘は別コミットで直す
 4. **Ruby を上げる場合**: Ruby を上げてコミット → `TargetRubyVersion` を上げて新しい指摘を直す（別コミット）
-   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console）を、新しい Ruby の default gem の版に一時固定で合わせ直す。default gem の版では要件を満たせず、要件を満たす最小の版に固定した gem（benchmark・securerandom・reline）は、新しい Ruby の default gem の版で要件を満たせるようになるかを見る。Ruby を上げるコミットに入れ、`BUNDLED WITH` もその Ruby の Bundler の版にする（Step 2）。その Ruby で default gem でなくなったものは 7 章の表に従う。手順は TIPS.md の「Ruby を上げる」
+   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb）を、新しい Ruby の default gem の版に一時固定で合わせ直す。default gem の版では要件を満たせず、要件を満たす最小の版に固定した gem（benchmark・securerandom・reline・tsort）は、新しい Ruby の default gem の版で要件を満たせるようになるかを見る。Ruby を上げるコミットに入れ、`BUNDLED WITH` もその Ruby の Bundler の版にする（Step 2）。その Ruby で default gem でなくなったものは 7 章の表に従う。手順は TIPS.md の「Ruby を上げる」
 5. **確認**: 「10. 完了条件」
 6. **記録**: LOG.md を更新 → `/code-review` → PR（向き先は epic）
 
