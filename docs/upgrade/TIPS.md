@@ -88,8 +88,8 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 
 - lock に reline が入ると、`bin/rails c` の irb（default gem。lock にない）も lock の reline を読む。reline や irb が変わる gem を上げたら、実際に `rails c` を起動して入力を試す
 - Claude Code の Bash には端末も `TERM` もない。`TERM` がないと reline 0.3.2 が terminfo を引けずに落ちる（`TERM=xterm-256color` を付ける）。reline は起動時にカーソル位置の問い合わせ（`ESC[6n`）を送って返事を待つので、`script` コマンドに入力をパイプで流すだけでは止まったままになる
-- Python の `pty.fork` で `bin/rails c` を起動し、出力に `ESC[6n` が来たら `ESC[1;1R` を返し、入力を `\r` 付きで 1 行ずつ送ると動かせる（Step 2-b ではこの形のドライバーを scratchpad に置いた）。`Reline::VERSION`・`IRB::VERSION`・`IRB.CurrentContext.io.class` を `puts` し、複数行の入力（`if true` … `end`）と Tab の補完を試す。development は `DATABASE_URL=sqlite3:db/e2e.sqlite3` を付ける
-- 同じドライバーで、`bin/rails runner` の中で `byebug` を呼び、`next`・`continue` を送ると、デバッガーの入力も確かめられる
+- Python の `pty.fork` で `bin/rails c` を起動し、出力に `ESC[6n` が来たら `ESC[1;1R` を返し、入力を `\r` 付きで 1 行ずつ送ると動かせる。リポジトリ直下で `scripts/check-console <rs|rp|op>` を流す（Step 2-b の道具をスキル化の PR でスクリプトにした）。`Reline::VERSION`・`IRB::VERSION`・lock の reline・io-console の版・`IRB.CurrentContext.io.class` を表示し、Tab の補完と複数行の入力（`if true` … `end`）を試す。development は `DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて起動する
+- `bin/rails runner` の中で `byebug` を呼び、`next`・`continue` を送ると、デバッガーの入力も確かめられる（`CONSOLE_STEPS='["next\r", "continue\r"]' scripts/check-console rs -- bin/rails runner 'byebug; 1'`）
 
 ## 設定の値と応答の比較（Rails を上げる Step）
 
