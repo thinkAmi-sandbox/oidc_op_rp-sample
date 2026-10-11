@@ -2249,20 +2249,63 @@ verify:
 
 | 変更 | 理由 |
 |---|---|
+| マイグレーションの前に、annotate が `test/fixtures/users.yml` に足した注釈を、別のコミットにした（`8d1a987`） | E2E 用の DB で `db:migrate` を流すと、annotate（`lib/tasks/auto_annotate_models.rake`、`'exclude_fixtures' => 'false'`）が users テーブルの注釈を `users.yml` に足した。`users.yml` は Step 0-d-2 で、OP の最後のマイグレーション（2021 年）より後に作ったので、初めて annotate が流れた。消しても `db:migrate` のたびに戻ってくるので、残して、マイグレーションとは理由を分けた（人間が判断） |
+| gem を上げるコミットは、`scripts/commit-per-app` を使わず、同じ手順を手で行った | `commit-per-app` はステージ済みの変更があると止まり、アプリの外（`e2e/baseline/discovery.json`）をステージしない。RS・RP に変更がなく退避が要らないので、OP の検査と E2E を流してから、ファイルを指定してコミットした |
 
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの後）に、14 ファイルのハッシュを控えた。件数は Step 3 の手動確認の後と同じ（OP `oauth_access_grants` 21・`oauth_access_tokens` 52、RP `sessions` 12・`op_users` 1）。件数は、本体と `-wal` を scratchpad にコピーして数えた。
 
+- gems の 3 つのコミットの後（`18d6f16` の時点）も、14 ファイルのハッシュは作業の開始時と同じ。schema.rb の書き出しとマイグレーションは E2E 用の DB で行い、手動確認用の DB には触れていない
+
 ### gem ごとの対応
 
 | gem | バージョン | 対応 |
 |---|---|---|
+| doorkeeper-openid_connect（OP） | 1.10.5 → 2.0.0 | `bundle update doorkeeper-openid_connect --conservative`。lock で動いたのはこの gem と依存の行（doorkeeper `< 6.0` → `< 7.0`）だけで、doorkeeper 5.9.9・一時固定・default gem は動いていない。落とした `.gem` は `scripts/verify-gem-checksums` で rubygems の SHA-256 と一致した。initializer（DEF-7.1-49）とロケール（DEF-7.1-50）を 2.0.0 の雛形に合わせた。initializer で OP が雛形から変えたところは、1.10.5 の雛形と比べても 2.0.0 の雛形と比べても同じ（足したのは雛形の 38 行だけ）（`8abc86d`） |
+
+schema.rb とマイグレーション（OP）:
+
+- `adf94ad`: `DATABASE_URL=sqlite3:db/e2e.sqlite3 bin/rails db:schema:dump` で、schema.rb を Rails 7.1 の形で書き出しただけのコミット（DEF-7.1-51）。research で test の DB のコピーから試しに書き出したものと同じ。今の schema.rb と新しい形の schema.rb を、それぞれ空の DB に `db:schema:load` で読み込み、`sqlite_master` の SQL が同じことを確かめた
+- `8d1a987`: annotate が `test/fixtures/users.yml` に足した注釈（上の「作業計画からの変更点」）
+- `18d6f16`: `rails generate doorkeeper:openid_connect:add_post_logout_redirect_uris` が作ったマイグレーションを、出力のまま入れた。前の doorkeeper-openid_connect のマイグレーション（`20210812142144`）と同じく `frozen_string_literal` はなく、RuboCop は `db/` を見ない。E2E 用の DB で `db:migrate` を流し、schema.rb の差分は列の行と版の日付だけ。`db:migrate:status` で up を確かめた。test の DB にも列ができた（`maintain_test_schema`）
 
 ### 意図的な仕様変更
 
-PLAN.md の 6 章の「Step 3-b」の 3 つ（`post_logout_redirect_uris` の列、discovery の `authorization_response_iss_parameter_supported`、webfinger のヘッダー）。結果は各作業の出口で足す。
+PLAN.md の 6 章の「Step 3-b」の 3 つ。gems で、実際の差分を人間に示して確かめてから、応答のスナップショットと E2E の baseline を作り直した。
+
+- discovery（`8abc86d`）: `discovery.txt`・`oauth_authorization_server.txt` の本文の `token_endpoint_auth_methods_supported` と `subject_types_supported` の間に `"authorization_response_iss_parameter_supported": false` の 1 行が増えた。E2E の `e2e/baseline/discovery.json` にも同じキーが増えた（キーは辞書順なので `authorization_endpoint` の次）。ほかの行は同じ
+- webfinger（`8abc86d`）: `webfinger.txt` に `access-control-allow-origin: *` が増え、`content-type` が `application/json; charset=utf-8` → `application/jrd+json; charset=utf-8` になった（charset は Rails が付ける）。本文は同じ
+- `post_logout_redirect_uris` の列（`18d6f16`）: OP の `oauth_applications` に null 可の text の列が増えた。既にある行は NULL。応答のスナップショット（applications の画面を含む）は変わらない。手動確認用の DB は verify で migrate する
+
+### 前後の比較
+
+上げる前（Step 3-b の計画の docs のコミット `cc20ea8` の後）に、次のものを書き出し、各コミットの前に取り直して比べた。
+
+- `scripts/check-apps` の結果（上げる前は 3 アプリの検査と E2E。36 項目すべて通った。RS 11・RP 33・OP 69 runs、0 failures（`CI=1` も同じ）、E2E 10 passed）
+- `scripts/compare-config dump`（OP の test・development。RS・RP は変更がないので取っていない）
+- `RUBYOPT=-W:deprecated` を付けた OP の development の eager load の警告（0 件）
+- OP の brakeman の JSON の出力
+- テストの出力の DEPRECATION（OP の `auth_time_from_resource_owner` だけ。IMP-011）
+
+結果は次のとおり。
+
+- doorkeeper-openid_connect 2.0.0: 上げた直後に OP の検査を流すと、minitest の応答のスナップショット 3 件（discovery・`oauth_authorization_server`・webfinger）と E2E の 1 件（discovery の baseline）だけが落ちた。ほかの 66 件と E2E の 9 件、RuboCop・`zeitwerk:check`・起動の途中の読み込み・bundler-audit・brakeman は通った。差分は上の「意図的な仕様変更」のとおりで、ほかの変化は混じっていない。OP の設定の値と起動の途中に読み込み済みの部品（initializer・ロケールを変えた後も）、eager load の警告、brakeman の警告と無視した警告・実行したチェック、テストの出力の DEPRECATION は前と同じ
+- schema.rb の書き出し・注釈・マイグレーション: 各コミットの前に OP の検査と E2E が通った（OP 69 runs・0 failures、E2E 10 passed）。応答のスナップショットの差分はない
 
 ### 遭遇した問題
 
 ### 確認結果
+
+### スキルについて気づいたこと
+
+Step 3 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+research:
+
+1. gem が求めるマイグレーションを流すと、アプリの道具（OP の annotate）が `db:migrate` の後に別のファイルを変えることを、research で見込めなかった。マイグレーションを流す作業は、ほかの作業より副作用（schema.rb の書き出しの形、annotate）が大きいが、research の手順に、マイグレーションの副作用を試す手順がない（schema.rb の書き出しの形は、DB のコピーから試して見つけた）
+
+gems:
+
+2. gems の手順は「gem を上げる」だけを想定していて、gem が求めるマイグレーション（generator を流す、DB を migrate する、schema.rb を書き出す）の手順と、どの DB で流すか（手動確認用の DB に触れない）が書いていない。今回は作業計画で決めた
+3. `scripts/commit-per-app` は、アプリの外のファイル（E2E の baseline）を、アプリの変更と同じコミットに入れられない。応答の変化が E2E の baseline にも出る gem では、手で同じ手順を行うことになる。注釈だけのコミットのように、アプリの中の変更の一部だけをコミットするときも、退避を手で行った

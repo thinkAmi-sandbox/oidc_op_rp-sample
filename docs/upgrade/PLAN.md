@@ -758,9 +758,9 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 
 Step 3 が epic に入ってから、`/rails-upgrade research` で調べた。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-11）。Ruby 3.2.11・Rails 7.1.6 のまま、OP の doorkeeper-openid_connect だけを 1.10.5 → 2.0.0 に上げる。doorkeeper は 5.9.9 のまま（6.0 は rc）。経緯と作業の記録は LOG.md の Step 3-b。
 
-- [ ] gems: doorkeeper-openid_connect 2.0.0（OP。initializer・ロケールを雛形に合わせる）
-- [ ] gems: schema.rb を Rails 7.1 の形で書き出す（OP）
-- [ ] gems: `post_logout_redirect_uris` のマイグレーション（OP）
+- [x] gems: doorkeeper-openid_connect 2.0.0（OP。initializer・ロケールを雛形に合わせた。DEF-7.1-49・50）
+- [x] gems: schema.rb を Rails 7.1 の形で書き出す（OP。DEF-7.1-51）
+- [x] gems: `post_logout_redirect_uris` のマイグレーション（OP。その前に、annotate が `test/fixtures/users.yml` に足した注釈を別のコミットにした）
 - [ ] verify（手動確認の直前に、手動確認用の OP の DB の写しを取ってから migrate する）
 - [ ] pr
 
