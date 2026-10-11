@@ -677,7 +677,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - [x] rails-app-update（DEF-7.1-10〜18）
 - [x] rails-app-update: RP の autoload_lib_once（案 B のまま。案 A には切り替えていない）
 - [x] rails-defaults（グループ 1〜4・6・7。DEF-7.1-19〜41）
-- [ ] rails-load-defaults
+- [x] rails-load-defaults（DEF-7.1-42〜46。RuboCop の `TargetRailsVersion` 7.1）
 - [ ] verify
 - [ ] pr
 

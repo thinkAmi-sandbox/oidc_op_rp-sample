@@ -2049,6 +2049,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 - rails-lock で、人間に確かめて 3 アプリの `tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーし、守るファイルを 12 にした（コピーの直後にハッシュを控え、元の 9 ファイルのハッシュが変わっていないことを確かめた）
 - rails-defaults の後（`3d85c46` の時点）に、12 ファイルのハッシュが作業の開始時（`local_secret.txt` はコピーの直後）と同じことを確かめた。ハッシュの控えはセッションの scratchpad にしかないので、次のセッションは、始めた時点のハッシュをこの時点の続きとして控え直す
+- rails-load-defaults の始め（`e539059` の時点）に 12 ファイルのハッシュを控え直し、`load_defaults 7.1` のコミット（各アプリの E2E を含む）の後も同じことを確かめた
 
 ### gem ごとの対応
 
@@ -2101,6 +2102,14 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - rack-mini-profiler 5.0.0（RP・OP）
   - Step 2-b で心配した、`Rails.env.local?` で development のプロファイラーが無効になることは起きない。Rails 7.1.6 の development では `Rails.env.local?` が true で、`authorization_mode` は `:allow_all` のまま
   - development の応答ヘッダー（`x-miniprofiler-*`、`__profilin` の Cookie）と、RP のトップのバッジの `<script>` の属性は前と同じ（gem の版のハッシュだけが変わった）。設定の値と起動の途中の読み込み、eager load の警告も前と同じ。RP・OP の検査と E2E が通った
+- `load_defaults 7.1`（rails-load-defaults）
+  - 3 アプリを `config.load_defaults 7.1` にし、`new_framework_defaults_7_1.rb` を消した。rails-defaults で一時的に足した設定はほかになかった
+  - 前の書き出しを取る前に、`load_defaults 7.1` に任せた 5 つの設定のうち 3 つ（`add_autoload_paths_to_load_path`、`action_text.sanitizer_vendor`、`cache_format_version` が効く先の coder）の値を `compare-config` が拾えないと分かり、`scripts/lib/dump_config.rb` に足した（`269d6a0`）。足した後の書き出しを 2 回取り、同じだった
+  - 設定の値（3 アプリの test・development）: 違うのは `load_defaults 7.1` に任せた 5 つの設定だけ（DEF-7.1-42〜46）で、6 つの書き出しで同じ違い。`new_framework_defaults_7_1.rb` で有効にしていた 22 の設定の値と、起動の途中に読み込み済みの部品は変わらない
+  - 3 アプリの検査と E2E がすべて通った。minitest の件数と assertion の数（RS 11・15、RP 33・71、OP 69・123）と E2E（10 passed）は前と同じで、応答のスナップショットの差分はない。development の eager load の警告は前後とも 0
+  - sanitizer を通るのは OP の `doorkeeper/applications/index.html.erb` の `simple_format` だけで、fixtures・手動確認用の DB の値（`sqlite3 -readonly` で読んだ）と改行・`&`・`<script>` を含む値で、HTML4 と HTML5 の出力が同じことを確かめた（DEF-7.1-45）
+  - 7.1.6 の雛形の initializer は 7.0.10 と同じで、消すものはなかった。雛形にない `backtrace_silencers.rb` は残し、先頭に残す理由のコメントを足した（人間が承認。7.0 のときはコミットメッセージにだけ書いていた）
+  - 解説（DEF-7.1-42〜46 と `backtrace_silencers.rb`）に人間の返事を得てから、記録（`173a321`）、RS `47a0dfc`・RP `52bafaa`・OP `7bca31e` の順にコミットした。RuboCop の `TargetRailsVersion` は 7.1 にして、3 アプリで新しい指摘がないことを確かめた（`c0853c8`）
 
 ### 遭遇した問題
 
@@ -2145,3 +2154,9 @@ rails-defaults:
 
 17. rails-defaults の手順は「設定が効いていないときは起動の途中の読み込みを疑う」としているが、`new_framework_defaults_*.rb` の雛形の行そのものが initializer では効かない・動かない場合（`log_file_size` はロガーの作られる時点、`sanitizer_vendor` は定数の読み込み）がある。どちらも `load_defaults` に任せる判断になったが、手順にこの選択肢がない
 18. 書き出しの道具（`compare-config`）が、新しい版の設定のクラスの値を拾えるかは、版ごとに足す必要がある。rails-defaults の手順の最初に、新しい設定の値が書き出されるかを確かめる手順がない（今回はグループ 1 の比較で気づき、途中で足して基準を取り直した）
+
+rails-load-defaults:
+
+19. 18 と同じことが rails-load-defaults にもある。手順 1 は「前の書き出しを取る」だけで、`load_defaults` に任せた設定の値が書き出されるかを確かめる手順がない（今回は取る前に気づき、道具に足してから取った）
+20. 手順 2 の `new_framework_defaults_*.rb` の削除を `git rm` で行うと、削除がステージされたまま残る。commit.md の注意のとおり外そうとしたが、消えたファイルは zsh のグロブ（`rails_*/...`）に当たらず、1 回目は外れていなかった。`scripts/commit-per-app` はアプリのディレクトリをステージするので、手順 2 はステージしない `rm` で足りる
+21. 手順 3 は「消す initializer を決める」だけで、残す initializer（雛形にないファイル）に templates.md の「残す独自設定のコメント」を当てるかが書いていない。前の版（7.0）ではコメントを足していなかった。今回は解説の項目に入れて人間に確かめた
