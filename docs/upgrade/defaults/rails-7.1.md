@@ -16,6 +16,7 @@
 | DEF-7.1-06 | activerecord-session_store 2.3.0 の変化（SameSite の既定ほか） | 周辺 gem の既定値（activerecord-session_store 2.3.0） | RP | 追随 |
 | DEF-7.1-07 | puma を通した応答に Content-Length が付く | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-7.1-08 | development の Server-Timing に `transaction.active_record` が増える | Rails の既定値 | 3 アプリ（development） | 追随 |
+| DEF-7.1-09 | rack-mini-profiler の高度なデバッグ機能が、development で既定で無効になる | 周辺 gem の既定値（rack-mini-profiler 5.0.0） | RP・OP | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -108,3 +109,13 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随。Rails 7.1.6 の直後の予定だったが、Rails 7.1.6 だけでは SameSite が消えるので、同じコミットで上げた（人間が判断。CLAUDE.md の「gem が新しい Rails に未対応のとき」の ①）
 - 出典: activerecord-session_store の GitHub の v2.3.0 のリリース、コミット 121f9ff7、`activerecord-session_store-2.3.0/lib/action_dispatch/session/active_record_store.rb`、`activerecord-session_store-2.3.0/lib/active_record/session_store/session.rb`、`actionpack-7.1.6/lib/action_dispatch/middleware/cookies.rb`、`rack-2.2.24/lib/rack/session/abstract/id.rb`。Rails ガイドに該当の節はない
 - コミット: RP（`update rails to 7.1.6`）
+
+### DEF-7.1-09: rack-mini-profiler の高度なデバッグ機能が、development で既定で無効になる
+
+- 種類: 周辺 gem の既定値（rack-mini-profiler 4.0.1 → 5.0.0）/ 対象: RP・OP（development だけ）
+- 何が変わるか: `Rack::MiniProfiler.config.enable_advanced_debugging_tools` が、development で true → false になる。4.0.1 の railtie は `c.enable_advanced_debugging_tools = Rails.env.development?` で有効にしていて、5.0.0 でこの行がなくなった（5.0.0 で `bin/rails runner` から読むと false）。使えなくなるのは、環境変数やメモリーの中身を画面に出す機能（`?pp=env`、`?pp=analyze-memory` など）。バッジ、基本の機能、`x-miniprofiler-*` のヘッダー、`__profilin` の Cookie は変わらない。5.0.0 の railtie が使う `Rails.env.local?` は Rails 7.1 から使え、development で true なので、`authorization_mode` は `:allow_all` のまま
+- なぜ: development でも、外から届くアドレスで起動したり（`-b 0.0.0.0`）、トンネルで公開したりすると、環境変数やメモリーの中身が他人に見える。README は既定で無効と書いていたのに、railtie が development で有効にしていた食い違いを、安全な側に直した（rack-mini-profiler#645）
+- 3 アプリへの影響: 開発用の道具の機能が減るだけで、業務的な挙動ではない。RP の `.env` には OP のクライアントの secret があり、OP には署名鍵があるので、無効のほうが安全。3 アプリとも rack-mini-profiler の initializer を持たず、generator の雛形は 4.0.1 と同じ。development のアプリを `Puma::Server` に通して、前後で応答ヘッダーとバッジの `<script>` の属性が同じことを確かめた
+- 扱い: 追随（有効にする設定は足さない）
+- 出典: rack-mini-profiler#645、`rack-mini-profiler-5.0.0/CHANGELOG.md`、v4.0.1 と v5.0.0 の `lib/mini_profiler_rails/railtie.rb`、`rack-mini-profiler-5.0.0/lib/mini_profiler/config.rb`。README の設定の表は「Defaults to `true` in development.」のまま残っていて、コードと合っていない。Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: RP・OP（`update rack-mini-profiler to 5.0.0`）
