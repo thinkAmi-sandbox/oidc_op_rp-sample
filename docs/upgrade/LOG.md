@@ -2055,7 +2055,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
   - スナップショットの差分は、リダイレクトの本文がなくなったこと（RP 4 件・OP 11 件。DEF-7.1-04）、ルーティングの `redirect` の Content-Type に charset が付いたこと（RP 1 件。DEF-7.1-05）、RP のセッション Cookie から `SameSite=Lax` が消えたこと（RP 4 件。activerecord-session_store 2.3.0 で元に戻した。DEF-7.1-06）。解説して人間の返事を得てから、RP・OP のスナップショットを作り直した。作り直した差分は、この 3 つだけ
   - minitest の件数は同じで、assertion の数が RS 14 → 15・RP 69 → 71・OP 121 → 123 に増えた。activesupport 7.1 の `assert_nothing_raised` が `assert(true)` を数えるようになったため（`activesupport-7.1.6/lib/active_support/testing/assertions.rb`。3 アプリの `test/eager_load_test.rb` で 1 つずつ）。RP・OP のもう 1 つずつは、どの assertion かまで確かめていない
   - 書き換えた後に、3 アプリの検査と E2E がすべて通った。brakeman の無視した EOL の警告 2 件は、Rails 7.1.6 でも同じ fingerprint で当たる
-  - development だけのヘッダーは、rails-lock の前に書き出した（RS の `/apples/show`、RP のトップ、OP の discovery とログイン画面。E2E 用の DB で `Puma::Server` に通した）。後の比べ方は rails-defaults と verify でまとめて行う
+  - development だけのヘッダー: rails-lock の前に書き出し（RS の `/apples/show`、RP のトップ、OP の discovery とログイン画面。E2E 用の DB で `Puma::Server` に通した）、rack-mini-profiler 5.0.0 の作業の始めに Rails 7.1.6 で取り直して比べた。RS の 401 が chunked から Content-Length 付きになり（DEF-7.1-07）、RP のトップの Server-Timing に `transaction.active_record` が増えた（DEF-7.1-08）。RP のトップと OP のログイン画面の Content-Length も変わったが、rack-mini-profiler が本文に入れる `data-ids` に前の要求の ID が積み上がるためで、Rails の版の違いではない。どちらも rails-lock のコミットの後に比べ、解説への返事もコミットの後にもらった
   - Rails 7.1 は SQLite を WAL で開く（rails/rails#49349）。手動確認用の development の DB は、まだ 7.1 で開いていない（journal mode は `delete` のまま）。verify の手動確認で開くと、DB のファイルが WAL になり、`-wal`・`-shm` のファイルができる見込み
 
 ### 遭遇した問題
@@ -2091,3 +2091,4 @@ rails-lock:
     - アプリの外の道具（E2E の起動）を直す変更が要ること
     - 新しい Rails を必要とする gem を、Rails と同じコミットで上げる判断（7 章の「Rails と同時か直後」の「同時」）。今回は、どれも「この手順にないことが要る」で止まって確かめた
 14. 検査が落ちたときの最初の結果（スナップショットの差分が RP 6 件・OP 11 件、bundler-audit、E2E）を、どこまで調べてから止まるかの目安がない。今回は、原因を 3 種類に分けて全体を示し、1 論点ずつ確かめた
+15. rails-lock の手順に、development だけのヘッダーを比べる手順がない（設定の「前後の比較」には「Rails を上げるとき: development だけのヘッダー」とある）。書き出しは取ったが、比べるのを後に回し、Rails 7.1.6 のコミットの後に差分（DEF-7.1-07・08）を見つけた。rails-lock の検査の後、コミットの前に比べる手順が要る

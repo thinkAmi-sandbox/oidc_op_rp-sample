@@ -14,6 +14,8 @@
 | DEF-7.1-04 | リダイレクトの応答が本文を返さない | Rails の既定値 | RP・OP | 追随 |
 | DEF-7.1-05 | ルーティングの `redirect` の Content-Type に charset が付く | Rails の既定値 | RP | 追随 |
 | DEF-7.1-06 | activerecord-session_store 2.3.0 の変化（SameSite の既定ほか） | 周辺 gem の既定値（activerecord-session_store 2.3.0） | RP | 追随 |
+| DEF-7.1-07 | puma を通した応答に Content-Length が付く | Rails の既定値 | 3 アプリ | 追随 |
+| DEF-7.1-08 | development の Server-Timing に `transaction.active_record` が増える | Rails の既定値 | 3 アプリ（development） | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -72,6 +74,26 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: rails/rails#47758、`actionpack-7.1.6/lib/action_dispatch/routing/redirection.rb`。Rails ガイドに該当の節はない
 - コミット: RP（`update rails to 7.1.6`）
+
+### DEF-7.1-07: puma を通した応答に Content-Length が付く
+
+- 種類: Rails の既定値 / 対象: RS・RP・OP（puma で動かすすべての環境）
+- 何が変わるか: 本文の長さが前もって分からなかった応答が、`transfer-encoding: chunked` から `content-length: <長さ>` で返るようになる。RS の `/apples/show`（401）が `content-length: 1`（本文は前と同じ空白 1 文字）になった。ほかに比べた応答（RP のトップ、OP の discovery とログイン画面）は、前から Content-Length が付いていた
+- なぜ: Rack 3 の仕様に合わせて、Rails の応答の本文（`ActionDispatch::Response::RackBody`）が `to_ary` を持つようになった（rails/rails#47092）。puma は、本文が `to_ary` に応じると長さを計って Content-Length を付ける
+- 3 アプリへの影響: 同じ本文を、長さを先に示して送るだけ。RS の 401 を読む RP（faraday）とブラウザは、どちらの形も扱える。minitest の応答のスナップショットは puma を通らないので変わらない。development のアプリを `Puma::Server` に直接通し、Rails 7.0.10 と 7.1.6（どちらも puma 8.0.2）で比べた
+- 扱い: 追随
+- 出典: rails/rails#47092、`actionpack-7.1.6/lib/action_dispatch/http/response.rb`（`RackBody#to_ary`）、`puma-8.0.2/lib/puma/response.rb`。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`update rails to 7.1.6`）。比べたのはコミットの後で、解説への返事もコミットの後にもらった
+
+### DEF-7.1-08: development の Server-Timing に `transaction.active_record` が増える
+
+- 種類: Rails の既定値 / 対象: DB に書く要求（比べた中では RP のトップ。セッションの行を作る）。development だけ（`config.server_timing = true`）
+- 何が変わるか: `server-timing` に `transaction.active_record;dur=...` が 1 つ増える
+- なぜ: Active Record 7.1 で、トランザクションの通知 `transaction.active_record` が増えた。Server-Timing は通知を集めて出すので、自動で増える
+- 3 アプリへの影響: development の計測のヘッダーだけで、業務的な挙動ではない
+- 扱い: 追随
+- 出典: `activerecord-7.1.6/CHANGELOG.md`（`transaction.active_record` の通知の項）。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`update rails to 7.1.6`）。比べたのはコミットの後で、解説への返事もコミットの後にもらった
 
 ### DEF-7.1-06: activerecord-session_store 2.3.0 の変化
 
