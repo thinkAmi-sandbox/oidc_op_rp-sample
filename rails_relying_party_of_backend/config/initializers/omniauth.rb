@@ -1,5 +1,4 @@
-require 'omniauth/strategies/my_op'
-
+# provider の :my_op は OmniAuth::Strategies::MyOp を探し、lib の once のローダー（config/application.rb）が読む
 Rails.application.config.middleware.use OmniAuth::Builder do
   provider :my_op,
            ENV['CLIENT_ID_OF_MY_OP'],
