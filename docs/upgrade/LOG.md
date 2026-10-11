@@ -2257,6 +2257,8 @@ verify:
 作業の開始時（ブランチを切って最初のコミットの後）に、14 ファイルのハッシュを控えた。件数は Step 3 の手動確認の後と同じ（OP `oauth_access_grants` 21・`oauth_access_tokens` 52、RP `sessions` 12・`op_users` 1）。件数は、本体と `-wal` を scratchpad にコピーして数えた。
 
 - gems の 3 つのコミットの後（`18d6f16` の時点）も、14 ファイルのハッシュは作業の開始時と同じ。schema.rb の書き出しとマイグレーションは E2E 用の DB で行い、手動確認用の DB には触れていない
+- verify の手動確認の直前に、3 アプリのサーバーが止まっていて、14 ファイルのハッシュと件数が作業の開始時と同じことを確かめた。OP の development DB の本体と `-wal` を `rails_open_id_provider/tmp/manual_check_backup/` に写し、写しのハッシュが元と同じこと、写しのコピーで件数が同じで `integrity_check` が ok なことを確かめた（写しは、PR が epic に入った後に、確かめてから消す）
+- 人間に確かめてから、手動確認用の OP の development DB に `bin/rails db:migrate` を流した。annotate は「Model files unchanged.」で、schema.rb・`test/fixtures/users.yml` に差分はなく、`db:migrate:status` は up。`db:migrate` が閉じるときにチェックポイントが起き、`-wal` が 0 バイトになった（中身は本体に移った）。件数は同じ（`oauth_access_grants` 21・`oauth_access_tokens` 52）で、`oauth_applications` の 3 行の新しい列は NULL。ハッシュが変わったのは OP の DB の本体と `-wal` だけ
 
 ### gem ごとの対応
 
@@ -2293,9 +2295,30 @@ PLAN.md の 6 章の「Step 3-b」の 3 つ。gems で、実際の差分を人�
 - doorkeeper-openid_connect 2.0.0: 上げた直後に OP の検査を流すと、minitest の応答のスナップショット 3 件（discovery・`oauth_authorization_server`・webfinger）と E2E の 1 件（discovery の baseline）だけが落ちた。ほかの 66 件と E2E の 9 件、RuboCop・`zeitwerk:check`・起動の途中の読み込み・bundler-audit・brakeman は通った。差分は上の「意図的な仕様変更」のとおりで、ほかの変化は混じっていない。OP の設定の値と起動の途中に読み込み済みの部品（initializer・ロケールを変えた後も）、eager load の警告、brakeman の警告と無視した警告・実行したチェック、テストの出力の DEPRECATION は前と同じ
 - schema.rb の書き出し・注釈・マイグレーション: 各コミットの前に OP の検査と E2E が通った（OP 69 runs・0 failures、E2E 10 passed）。応答のスナップショットの差分はない
 
+### 手動確認
+
+verify で、マイグレーションを流した後に `.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Rails 7.1.6・Puma 8.0.2 が出た。OP は起動の後の最初の要求で未実行マイグレーションを調べ、エラーにならなかった。
+
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP のログイン画面も同意画面も出ずに RP に戻った。OP のログは、認可エンドポイントが 302、トークン・userinfo・JWKS が 200
+- introspection 用 RP: 前回のトークンは revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke（OP は 200）の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回。Step 3 と同じ
+- サーバーの出力: 3 アプリとも、エラー・warning・DEPRECATION の新しいものはない。RP の `/stylesheets/application.css` のルーティングのエラーは元からのもの
+- 手動確認用の環境: 手動確認で、OP の development DB は `oauth_access_grants` が 21 → 23 件、`oauth_access_tokens` が 52 → 57 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 12 件のまま（ID 25 の行が 26 に入れ替わった）。`op_users` は 1 件のまま。OP・RP の DB の本体と `-wal` のハッシュが変わり、RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt`・`tmp/local_secret.txt` は変わっていない。以降の基準は手動確認の後の 14 ファイルのハッシュ
+
 ### 遭遇した問題
 
 ### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`f81dc06`）で 36 の検査がすべて通った。各コミットの前には、OP と E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。E2E の baseline の差分は、意図的な仕様変更の `discovery.json` だけ（作り直してコミットした）。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で毎回作り直していて、新しい schema.rb から `post_logout_redirect_uris` の列ができる
+- RuboCop・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）。bundler-audit の無視リストは変わらない（この Step で解消した advisory はない）
+- lock: epic（`522e5e9`）からの動きは、OP の doorkeeper-openid_connect 1.10.5 → 2.0.0 と依存の行だけ。default gem に合わせた一時固定と、Step 3 で固定した tsort・irb・connection_pool は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: 上の「手動確認用の環境」と「手動確認」
 
 ### スキルについて気づいたこと
 
