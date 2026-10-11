@@ -54,7 +54,8 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
   - Gemfile に既にある gem を固定するときは、行を足さずに既にある行に版を書き、後で元に戻す（Step 2-b の brakeman）。作業の前に Gemfile を scratchpad にコピーしておき、コピーで戻すと確実
   - 依存で入る gem が default gem と同じ名前のとき（Step 2-b の byebug 13 の reline・io-console）は、default gem の版で要件を満たせるならその版に（ダウンロードもビルドもしない）、満たせないなら要件を満たす最小の版に固定する。固定しないと最新の版（io-console は C 拡張）が入る
-- 落とした `.gem`（`vendor/bundle/ruby/<ABI の版>/cache/<gem>-<版>.gem`）の SHA-256 を、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json` の `sha` と比べる
+- 落とした `.gem`（`vendor/bundle/ruby/<ABI の版>/cache/<gem>-<版>.gem`）の SHA-256 を、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json?platform=<プラットフォーム>` の `sha` と比べる。リポジトリ直下で `scripts/verify-gem-checksums <rs|rp|op> --changed <作業の前の ref>` を流すと、lock で増えた・変わった gem だけを照合する（Step 2・2-b の道具をスキル化の PR でスクリプトにした）
+  - プラットフォームを渡さないと、java 版などのある gem（puma・json・nio4r・racc など）では別のプラットフォームの版の `sha` が返り、不一致に見える（スキル化の PR で、スクリプトを作るときに起きた）
 - 上げたときに動く gem は、アプリのディレクトリで `bundle lock --update <gem> --conservative --print` を実行すると、lock を書かずに解決の結果だけが標準出力に出る。`diff Gemfile.lock <出力>` で比べる。Plan モードでも使える（Step 2-b）
 - `--conservative` だけでは、その gem は最新の版（メジャーをまたぐ）まで上がる。同じマイナーの最新にとどめるなら `--patch` を足す（Step 2-b の doorkeeper-openid_connect は、`--conservative` だけでは 2.0.0、`--patch` を足すと 1.10.5）
 - 一時固定が要るかは、epic の lock と Gemfile を scratchpad にコピーし、`BUNDLE_GEMFILE` をそのコピーに向けて `bundle lock --update <gem> --conservative` を実行すると分かる（gem は入れず、依存の解決だけを行う）
@@ -80,7 +81,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - `bundle install --local` は、インストール先のキャッシュではなく、アプリのキャッシュ（`cache_path`。既定は `vendor/cache`）しか見ない。`BUNDLE_CACHE_PATH` を付けないと、gem が見つからずに止まる
   - `--no-cache` を付けないと、入れた後でアプリのキャッシュを最新にしようとして、キャッシュにない default gem の `.gem` を、`--local` でも rubygems.org から落とす（Step 2 の RS・RP で起きた。LOG.md の Step 2「遭遇した問題」）
   - 入れた後は、`Fetching` の行がないこと、default gem が default gem から読まれること（`Gem.loaded_specs["json"].default_gem?`）を見る
-  - コピーした `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json?platform=<プラットフォーム>` の `sha` と比べる（Step 2 では `Gem::Package.new(<ファイル>).spec` で名前・版・プラットフォームを読んで比べた）
+  - コピーした `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、rubygems.org の値と比べる（`scripts/verify-gem-checksums <rs|rp|op>` でキャッシュのすべてを照合する。名前・版・プラットフォームは `Gem::Package.new(<ファイル>).spec` で読む）
 - 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行（Ruby の非推奨の警告は既定で出ないので、`RUBYOPT=-W:deprecated` を付けた minitest と、development の `bin/rails runner 'Rails.application.eager_load!'` も流す）、応答と E2E のスナップショット、起動の途中に読み込み済みの部品と設定の値（`scripts/compare-config`。下の「設定の値と応答の比較」）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
 - brakeman の EOLRuby の警告は、Ruby の版がメッセージにだけ入り、fingerprint は変わらないので、無視リストに当たり続ける（無視リストのメッセージは古い版のまま残る）
 
