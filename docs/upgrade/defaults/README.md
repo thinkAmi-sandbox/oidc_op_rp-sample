@@ -18,4 +18,4 @@ Ruby / Rails のアップグレードで、Rails（と周辺 gem）の既定値�
 | ファイル | Rails の版 | Step |
 |---|---|---|
 | [rails-7.0.md](rails-7.0.md) | 6.1.7.10 → 7.0.10 | 1、1-b-3（周辺 gem）、2-b（周辺 gem） |
-| [rails-7.1.md](rails-7.1.md) | 7.0.10 → 7.1.6 | 3 |
+| [rails-7.1.md](rails-7.1.md) | 7.0.10 → 7.1.6 | 3、3-b（周辺 gem） |

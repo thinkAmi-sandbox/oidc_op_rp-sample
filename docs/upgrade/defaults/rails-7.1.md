@@ -1,7 +1,8 @@
 # Rails 7.1 の既定値への追随
 
 - 版: Rails 7.0.10 → 7.1.6（Ruby 3.2.11）
-- Step: 3（ブランチ `upgrade/step3-rails71`）/ PR: （PR 作成後に記入）
+- Step: 3（ブランチ `upgrade/step3-rails71`）/ PR: [#29](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/29)
+- Step: 3-b（周辺 gem。ブランチ `upgrade/step3b-doorkeeper-oidc20`）/ PR: （PR 作成後に記入）
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
@@ -56,6 +57,9 @@
 | DEF-7.1-46 | Action Text の sanitizer が HTML5 になる | Rails の既定値（`load_defaults 7.1`） | 3 アプリ | 追随 |
 | DEF-7.1-47 | development の未実行マイグレーションの検査が、DB にメタデータのテーブルを作る | Rails の既定値 | RS（development） | 追随 |
 | DEF-7.1-48 | SQLite の DB が WAL で開かれる | Rails の既定値 | 3 アプリ | 追随 |
+| DEF-7.1-49 | OP の initializer に、gem の雛形のコメントが 2 つ増える | 周辺 gem の雛形（doorkeeper-openid_connect 2.0.0） | OP | 追随 |
+| DEF-7.1-50 | OP のロケールに、`post_logout_redirect_uris` の属性名とエラー文言が増える | 周辺 gem の雛形（doorkeeper-openid_connect 2.0.0） | OP | 追随 |
+| DEF-7.1-51 | OP の schema.rb が、Rails 7.0 からの書き出しの形になる | Rails の既定値（schema.rb の書き出し） | OP | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -582,3 +586,42 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: rails/rails#48522、`actiontext-7.1.6/CHANGELOG.md`、`actiontext-7.1.6/lib/action_text/engine.rb`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.18.2「config.action_text.sanitizer_vendor」
 - コミット: RS・RP・OP（`switch to load_defaults 7.1`）
+
+## 周辺 gem（Step 3-b）
+
+Step 3-b で、doorkeeper-openid_connect を 1.10.5 → 2.0.0 に上げたときに起きた、gem の雛形の変化と、`post_logout_redirect_uris` のマイグレーションの前に初めて出た schema.rb の書き出しの変化（DEF-7.1-51）。上げた理由と、業務的な挙動の変化（意図的な仕様変更）は [PLAN.md](../PLAN.md) の Step 3-b。
+
+### DEF-7.1-49: OP の initializer に、gem の雛形のコメントが 2 つ増える
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.5 → 2.0.0）/ 対象: OP（`config/initializers/doorkeeper_openid_connect.rb`）
+- 何が変わるか: 設定の行は変わらず、雛形のコメントが 2 か所に増える
+  - `issuer` の前: issuer が ID トークンの `iss` と discovery の `issuer` になること。doorkeeper 本体に `issuer` を設定すればこのブロックを省けて、両方あればこちらが優先されること。doorkeeper に `issuer` の設定がない版では、このブロックを消すとエラーになること
+  - 末尾: ID トークン・userinfo を独自のクラスにする `id_token_class`・`user_info_class` の説明と、コメントアウトした例。独自のクラスは gem の基底クラスを継承し、上書きしてよいのは `claims`・`audience`・`select_key` など
+- なぜ: 1 つ目は doorkeeper の `issuer` へのフォールバック（#322）、2 つ目は独自のクラスの設定（#335）と、基底クラスの継承を必須にした 2.0.0 の破壊的な変更（#364）
+- OP への影響: ない。コメントだけで、設定の値と起動の途中に読み込み済みの部品（`scripts/compare-config`）は前後で同じ。OP は `issuer` を文字列で設定しているので、フォールバックは通らない。2 つのクラスの設定は既定のまま。OP が雛形から変えた行（`# =======> 変更開始` の印の範囲）は変えない
+- 扱い: 追随（雛形と同じ位置に 2 つの塊を足す。Step 1-b-3 の決まりで、gem の generator の雛形にも追随する）
+- 出典: `doorkeeper-openid_connect-2.0.0/lib/generators/doorkeeper/openid_connect/templates/initializer.rb`（v1.10.5 との差分は +38 行で、すべてコメント）、`doorkeeper-openid_connect-2.0.0/CHANGELOG.md` の 2.0.0.beta1 の #322・#335 と 2.0.0 の #364。Rails の外の gem の雛形なので、Rails ガイドに該当の節はない
+- コミット: OP（`update doorkeeper-openid_connect to 2.0.0`）
+
+### DEF-7.1-50: OP のロケールに、`post_logout_redirect_uris` の属性名とエラー文言が増える
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.5 → 2.0.0）/ 対象: OP（`config/locales/doorkeeper_openid_connect.en.yml`）
+- 何が変わるか: `activerecord.attributes.doorkeeper/application.post_logout_redirect_uris`（`Post Logout Redirect URIs`）と、その属性のエラー文言 6 つ（`fragment_present`・`invalid_uri`・`unspecified_scheme`・`relative_uri`・`secured_uri`・`forbidden_uri`）が増える。既にある `doorkeeper.scopes.openid` などは変わらない
+- なぜ: `post_logout_redirect_uris` を doorkeeper の `RedirectUriValidator` で検証するようになり（#243）、`redirect_uri` と同じ形のエラー文言を足した（ロケールのコメント）
+- OP への影響: 画面に出る文字は変わらない。文言が出るのは `post_logout_redirect_uris` に不正な値を入れて保存したときだけで、OP が上書きしている doorkeeper の applications の画面には、この項目の入力欄がない（gem はビューを足さない）。gem の engine は Rails::Engine なので、gem の `config/locales/en.yml` はアプリの写しがなくても読み込まれ、写しを雛形に合わせても使われる文言は同じ。OP の写しは 1.10.5 の雛形と同じ中身だった
+- 扱い: 追随（2.0.0 の雛形で置き換える）
+- 出典: `doorkeeper-openid_connect-2.0.0/config/locales/en.yml`（v1.10.5 との差分は +18 行）、`doorkeeper-openid_connect-2.0.0/CHANGELOG.md` の 2.0.0.beta1 の #243、`doorkeeper-openid_connect-2.0.0/lib/doorkeeper/openid_connect/orm/active_record/mixins/application.rb`（検証）。Rails ガイドに該当の節はない
+- コミット: OP（`update doorkeeper-openid_connect to 2.0.0`）
+
+### DEF-7.1-51: OP の schema.rb が、Rails 7.0 からの書き出しの形になる
+
+- 種類: Rails の既定値（schema.rb の書き出し）/ 対象: OP（`db/schema.rb`）
+- 何が変わるか: schema.rb を書き出し直すと、3 つの書き方が変わる
+  - `ActiveRecord::Schema[6.1].define(...)` → `ActiveRecord::Schema[7.1].define(...)`
+  - datetime の列の `precision`: doorkeeper の 4 列（`oauth_access_grants`・`oauth_access_tokens` の `created_at`・`revoked_at`）に `precision: nil` が付き、users・oauth_applications の `created_at`・`updated_at` から `precision: 6` が消える
+  - `define ... do` の次の空行が消える
+- なぜ: Rails 7.0 で datetime の列の既定の精度が 6 になった（rails/rails#42297）。古い schema.rb を新しい既定で読むと本番と違う精度で DB ができるので、Rails 7.0.2 から、書き出した Rails の版を `Schema[x.y]` として入れ、その版の既定で読む（rails/rails#44286。空行が消えたのも同じ PR）。あわせて、新しい既定の 6 は省き、精度なしは `precision: nil` と書く（rails/rails#44358）。Step 1 の `app:update` は版を `Schema[6.1]` にしただけで（rails/rails の commit 7ad011c7d8）、OP は 2021 年からマイグレーションがなく書き出し直していなかったので、Step 3-b で `post_logout_redirect_uris` のマイグレーションの前に初めて出た
+- OP への影響: DB の列は変わらない。今の schema.rb と新しい形の schema.rb を、それぞれ空の DB に `db:schema:load` で読み込み、`sqlite_master` の SQL が同じことを確かめた（doorkeeper の列は `datetime`、users・oauth_applications の列は `datetime(6)` のまま）。E2E（`db:setup`）とテスト（`maintain_test_schema`）は schema.rb を読むので、同じ DB ができる。書き出しには E2E 用の DB（`DATABASE_URL=sqlite3:db/e2e.sqlite3`）を使い、手動確認用の DB には触れない
+- 扱い: 追随（マイグレーションとは理由が違うので、`bin/rails db:schema:dump` で書き出しの形だけを変えるコミットにする。マイグレーションのコミットの schema.rb の差分は、列の行と版の日付だけになる）
+- 出典: `activerecord-7.0.10/CHANGELOG.md`（「Dump the database schema containing the current Rails version」「Set precision 6 by default for `datetime` columns」）、rails/rails#42297・#44286・#44358、`activerecord-7.1.6/lib/active_record/schema_dumper.rb` の `header`、`activerecord-7.1.6/lib/active_record/connection_adapters/abstract/schema_dumper.rb` の `schema_precision`、Rails ガイド v7.0 の「Rails アップグレードガイド」の 2.15「Active RecordのスキーマダンプにRailsのバージョンが含まれるようになった」
+- コミット: OP（`dump schema.rb in the rails 7.1 format`）

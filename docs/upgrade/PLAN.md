@@ -70,7 +70,7 @@
 | 2-b | 3.2 | 7.0 | Ruby 3.2 以上を必要とする周辺 gem（doorkeeper-openid_connect 1.10.5、zeitwerk 2.7・2.8、byebug 13、simplecov 1.2、brakeman 8.0。rack-mini-profiler 5 は Step 3 に移した） |
 | スキル化 | 3.2 | 7.0 | `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（13 章） |
 | 3 | 3.2 | **7.1.x** | 直接の gem（brakeman 8.1、jwt 3.3、puma 8、omniauth-rails_csrf_protection 2.0）、`app:update`、`autoload_lib_once`（RP の独自ストラテジー対応）、activerecord-session_store 2.3、rack-mini-profiler 5 |
-| 3-b | 3.2 | 7.1 | doorkeeper-openid_connect 2.0（**意図的な仕様変更**: マイグレーションと discovery の応答の変化） |
+| 3-b | 3.2 | 7.1 | doorkeeper-openid_connect 2.0（**意図的な仕様変更**: マイグレーション、discovery と webfinger の応答の変化） |
 | 4 | **3.3** | 7.1 | Ruby のみ |
 | 5 | 3.3 | **7.2.x** | `Rails.application.secrets` 削除への対応、sqlite3 2.x、annotate → annotaterb |
 | 6 | 3.3 | **8.0.x** | puma 6 以上、Solid 系・Kamal 系の生成物は不採用 |
@@ -754,12 +754,70 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 | doorkeeper-openid_connect 2.0.0 | 2026-09-22、Ruby `>= 3.2`。`post_logout_redirect_uris` の列のマイグレーションが必須（#243）。discovery に `authorization_response_iss_parameter_supported` が常に出る（#333。v2.0.0 の `discovery_controller.rb:65`）。doorkeeper 6.0 は rc2（2026-09-24） |
 | 直接の gem の残り | 上げないものは次のとおり。ほかの直接の gem はすべて最新<br>・rubocop 1.92.0・webmock 3.27 以上: 2 週間たっていない<br>・simplecov 1.3: Ruby 3.3<br>・sqlite3 2.x: Rails 7.1 は 1.x だけ<br>・web-console 4.3: Rails 8.0 |
 
+### Step 3-b: doorkeeper-openid_connect 2.0.0（意図的な仕様変更）
+
+Step 3 が epic に入ってから、`/rails-upgrade research` で調べた。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-11）。Ruby 3.2.11・Rails 7.1.6 のまま、OP の doorkeeper-openid_connect だけを 1.10.5 → 2.0.0 に上げる。doorkeeper は 5.9.9 のまま（6.0 は rc）。経緯と作業の記録は LOG.md の Step 3-b。
+
+- [x] gems: doorkeeper-openid_connect 2.0.0（OP。initializer・ロケールを雛形に合わせた。DEF-7.1-49・50）
+- [x] gems: schema.rb を Rails 7.1 の形で書き出す（OP。DEF-7.1-51）
+- [x] gems: `post_logout_redirect_uris` のマイグレーション（OP。その前に、annotate が `test/fixtures/users.yml` に足した注釈を別のコミットにした）
+- [x] verify（手動確認の直前に、手動確認用の OP の DB の写しを取ってから migrate した。CI は push の後）
+- [x] pr
+
+意図的な仕様変更（3 章の 2 の B。人間が 1 つずつ判断した）:
+
+1. OP の `oauth_applications` に `post_logout_redirect_uris`（text、null 可、既定値なし）の列を足す（#243）
+   - gem の CHANGELOG（v2.0.0.beta1）が「Migration required」と書いたアップグレードの手順で、境目 1（gem の雛形への追随）の側にあたる
+   - 列は RP-Initiated Logout の登録 URI の置き場。機能のコードは列がなくても読み込まれ、列はその置き場所を足すだけなので、境目 5 の「使っていない機能を動かし始める」にはあたらないと判断した
+   - コードは列がなくても動く（getter は `[]`、検証は飛ばす、setter だけが例外）が、この分岐は移行のためのもので、後の版で外れるおそれがある
+2. discovery（`/.well-known/openid-configuration` と `/.well-known/oauth-authorization-server`）に `"authorization_response_iss_parameter_supported": false` が出る（#333）
+   - 値は doorkeeper の `issuer` の設定の有無で決まり、doorkeeper 5.9.9 にはその設定がないので `false`。設定では消せない
+   - 認可応答に `iss` は付かず、値は OP の挙動のとおり。RP・RS は discovery を読まない
+3. webfinger の応答の `Content-Type` が `application/jrd+json` になり、`Access-Control-Allow-Origin: *` が付く（#350）
+   - 設定では戻せない。RP・RS・E2E は webfinger を呼ばない。公開の情報（issuer の URL）だけを返す応答
+
+着手時の作業計画で決めたこと（人間が承認）:
+
+- コミットは OP だけで、次の順にする。PR は 1 つ
+  1. gem を上げる（lock、initializer・ロケールの雛形への追随、応答のスナップショット 3 つと E2E の `discovery.json`）
+  2. schema.rb を Rails 7.1 の形で書き出すだけ
+  3. マイグレーション
+- 応答のスナップショット（`discovery.txt`・`oauth_authorization_server.txt`・`webfinger.txt`）と E2E の `e2e/baseline/discovery.json` は、gems の作業で実際の差分を示し、人間に確かめてから作り直す
+- schema.rb の書き出しとマイグレーションは、E2E 用の DB（`DATABASE_URL=sqlite3:db/e2e.sqlite3`）で行い、手動確認用の DB には触れない
+- 手動確認用の OP の development DB は、verify の手動確認の直前に 1 回だけ migrate する
+  - マイグレーションのファイルが入ると、development の OP は migrate するまで、すべての要求が `ActiveRecord::PendingMigrationError` になる
+  - 流す前に、サーバーが止まっていて 14 ファイルのハッシュと件数が基準と同じことを確かめる
+  - 本体と `-wal` を `rails_open_id_provider/tmp/manual_check_backup/`（gitignore）に写し、写しのハッシュが元と同じことを確かめる。`-shm` は開くときに作り直されるので写さない。scratchpad はセッションをまたいで残らないので使わない
+  - 流した後に、schema.rb・`app/models/user.rb`（annotate）に差分がないこと、件数、`db:migrate:status` を確かめる
+  - 戻すときは、サーバーを止めて写しを戻し、`-shm` を消す（その場で人間に確かめる）
+  - 写しは、Step 3-b の PR が epic に入った後に、確かめてから消す
+  - LOG.md の Step 3 の「スキルについて気づいたこと」の 22（元に戻す選択肢を残す）を踏まえた
+- 一時固定は要らない。手動確認は verify で 1 回
+
+調べたこと（着手時の 2026-10-11）。gem の 1.10.5...2.0.0 の差分はサブエージェントで調べ、要点（discovery の値、列がないときの挙動、webfinger、雛形の差分）は自分で gem のソースで確かめた。
+
+| 項目 | 分かったこと |
+|---|---|
+| 版・要件 | 2.0.0 は 2026-09-22 公開。Ruby `>= 3.2`。依存は doorkeeper `>= 5.5, < 7.0`（1.10.5 は `< 6.0`）・jwt `>= 2.5`・ostruct `>= 0.5`。2.0.1 は出ていない（rubygems の API、`doorkeeper-openid_connect-2.0.0/doorkeeper-openid_connect.gemspec`） |
+| lock | `bundle lock --update doorkeeper-openid_connect --conservative --print` で動くのは、この gem と依存の行だけ。doorkeeper 5.9.9・jwt 3.3.0・ostruct 0.5.5・default gem・一時固定は動かない |
+| advisory | 試した lock に bundler-audit（DB は 2026-10-10）をかけても、今と同じ（無視リストのもの）。この gem の advisory（GHSA-8r7r-wh7x-27ff ほか）は 1.10.5 に当たらない。2.0.0 の CHANGELOG の「Security」の項（DCR の既定の scope）は advisory がなく、OP は DCR を有効にしていない |
+| `post_logout_redirect_uris`（#243） | `rails generate doorkeeper:openid_connect:add_post_logout_redirect_uris` が `add_column :oauth_applications, :post_logout_redirect_uris, :text` のマイグレーションを作る（`.../templates/add_post_logout_redirect_uris.rb.erb`）。end_session のエンドポイントは gem になく、discovery の `end_session_endpoint` も変わらない。列がないとき、getter は `[]`、検証は飛ばし、setter だけが `ActiveModel::MissingAttributeError`（`.../orm/active_record/mixins/application.rb`）。列を読むのは DCR だけ。Step 3 の着手時の「マイグレーションが必須」は CHANGELOG の記述で、コードは列がなくても動く |
+| discovery（#333） | `token_endpoint_auth_methods_supported` と `subject_types_supported` の間に出る。値は `Doorkeeper::OpenidConnect.doorkeeper_issuer.present?`（v2.0.0 の `discovery_controller.rb` の 61〜65 行）。doorkeeper 5.9.9 には `issuer` の設定がない（`doorkeeper-5.9.9/lib` に `option :issuer` がない）ので `false`。gem が認可応答に `iss` を付けるのは `id_token` の応答と doorkeeper に issuer があるときだけで、OP は当たらない |
+| webfinger（#350） | RFC 7033 に合わせ、`Access-Control-Allow-Origin: *` と `content_type: "application/jrd+json"` で返す（v2.0.0 の `discovery_controller.rb` の 17〜23 行）。本文は変わらない |
+| ほかの破壊的な変更 | `jws_private_key`・`jws_public_key` の削除、`IdTokenToken` の削除と `HybridIdTokenConcern` → `AtHashConcern` の改名、カスタムの `id_token_class` は既定のクラスを継承する、DCR の既定値。OP はどれも使わない。ほかに、エッジケースの 500 が 4xx になるもの（不正な形の `max_age`、所有者のないトークンの userinfo）と、resource owner かアプリケーションのないトークンに id_token を付けないもの（OP の client_credentials は `scope: introspection` だけ）がある（`CHANGELOG.md`、compare v1.10.5...v2.0.0） |
+| ID トークン・JWKS・userinfo・token | 正常な流れでは同じ（ヘッダーの `typ`・`kid`、claim の順、RS256 の JWKS） |
+| gem の雛形 | initializer は +38 行で、コメントだけ（issuer を doorkeeper から引くフォールバックの説明、`id_token_class`・`user_info_class`）。ロケールは +18 行（`post_logout_redirect_uris` の属性名とエラー文言）。OP の initializer・ロケールは 1.10.5 の雛形に合わせてある |
+| schema.rb の書き出し | OP は 2021 年からマイグレーションがなく、schema.rb は `ActiveRecord::Schema[6.1]` のまま。マイグレーションを流すと、Rails 7.0 からの書き出しの形になる（`Schema[7.1]`、datetime の `precision` の書き方、`define` の後の空行）。列の精度の中身は同じ（test の DB のコピーから scratchpad に書き出して確かめた。activerecord 7.0 の CHANGELOG の「Dump the database schema containing the current Rails version」、rails/rails#42297） |
+| RP・RS への影響 | RP は discovery を読まず、JWKS の URL を直接使う（`rails_relying_party_of_backend/lib/omniauth/strategies/my_op.rb:124`）。RP は OP にログアウトを伝えない（E2E の `logout.spec.ts`） |
+| 守っているテスト | discovery は OP の `discovery.txt`・`oauth_authorization_server.txt`（応答のスナップショット）、`discovery_test.rb`（キーを絞る）、E2E の `discovery.json`。webfinger は `webfinger.txt` |
+| 手動確認用の DB | DB の本体と `-wal` のコピーを Rails で開いて閉じても、`-wal` は残った（チェックポイントされない） |
+
 ### Step 2〜9
 
 「8. 各 Step 共通の手順」に従う。Step 固有の作業はロードマップの表のとおり。補足:
 
 - **Step 3（Rails 7.1）**: 上の「Step 3: Rails 7.1」の節（rack-mini-profiler 5.0.0 と RP の独自ストラテジーの案 B は、そこに移した）
-- **Step 3-b**: doorkeeper-openid_connect 2.0.0（Step 3 が epic に入った直後。マイグレーションと discovery の応答の変化を、意図的な仕様変更として扱う。Step 3 の着手時に決めた）
+- **Step 3-b**: 上の「Step 3-b: doorkeeper-openid_connect 2.0.0」の節
 - **Step 5（Rails 7.2）**: Rails 7.2 にした後で sqlite3 を 2.x へ（Rails 8.0 は 2.1 以上が必須のため前倒し）。annotate を annotaterb に置き換え（annotate は Rails 8 未対応）
   - OP の `lib/tasks/auto_annotate_models.rake` の `rubocop:disable`（Metrics/BlockLength・Rails/RakeEnvironment。0-e で付けた）を、annotaterb が生成するファイルに合わせて見直す
   - Rails 7.2 から「Redirected to」行のクエリにも `filter_parameters` が適用される。OP のログでリダイレクト先の `code=` が `[FILTERED]` になることを確認する（0-a では Rails 6.1 の制約で残ることを許容した）
@@ -795,7 +853,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
 | oauth2 / omniauth-oauth2 | 1.4.7 / 1.7.1 | 0-f-2 で 2.0.25 / 1.9.0（済。同時） | omniauth-oauth2 1.9 は oauth2 2.0.2 以上が必要。RS が `OAuth2::Client` を直接使い、RP が独自ストラテジーを持つので最も壊れやすい。oauth2 2.x は `auth_scheme` の既定値が `:request_body` から `:basic_auth` に、`authorize_url`・`token_url` の既定値が相対パスに変わる（RP の `site` はパス付きなので URL が壊れる）。設定で元の挙動に固定する。advisory（CVE-2026-54603）は 2.0.22 で修正 |
 | faraday | 1.7.0 | 0-d-3 で 1.10.6（済）→ 0-f-2 で 2.14.4（済。oauth2 の後。RP は Gemfile に明記） | oauth2 1.4.7 は faraday 2.0 未満を要求する（0-f で gemspec を確認）。RP と RS が直接呼んでいる（RP は Gemfile に明記する）。2.x の advisory は 2.14.3 で修正 |
 | faraday-net_http（faraday 2 の依存） | — | 0-f-2 で 3.0.2 に一時固定（済）→ Step 2 で見直し、3.0.2 のまま → Step 8（Ruby 3.4）で見直す（Ruby 3.3.12 の default gem の net-http は 0.4.1、3.4.11 は 0.6.0 で、3.4.x の `~> 0.5` を満たすのは 3.4 から。Step 2 のコードレビューで確かめた） | 3.1 以上は net-http gem に依存し、Ruby 3.1.7 の default gem の net-http・uri を置き換える。3.0.2 は依存がない。3.4.x は net-http `~> 0.5` で、Ruby 3.2.11 の default gem の net-http 0.4.1 では満たせない（Step 2）。3.1〜3.3 は `net-http >= 0` で、lock に net-http が増える |
-| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（済。initializer・ロケール・ビューを雛形に合わせた）→ Step 2-b で doorkeeper-openid_connect 1.10.5（済。`--patch --conservative`。`--conservative` だけでは 2.0.0 になる。initializer・ロケールを雛形に合わせた）→ 2.0.0 は Step 3-b（意図的な仕様変更として扱う。Step 3 の着手時に決めた） | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2-b で上げる。2.0.0 はメジャーで、`post_logout_redirect_uris` の列を足すマイグレーション（#243）が要り、応答も変わる（Step 2-b の着手時）。doorkeeper 6.0 では、トークンを 2 つの方法で渡す要求が 401 から 400 `invalid_request` になる（5.9.7 の CHANGELOG）ので、6.0 に上げるときに `userinfo_bearer_and_param` のスナップショットを見る。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
+| doorkeeper / doorkeeper-openid_connect | 5.5.2 / 1.8.0 | 0-f-3 で 5.7.1 / 1.8.9（済。交互に上げた）→ 1-b-3-2 で doorkeeper-openid_connect 1.8.11 → doorkeeper 5.8.2 → doorkeeper-openid_connect 1.10.1 → doorkeeper 5.9.9（済。initializer・ロケール・ビューを雛形に合わせた）→ Step 2-b で doorkeeper-openid_connect 1.10.5（済。`--patch --conservative`。`--conservative` だけでは 2.0.0 になる。initializer・ロケールを雛形に合わせた）→ 2.0.0 は Step 3-b（意図的な仕様変更として扱う。Step 3 の着手時に決めた。マイグレーション・discovery・webfinger の変化と判断は 6 章の「Step 3-b」の節） | doorkeeper-openid_connect 1.10.1 は GHSA-8r7r-wh7x-27ff（DCR の scope。`<= 1.10.3`）の対象だが、DCR を有効にしていないので影響しない（1-b-3-2 の着手時）。修正版の 1.10.4 は Ruby 3.2 以上なので、Step 2-b で上げる。2.0.0 はメジャーで、`post_logout_redirect_uris` の列を足すマイグレーション（#243）が要り、応答も変わる（Step 2-b の着手時）。doorkeeper 6.0 では、トークンを 2 つの方法で渡す要求が 401 から 400 `invalid_request` になる（5.9.7 の CHANGELOG）ので、6.0 に上げるときに `userinfo_bearer_and_param` のスナップショットを見る。openid_connect は 1.8.4 で JWT のライブラリが json-jwt から jwt に変わった（1.8.4〜1.8.7 は kid と `typ` が一時的に変わり、1.8.8 で戻った）。1.8.10 は Rails 6 のサポートをやめ、doorkeeper は 5.8.1 で CI から Rails 6 を外した。1.10.2 以上は Ruby 3.2 以上が必要。doorkeeper 5.5.2 の advisory（CVE-2023-34246）は 5.6.6 で修正された（0-f-3）。必須のマイグレーションはない（0-f の調査で確認）。1.8.9 と 5.6.9 は一時固定で入れたので、版は lock にしか残らない。`--conservative` を付けても `bundle update doorkeeper-openid_connect` は 1.10.1 になり（jwt は test グループに明記した後は 2.10.3 のまま。1-b-3 の調べ）、1.9.0〜1.10.4 は doorkeeper 5.8 未満で discovery が壊れる（1.10.5 の #329）。doorkeeper を 5.8 以上に上げてから openid_connect を上げる |
 | devise | 4.8.0 | 0-f-1 で 4.9.4（済）→ 1-b-3-1 で 5.0.4（済。advisory 2 件を解消。initializer を雛形に合わせた） | Rails 8.1 対応は Step 7 の最初に再確認。advisory 2 件は 5.x（5.0.4）でしか修正されず（4.9.4 も対象）、5.x は Rails 7.0 以上が必要（0-d-1 で確認）。initializer の `config.responder.error_status = :unprocessable_entity` は、Rack 3.1 以上で非推奨になる（そのときの雛形は `:unprocessable_content`）。Rack を 3.1 以上にする Step で、雛形に合わせ直す（テストの `assert_response :unprocessable_entity` も） |
 | dotenv-rails | 2.7.6 | 0-f-1 で 3.2.0（済） | 読むファイルの順番と、既にある環境変数を上書きしないことは 2.x と同じ。3.x はテストのたびに ENV を戻し、Rails のログに変数名を出す |
 | puma | 5.4 | 0-d-3 で 5.6.9（済）→ 0-f-1 で 6.6.1（済）→ Step 3 で 8.0.2（済。7.x は経由しない。直接の gem の方針。DEF-7.1-01〜03） | 7.0・8.0 の破壊的な変更のうち効くのは keep-alive の既定値と応答ヘッダー名の小文字化だけ（Step 3 の着手時）。5.5.0 以降（6.6.1 も）は PROXY protocol v1 の advisory 2 件（CVE-2026-47736 / 47737）の対象で、修正版は 7.2.1 / 8.0.2 だけ。`set_remote_address proxy_protocol: :v1` を設定していないので影響しない（無視リストに入れた） |

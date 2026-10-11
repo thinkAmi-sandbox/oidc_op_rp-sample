@@ -1,7 +1,8 @@
 HTTP 200
+access-control-allow-origin: *
 cache-control: max-age=0, private, must-revalidate
 content-length: <CONTENT_LENGTH>
-content-type: application/json; charset=utf-8
+content-type: application/jrd+json; charset=utf-8
 etag: <ETAG>
 referrer-policy: strict-origin-when-cross-origin
 x-content-type-options: nosniff
