@@ -638,7 +638,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - [x] `scripts/verify-gem-checksums`（キャッシュの `.gem` の SHA-256 を rubygems.org の値と比べる）
 - [x] `scripts/commit-per-app`（ほかのアプリの変更を退避し、検査してからコミットする）
 - [x] スキルの汎用の核（`.claude/skills/rails-upgrade/`）と、リポジトリ固有の設定（`.claude/rails-upgrade-project.md`）
-- [ ] スキルを試す（新しいセッションで、引数なしと `pr`）
+- [x] スキルを試す（新しいセッションで、引数なしと `pr`）
 - [ ] verify
 - [ ] pr
 - 着手時の作業計画で決めたこと（人間が承認）
