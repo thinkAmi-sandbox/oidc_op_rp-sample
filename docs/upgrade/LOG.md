@@ -2227,7 +2227,7 @@ verify:
 
 ## Step 3-b: doorkeeper-openid_connect 2.0.0（2026-10-11）
 
-- ブランチ / PR: `upgrade/step3b-doorkeeper-oidc20` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step3b-doorkeeper-oidc20` / [#30](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/30)
 - バージョン: Ruby 3.2.11（変更なし）/ Rails 7.1.6（変更なし）/ doorkeeper-openid_connect 1.10.5 → 2.0.0（OP）
 
 ### 作業計画で決めたこと
