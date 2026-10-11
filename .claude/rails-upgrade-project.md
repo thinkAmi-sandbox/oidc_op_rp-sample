@@ -21,7 +21,8 @@
 
 ## 記録
 
-- docs/upgrade/LOG.md: Step ごとの節（先頭の「記録のテンプレート」の形）。前の Step の PR へのリンクは、次の Step の最初のコミットで足す（「docs: link the step ... pull request in the upgrade log」）
+- docs/upgrade/LOG.md: Step ごとの節（先頭の「記録のテンプレート」の形）。節は research の出口で作り（作業計画で決めたこと）、各作業の出口で結果を足し、pr で仕上げる（スキル化の PR で決めた。それまでは Step の最後にまとめて書いていた）。前の Step の PR へのリンクは、次の Step の最初のコミットで足す（「docs: link the step ... pull request in the upgrade log」）
+- PLAN.md のチェックリストの項目は、先頭に作業名を付ける（例: `- [ ] gems: doorkeeper 5.9.9`、`- [ ] verify`、`- [ ] pr`）
 - 記録の上乗せ
   - 既定値・雛形への追随: docs/upgrade/defaults/（Rails の版ごとのファイル。ID は `DEF-<版>-<連番>`。記録のルールは defaults/README.md）。理解の関門の返事をもらったら、設定のコミットより前の docs のコミットで記録する
   - 見送った改善: docs/IMPROVEMENTS.md（ID は `IMP-<連番>`。足すときは人間の承認が要る）
