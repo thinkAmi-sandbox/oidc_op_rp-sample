@@ -117,6 +117,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 
 - 手動確認用のローカル環境（各アプリの development DB、`.env`、OP の署名鍵）は gitignore 対象。作業の前後で、次のファイルのハッシュが一致することを `shasum` で確かめる
   - `rails_open_id_provider/db/development.sqlite3`、`rails_relying_party_of_backend/db/development.sqlite3`、`rails_resource_server/db/development.sqlite3`
+  - `rails_open_id_provider/db/development.sqlite3-wal`、`rails_relying_party_of_backend/db/development.sqlite3-wal`（Step 3 の verify から。Rails 7.1 は SQLite を WAL で開き、サーバーを止めても `-wal` が残って、書き込んだ行がその中にある。DEF-7.1-48。`-shm` は読み取り専用で開いても更新日時が変わるので、ハッシュは比べない）
   - `rails_open_id_provider/jwtRS256.key`
   - `rails_relying_party_of_backend/.env`、`rails_resource_server/.env`
   - 3 アプリの `tmp/development_secret.txt`（Rails 7.0 までの development・test の secret_key_base）
@@ -128,6 +129,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - ブラウザペインが画面に出ていないと、AI からは表示できない（`tabs_context` が「hidden」と返す）。手動確認を頼む前に、人間にペインを開いてもらう
 - プレビューのサーバーの標準出力は `preview_logs` で読む。`search` は部分一致で、正規表現は使えない
 - 手動確認でログインすると、RP と OP の development DB に行が増えてハッシュが変わる。手動確認の直前にハッシュが作業前と一致することを確かめ、前後の件数を読み取り専用の `sqlite3 -readonly` で数えて記録する（Step 0-f-2）。以降の基準は手動確認の後のハッシュ
+- Step 3 の verify から、development DB は WAL になっている（DEF-7.1-48）。件数は `-wal` の中も含めて数えるため、本体のファイルだけをコピーして数えない。`sqlite3 -readonly` は `-shm` があれば開ける。`-shm` がない WAL の DB は `unable to open database file` になるので、本体と `-wal` を一緒に scratchpad にコピーして数える
 
 ## LOG.md の書き方
 
