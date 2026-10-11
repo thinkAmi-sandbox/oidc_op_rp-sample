@@ -33,6 +33,23 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 - RP の独自ストラテジー: `config/application.rb` に `config.autoload_lib_once(ignore: %w(assets tasks))` と `Rails.autoloaders.once.inflector.inflect("omniauth" => "OmniAuth")` を足し、`config/initializers/omniauth.rb` の `require` を消した（作業計画の案 B のまま）。once のローダーが `lib/omniauth/strategies/my_op.rb` を `OmniAuth::Strategies::MyOp` として扱い、main のローダーには `lib` がない（リロードしない）ことを確かめた
 - 設定の値の比較（3 アプリの test・development）で変わったのは、DEF-7.1-12〜14 の値だけ。`autoload_lib_once` の前後では同じ。3 アプリの検査と E2E は、各コミットで通った
 
+### `new_framework_defaults_7_1.rb` を有効にした順番
+
+グループと順番は人間が決めた。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた（RP を含め、起動の途中の読み込みで効かない設定はなかった）。解説への返事の後に、アプリごとにコミットした。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`load_defaults`（`new_framework_defaults_7_1.rb`）」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 使っていない機能 | 14 項目（暗号化、トランザクションのコールバック、関連の名前、`attr_readonly`、`serialize`、Marshal の形式、`has_secure_token`、BigDecimal のジョブの引数、キャッシュの有効期限、query log tags、`Parameters` の `==`） | 変わらない（DEF-7.1-19〜32） |
+| 2 | DB の扱い | SQLite の文字列の厳しいモード、`belongs_to` の検証、トランザクションの `return` | 変わらない（DEF-7.1-33〜35） |
+| 3 | テストだけ | `dom_testing_default_html_version` | テストの HTML の読み方だけ（DEF-7.1-36） |
+| 4 | ログ | `precompile_filter_parameters`、`debug_exception_log_level` | 伏せる結果は同じ。ログのレベルの表示だけ（DEF-7.1-37・38） |
+| 6 | 応答のヘッダー | `default_headers` | `X-Download-Options` がなくなる。スナップショットを作り直した（DEF-7.1-39） |
+| 7 | Cookie・メッセージの形式 | `message_serializer`、`use_message_serializer_for_metadata` | OP のセッション Cookie の形式が変わる。7.1 は古い形式も読める（DEF-7.1-40・41） |
+
+- グループ 1 で `action_text.sanitizer_vendor` を有効にすると、3 アプリとも `uninitialized constant Rails::HTML (NameError)` で起動しなかった。sprockets-rails を入れていないアプリでは、initializer の時点で rails-html-sanitizer が読み込まれていない（rails/rails#51246）。Rails 7.1.6 の `load_defaults 7.1` は `require "action_view/helpers"` してから値を決める（#51267）ので、2 つの `sanitizer_vendor` は `load_defaults 7.1` に任せた（人間が判断。グループ 5 はなくなった）
+- グループ 4 の `log_file_size` は、initializer で有効にしても、ロガーが `initialize_logger` で先に作られているので、ログのファイルの上限は 1 MB のままだった。`load_defaults 7.1` に任せた（人間が判断）
+- `compare-config` は、7.1 の設定のいくつかでクラスの値を書き出さなかったので、`scripts/lib/dump_config.rb` に 14 の値を足した（`2c74e3f`）。暗号化の `support_sha1_for_non_deterministic_encryption` は読み出す口がないので、previous の数で見た
+
 ### 作業計画からの変更点
 
 ### `app:update` で採用したもの・戻したもの
@@ -2120,3 +2137,8 @@ rails-lock:
 gems（Rails の直後）:
 
 16. Claude Code の hooks の安全チェックは、`git commit` と同じコマンド行の `sed -n` も `--no-verify` として止める（TIPS.md の「コミット」に書いてあるとおり）。docs のコミットと、検査の結果を `sed -n` で読む行を 1 回の呼び出しにまとめて、止められた。コミットの手順（commit.md）にこの注意がなく、設定の「作業ごとの参照」からも TIPS.md の「コミット」を指していない
+
+rails-defaults:
+
+17. rails-defaults の手順は「設定が効いていないときは起動の途中の読み込みを疑う」としているが、`new_framework_defaults_*.rb` の雛形の行そのものが initializer では効かない・動かない場合（`log_file_size` はロガーの作られる時点、`sanitizer_vendor` は定数の読み込み）がある。どちらも `load_defaults` に任せる判断になったが、手順にこの選択肢がない
+18. 書き出しの道具（`compare-config`）が、新しい版の設定のクラスの値を拾えるかは、版ごとに足す必要がある。rails-defaults の手順の最初に、新しい設定の値が書き出されるかを確かめる手順がない（今回はグループ 1 の比較で気づき、途中で足して基準を取り直した）

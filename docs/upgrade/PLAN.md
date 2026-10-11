@@ -676,7 +676,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - [x] gems: rack-mini-profiler 5.0.0（RP・OP。Gemfile `~> 4.0` → `~> 5.0`。DEF-7.1-09）
 - [x] rails-app-update（DEF-7.1-10〜18）
 - [x] rails-app-update: RP の autoload_lib_once（案 B のまま。案 A には切り替えていない）
-- [ ] rails-defaults
+- [x] rails-defaults（グループ 1〜4・6・7。DEF-7.1-19〜41）
 - [ ] rails-load-defaults
 - [ ] verify
 - [ ] pr
@@ -721,6 +721,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - 着手後に決めたこと（人間が判断）
   - E2E の起動（`e2e/scripts/start-server.sh`）で、`db:drop` と `db:setup`（RS は `db:create`）を別のプロセスで流す。Rails 7.1 では 1 つのプロセスで流すと、作り直した DB にスキーマが入らない。Rails 7.1.6 の lock の前に、別のコミットにした
   - RP は activerecord-session_store 2.3.0 を Rails 7.1.6 と同じコミットで上げる。2.2.0 のままだと、Rails 7.1 でセッション Cookie から `SameSite=Lax` が消える（CLAUDE.md の「gem が新しい Rails に未対応のとき」の ①。DEF-7.1-06）
+  - `new_framework_defaults_7_1.rb` のグループと順番: 1 使っていない機能 → 2 DB の扱い → 3 テストだけ → 4 ログ → 6 応答のヘッダー → 7 Cookie・メッセージの形式。`action_view.sanitizer_vendor`・`action_text.sanitizer_vendor`（雛形の行は initializer の時点で `Rails::HTML` がなく `NameError`。rails/rails#51246）と `log_file_size`（ロガーは initializer より前に作られる）は、`add_autoload_paths_to_load_path`・`cache_format_version` と同じく `load_defaults 7.1` に任せる（グループ 5 はなくなった）
   - RS の jwt は 2.10.3 のままにする。作業計画は jwt を「3 アプリ」としていたが、RS の jwt は oauth2 の依存（間接の gem）で、直接の gem の方針の対象外だった（RS のコミットの前に気づいた）
   - 2.10.3 は CVE-2026-45363 の修正版で、ほかの advisory はない。RS は jwt の処理を通らない（oauth2 の assertion のグラントだけが `JWT.encode` を使う）。ruby-jwt の `2-10-stable` はバックポートだけで、将来の修正が戻されないおそれはある。そのため、間接の gem は epic の最後の段階でまとめて上げることを考える（14 章）
 
