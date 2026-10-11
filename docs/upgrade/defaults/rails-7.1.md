@@ -44,6 +44,8 @@
 | DEF-7.1-34 | 必須の `belongs_to` の検証が、外部キーが変わったときだけ問い合わせる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-35 | トランザクションのブロックを `return` などで抜けると、コミットする | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-36 | テストの HTML の読み方が HTML5 になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ（test） | 追随 |
+| DEF-7.1-37 | `filter_parameters` を先に正規表現にまとめる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-38 | 処理されなかった例外のログのレベルが ERROR になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -243,7 +245,7 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 
 ## `load_defaults`（`new_framework_defaults_7_1.rb`）
 
-`new_framework_defaults_7_1.rb` の設定を、グループごとに有効にした。グループと順番は人間が決めた（[PLAN.md](../PLAN.md) の Step 3、[LOG.md](../LOG.md) の Step 3）。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた。`action_view.sanitizer_vendor`・`action_text.sanitizer_vendor`・`add_autoload_paths_to_load_path`・`cache_format_version` は、`new_framework_defaults_7_1.rb` では有効にせず、`load_defaults 7.1` に任せる（`load_defaults 7.1` にするときに値を確かめる）。`sanitizer_vendor` の行は、sprockets-rails を入れていないアプリでは initializer の時点で `Rails::HTML` がなく、`NameError` で起動しない（rails/rails#51246。Rails 7.1.6 の `load_defaults` の側は #51267 で直っている）
+`new_framework_defaults_7_1.rb` の設定を、グループごとに有効にした。グループと順番は人間が決めた（[PLAN.md](../PLAN.md) の Step 3、[LOG.md](../LOG.md) の Step 3）。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた。`action_view.sanitizer_vendor`・`action_text.sanitizer_vendor`・`add_autoload_paths_to_load_path`・`cache_format_version`・`log_file_size` は、`new_framework_defaults_7_1.rb` では有効にせず、`load_defaults 7.1` に任せる（`load_defaults 7.1` にするときに値を確かめる）。`sanitizer_vendor` の行は、sprockets-rails を入れていないアプリでは initializer の時点で `Rails::HTML` がなく、`NameError` で起動しない（rails/rails#51246。Rails 7.1.6 の `load_defaults` の側は #51267 で直っている）
 
 ### グループ 1: 3 アプリが使っていない機能
 
@@ -434,3 +436,27 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: rails/rails#48682、`rails-dom-testing-2.3.0/README.md`、`rails-dom-testing-2.3.0/lib/rails/dom/testing/railtie.rb`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.2.25「config.dom_testing_default_html_version」
 - コミット: RS・RP・OP（`parse test HTML as HTML5 as in Rails 7.1`）
+
+### グループ 4: ログ
+
+`log_file_size` は、`new_framework_defaults_7_1.rb` では効かないので有効にせず、`load_defaults 7.1` に任せる（人間が判断）。initializer で有効にすると `config.log_file_size` は 100 MB になったが、ロガーは起動の早い段階の `initialize_logger` で作られる（`railties-7.1.6/lib/rails/application/bootstrap.rb`）ので、ログのファイルの上限は `Logger` の既定の 1 MB のままだった。
+
+### DEF-7.1-37: `filter_parameters` を先に正規表現にまとめる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 4）/ 対象: RS・RP・OP
+- 何が変わるか: `config.precompile_filter_parameters = true`。起動の時点で `filter_parameters` の並びを 1 つの正規表現にまとめる。設定の値の比較: RS・RP は `[:passw, ..., :code]` → `[/(?i:passw)|...|(?i:code)/]`。OP は doorkeeper が足す完全一致の正規表現も 1 つにまとまる。サンプルの値を伏せた結果（`code`・`code_verifier`・`client_secret`・`access_token`・`id_token`・`password` は `[FILTERED]`、`state`・`name` はそのまま）は前後で同じ
+- なぜ: 伏せるたびに並びを 1 つずつ調べていたのを、先にまとめて速くした（rails/rails#46452・#48180）
+- 3 アプリへの影響: ログで伏せる項目は同じ
+- 扱い: 追随
+- 出典: rails/rails#46452・#48180、`railties-7.1.6/CHANGELOG.md`（「Add `config.precompile_filter_parameters`」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.2.46「config.precompile_filter_parameters」
+- コミット: RS・RP・OP（`enable the logging defaults of Rails 7.1`）
+
+### DEF-7.1-38: 処理されなかった例外のログのレベルが FATAL から ERROR になる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 4）/ 対象: RS・RP・OP
+- 何が変わるか: `config.action_dispatch.debug_exception_log_level = :error`。要求の処理中に捕まえられなかった例外を、`DebugExceptions` が ERROR のレベルでログに書く。設定の値の比較: env_config の値が 4（FATAL）→ 3（ERROR）
+- なぜ: FATAL は「プログラムが止まる、扱えない誤り」のためのレベルで、`DebugExceptions` が扱っている例外には合わない（rails/rails#48575）
+- 3 アプリへの影響: ログの行のレベルの表示だけ。ログのレベルを ERROR より上にしていないので、出る行も変わらない
+- 扱い: 追随
+- 出典: rails/rails#48575、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.10.2「config.action_dispatch.debug_exception_log_level」
+- コミット: RS・RP・OP（`enable the logging defaults of Rails 7.1`）
