@@ -106,7 +106,8 @@ receivers.each do |namespace, names|
     names.each do |name|
       receiver = constant.call(name)
       next unless receiver.is_a?(Module) && receiver.respond_to?(key)
-      next unless receiver.method(key).arity.zero?
+      # 引数なしで呼べるもの（arity が 0 か、省略できる引数だけの -1）。委譲のメソッドは (...) で -1 になる
+      next unless [0, -1].include?(receiver.method(key).arity)
 
       lines << "  #{name}.#{key} = #{read.call { receiver.public_send(key) }}"
     end

@@ -10,7 +10,8 @@
 #   scripts/compare-config diff <ラベル1> <ラベル2>  書き出しを比べる。違いがあれば終了コード 1
 #   --root <ディレクトリ>                         アプリのあるリポジトリ（既定はこのスクリプトのリポジトリ。worktree を比べるとき）
 #
-# 書き出しは環境変数 COMPARE_CONFIG_DIR（なければ一時ディレクトリ）の <ラベル>/<アプリ>-<環境>.txt に置く。
+# 書き出しは環境変数 COMPARE_CONFIG_DIR（なければ $TMPDIR/compare-config）の <ラベル>/<アプリ>-<環境>.txt に置く。
+# dump は、同じラベルの前の書き出しを消してから書く（前の書き出しが残って diff に混ざらないようにする）。
 # development は手動確認用の DB に触れないよう、E2E 用の DB（db/e2e.sqlite3）を指す。
 # Ruby は各アプリのディレクトリで mise を通して使う。
 
@@ -66,7 +67,11 @@ done
 case "$command" in
   dump)
     [ ${#labels[@]} -eq 1 ] || { echo "dump にはラベルを 1 つ渡す" >&2; exit 2; }
+    case "${labels[0]}" in
+      */*|.|..) echo "ラベルに / は使えない" >&2; exit 2 ;;
+    esac
     dir="$OUT_DIR/${labels[0]}"
+    rm -rf "$dir"
     mkdir -p "$dir"
     failed=0
     for app in "${apps[@]}"; do
