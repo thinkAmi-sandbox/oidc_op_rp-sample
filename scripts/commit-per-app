@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# 1 つのアプリの変更だけで検査と E2E を流してからコミットする。ほかの 2 アプリの変更は git stash で退避し、
+# 終わったら（検査やコミットが失敗しても）戻す。コミットはアプリごとに分け、そのアプリの変更だけで検査が通ることを
+# 確かめてからコミットする、という手順（docs/upgrade/TIPS.md の「コミット」）を、Step 2-b の道具をもとにスクリプトにした。
+#
+# 使い方（リポジトリ直下で）:
+#   scripts/commit-per-app rs <メッセージのファイル>   RS（rs / rp / op）の変更をコミットする
+#
+# 流れ: ほかのアプリの変更を退避 → scripts/check-apps --app <アプリ>（検査と E2E）→ そのアプリのディレクトリをステージして
+# `git commit -F <メッセージのファイル>`（hooks の安全チェックも走る）→ 退避を戻す。
+# 検査が落ちたらコミットしない。コミットが失敗したらステージを外す。どちらも終了コード 1 で、変更は作業ツリーに残る。
+# アプリの外（docs/ など）の変更は退避もステージもしない。検査の出力は CHECK_APPS_LOG_DIR（scripts/check-apps と同じ）。
+
+set -u
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+usage() {
+  sed -n '6,7p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+case "${1:-}" in
+  rs) app=rails_resource_server ;;
+  rp) app=rails_relying_party_of_backend ;;
+  op) app=rails_open_id_provider ;;
+  -h|--help) usage; exit 0 ;;
+  *) echo "アプリ（rs / rp / op）を渡す" >&2; usage >&2; exit 2 ;;
+esac
+key="$1"
+message="${2:-}"
+[ -f "$message" ] || { echo "メッセージのファイルを渡す" >&2; usage >&2; exit 2; }
+[ $# -eq 2 ] || { echo "引数が多い" >&2; usage >&2; exit 2; }
+message="$(cd "$(dirname "$message")" && pwd)/$(basename "$message")"
+
+cd "$ROOT" || exit 2
+if [ -z "$(git status --porcelain -- "$app")" ]; then
+  echo "$app に変更がない" >&2
+  exit 2
+fi
+if ! git diff --cached --quiet; then
+  echo "ステージ済みの変更がある（git rm の削除などが別のコミットに紛れないよう、先に片付ける）" >&2
+  git diff --cached --name-status >&2
+  exit 2
+fi
+
+others=()
+for other in rails_resource_server rails_relying_party_of_backend rails_open_id_provider; do
+  [ "$other" != "$app" ] && [ -n "$(git status --porcelain -- "$other")" ] && others+=("$other")
+done
+
+stashed=0
+restore() {
+  if [ "$stashed" -eq 1 ]; then
+    if git stash pop -q; then
+      echo "退避したほかのアプリの変更を戻した: ${others[*]}"
+    else
+      echo "退避した変更を戻せなかった。git stash list で確かめ、手で git stash pop する" >&2
+    fi
+    stashed=0
+  fi
+}
+trap restore EXIT
+trap 'exit 130' INT TERM
+
+if [ ${#others[@]} -gt 0 ]; then
+  git stash push -q -u -m "commit-per-app: $key 以外のアプリの変更" -- "${others[@]}" || { echo "退避に失敗した" >&2; exit 1; }
+  stashed=1
+  echo "ほかのアプリの変更を退避した: ${others[*]}"
+fi
+
+echo "== scripts/check-apps --app $key"
+if ! "$ROOT/scripts/check-apps" --app "$key"; then
+  echo "検査が落ちたので、コミットしない" >&2
+  exit 1
+fi
+
+git add -- "$app"
+if ! git commit -q -F "$message"; then
+  git reset -q -- "$app"
+  echo "コミットに失敗したので、ステージを外した（変更は作業ツリーに残っている）" >&2
+  exit 1
+fi
+git log --oneline -1
