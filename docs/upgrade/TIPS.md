@@ -119,6 +119,8 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - `rails_open_id_provider/db/development.sqlite3`、`rails_relying_party_of_backend/db/development.sqlite3`、`rails_resource_server/db/development.sqlite3`
   - `rails_open_id_provider/jwtRS256.key`
   - `rails_relying_party_of_backend/.env`、`rails_resource_server/.env`
+  - 3 アプリの `tmp/development_secret.txt`（Rails 7.0 までの development・test の secret_key_base）
+  - 3 アプリの `tmp/local_secret.txt`（Rails 7.1 からの secret_key_base。Step 3 の rails-lock で、各アプリを 7.1 で初めて起動する前に `development_secret.txt` からコピーする。PLAN.md の Step 3）
 - RP のトップページを開くと、セッションの行が増えて development DB が変わる。OP の discovery と、トークンなしでの RS へのリクエストは DB を変えない
 - `.claude/launch.json` の設定で、3 アプリをプレビューから起動できる。プレビューは起動時にトップページを開くので、RP は手動確認のとき以外はプレビューで起動しない
 - development のアプリを `rails runner` から `Rack::MockRequest` で呼ぶときは、`HTTP_HOST` に `localhost:<ポート>` を渡す（ないと HostAuthorization に 403 で止められる）。手動確認用の DB を変えないよう、`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付ける

@@ -1974,3 +1974,46 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | この PR で足した決まり（チェックリストの項目の先頭に作業名）に、この PR の「スキル化」のチェックリストのスクリプトとスキルの行が従っていない | 直さない。スキル化は、スキルの作業（gems・ruby など）の外で行った Step で、当てはまる作業名がない。作業名のある verify と pr の項目には付けた |
 
 コードレビューの後に、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り（件数は上と同じ）、手動確認用の環境の 9 ファイルのハッシュが作業の開始時と同じことを確かめた。作り直した worktree は、確かめた後で消した。
+
+## Step 3: Rails 7.1（2026-10-11〜）
+
+- ブランチ / PR: `upgrade/step3-rails71` / （PR 作成後に記入）
+- バージョン: Ruby 3.2.11（変更なし）/ Rails 7.0.10 → 7.1.6（予定）
+- `/rails-upgrade` のスキルを実際の作業に使う最初の Step。スキルの手順・型・設定で、足りない・合わない・迷ったところは、作業を止めずに控えて、この節の最後の「スキルについて気づいたこと」に書く（スキルを直すかは人間が判断する）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade research` で、Plan モードで調べた（サブエージェント 2 つ: アプリと gem のコードの Rails 7.1 への影響、Rails 7.1 と周辺 gem の一次の出典）。lock の解決は、scratchpad の lock のコピーに `scripts/resolve-lock`・`bundle lock --print` をかけて試した。作業計画を出し、論点を 1 つずつ人間と確かめてから承認を得た。調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 3: Rails 7.1」に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| brakeman 8.1.0 の時期 | Step 3 の最初に上げる。公開から 2 週間の決まりの例外 | 計画では「Step 3 の最初」だったが、着手の日に公開から 10 日目だった。8.1.1 も advisory も出ておらず、先送りしても 2 週間たつ日（10-15）より前に次の Step に着手する見込みが高い（人間が判断） |
+| secret_key_base のファイル | rails-lock で各アプリを 7.1 で初めて起動する前に、`tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーする（元は残す）。TIPS.md の守るファイルを 12 にする | Rails 7.1 は `tmp/local_secret.txt` だけを読む（rails/rails#48471。ガイドへの追記は #52083）。コピーなら手動確認用の環境を作り直さず、7.0 以前のブランチでも同じ鍵で動く。人間が根拠（PR とガイドの節）を確かめてから同意した |
+| connection_pool | 2.5.5 に一時固定し、Step 5 で見直す | 3.0 はキーワード引数だけで、Rails 7.1.6 の Redis・Memcache のキャッシュストアと合わない（rails/rails#56291）。Rails 7.2 も `< 3` に固定した（#56620） |
+| 直接の gem の方針 | Ruby が対応していて特に不具合がなければ、Gemfile に書いた直接の gem は、上げられる時点で最新版に上げる。間接の gem は対象外 | 人間の方針。jwt 3.x の時期を確かめる中で出た。間接の gem は Rails や直接の gem の要件で動き、default gem に合わせた固定は意図したもの（人間が範囲を決めた） |
+| jwt | Step 3 で 3.3.0（Rails を上げる前） | 方針による。当初の見立て（Step 3 では上げない）は取り下げた。3.0〜3.3 の破壊的な変更は、このリポジトリの使い方に当たらない見込み。gems の手順 1 で、RP の `my_op.rb` のオプションでの検証の効き方を gem のソースで確かめる |
+| puma | Step 3 で 8.0.2（7.x は経由しない） | 方針による。advisory 2 件（CVE-2026-47736・47737）が解消する。7.0・8.0 の破壊的な変更のうち、効くのは keep-alive の既定値と応答ヘッダー名の小文字化だけ |
+| omniauth-rails_csrf_protection | Step 3 で 2.0.1（7 章の「Step 7」を前倒し） | 方針による。Rails 8.1 未満では 1.0.2 と同じ処理 |
+| doorkeeper-openid_connect 2.0.0 | Step 3 に入れず、直後のサブステップ 3-b で、意図的な仕様変更として扱う | マイグレーション（#243）と discovery の応答の変化（#333）があり、方針の「特に不具合がない」に当たらない |
+| 手動確認の時期 | verify で 1 回。途中で前の Cookie やセッションに影響する変化が見つかったら、止まって相談し直す | 前の Cookie を読めなくする変更がない見込み（secret はコピー、`message_serializer` は古い形式も読める） |
+
+順番は、PLAN.md の Step 3 のチェックリストのとおり（brakeman → jwt → puma → omniauth-rails_csrf_protection → Rails 7.1.6 → activerecord-session_store → rack-mini-profiler → `app:update` → RP の `autoload_lib_once` → `new_framework_defaults_7_1.rb` → `load_defaults 7.1`）。
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切った後）に、9 ファイルのハッシュを控えた。件数は Step 2-b の手動確認の後と同じ（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）。スキル化の PR では手動確認をしていないので、基準は Step 2-b の手動確認の後のまま。
+
+### スキルについて気づいたこと
+
+research:
+
+1. research の手順 4 は、設定の「作業ごとの参照」の research の行を指すが、その行には `--print` しかない。Rails のマイナーを上げる Step で使う `scripts/resolve-lock` は、rails-lock の行にしかない。research でも resolve-lock を使った
+2. `resolve-lock` は、解決できないときにエラーに出た gem を `--unpin` に足して流し直す（7.1.6 では rails-dom-testing・erubi の 2 回）。zsh で引数を配列にせずに繰り返すと、`--unpin` の値が 1 語にならず「不明な引数」になった
+3. advisory の確かめ方は、今の lock を無視リストなしで見る方法だけが書いてある。解決した lock（scratchpad）に `bundle-audit check <ディレクトリ>` をかけて、解消と増加を見る方法は書いていない。`--gemfile-lock` はアプリのディレクトリからの相対パスとして扱われた
+4. PLAN.md が時期を「Step 3 の最初」と決めていた brakeman 8.1.0 が、着手の日にまだ 2 週間たっていなかった。計画で決めた時期と 2 週間の決まりが食い違ったときの扱いは、research に書いていない（今回は人間が例外とした）
+5. research の手順 5（非推奨警告）は、今の版の警告しか確かめられない。新しい版の非推奨（`show_exceptions = false` など）は、ソースを読んで見込みを立てるしかない
+6. 守るファイルが Rails の版で変わること（7.1 の `tmp/local_secret.txt`）を、research で確かめる項目がない
+7. Plan モードで research を行ったが、`bundle-audit update` は advisory のデータベース（リポジトリの外）を書き換える
+8. 「直接の gem は、上げられる時点で最新版に上げる」という方針が、research の対話で人間から出た。7 章の振り分けは「時期を決めた gem はその Step で」となっていて、今上げられるメジャーの更新を先送りしていた（jwt・puma・omniauth-rails_csrf_protection）。research の手順 3（周辺 gem の振り分け）は設定の「計画」を指すだけで、この方針を書く場所がない（今回は 7 章の冒頭に足した）
+9. 「質問は 1 回に 1 論点」は、Plan モードの選択式の質問（AskUserQuestion）がフックで止められ、テキストで行った。論点が 9 つあり、計画の承認の前に 9 往復した。今回はそれでよかったが、論点が多いときの進め方（見立てに異論がなさそうなものをまとめて示すか）は書いていない
+10. 設定の「手動確認用の環境」は「9 ファイル」としているが、指す先の TIPS.md の一覧には 6 ファイル（`tmp/development_secret.txt` の 3 つがない）しか書いていなかった。Step 3 の docs のコミットで、`development_secret.txt` と `local_secret.txt` を TIPS.md に足した
