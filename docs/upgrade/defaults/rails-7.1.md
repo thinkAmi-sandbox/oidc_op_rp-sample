@@ -17,6 +17,15 @@
 | DEF-7.1-07 | puma を通した応答に Content-Length が付く | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-7.1-08 | development の Server-Timing に `transaction.active_record` が増える | Rails の既定値 | 3 アプリ（development） | 追随 |
 | DEF-7.1-09 | rack-mini-profiler の高度なデバッグ機能が、development で既定で無効になる | 周辺 gem の既定値（rack-mini-profiler 5.0.0） | RP・OP | 追随 |
+| DEF-7.1-10 | `config.autoload_lib(ignore: %w(assets tasks))` | `app:update` の雛形 | RS・OP（RP は採用しない） | 追随 |
+| DEF-7.1-11 | `cache_classes` が `enable_reloading` になる | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.1-12 | development・test で `raise_on_missing_callback_actions = true` | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.1-13 | test の `show_exceptions` が `:rescuable` になる | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.1-14 | development で `active_job.verbose_enqueue_logs = true` | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.1-15 | production.rb の雛形 | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.1-16 | コメントと書き方だけの変化 | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.1-17 | `bin/setup` の `system!` が例外で止まる | `app:update` の雛形 | 3 アプリ | 追随 |
+| DEF-7.1-18 | `active_storage:update` のマイグレーション | `app:update` の雛形 | 3 アプリ | 採用しない |
 
 ## 周辺 gem（Step 3）
 
@@ -119,3 +128,97 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随（有効にする設定は足さない）
 - 出典: rack-mini-profiler#645、`rack-mini-profiler-5.0.0/CHANGELOG.md`、v4.0.1 と v5.0.0 の `lib/mini_profiler_rails/railtie.rb`、`rack-mini-profiler-5.0.0/lib/mini_profiler/config.rb`。README の設定の表は「Defaults to `true` in development.」のまま残っていて、コードと合っていない。Rails の外の gem なので、Rails ガイドに該当の節はない
 - コミット: RP・OP（`update rack-mini-profiler to 5.0.0`）
+
+## `app:update` の雛形
+
+`bin/rails app:update`（Rails 7.1.6）を 3 アプリで全上書きで流し、`scripts/restore-app-config` でアプリの独自設定（test の `deprecation = :raise`、`filter_parameter_logging.rb` のコメントと `:code`）を戻した後の差分。差分は人間が確かめた。設定の値の比較（3 アプリの test・development）で変わったのは、DEF-7.1-12〜14 の値だけ。`app:update` が一度作って同じ実行の中で消したファイル（`assets.rb` など）は、前後ともないので差分にならない。
+
+### DEF-7.1-10: `config/application.rb` に `config.autoload_lib(ignore: %w(assets tasks))`
+
+- 種類: `app:update` の雛形 / 対象: RS・OP（採用）、RP（採用しない）
+- 何が変わるか: `lib` が autoload・eager load の対象になる（`assets`・`tasks` を除く）。RS の `lib` は `tasks/.keep` だけ、OP の `lib` は `assets/.keep` と `tasks/`（annotate の rake）だけで、読み込まれる Ruby のファイルはない。test で `Rails.autoloaders.main.dirs` に `lib` が入り、`lib/tasks`（OP は `lib/assets` も）が無視されることを確かめた
+- なぜ: Rails 7.1 の新しいアプリは `lib` を autoload する（rails/rails#49032）
+- 3 アプリへの影響: RS・OP は読み込むファイルがなく、`zeitwerk:check` は通った。RP は採用すると `lib/omniauth/strategies/my_op.rb` が `Omniauth::Strategies::MyOp` として読まれ、`zeitwerk:check` と eager load のテストが `NameError: uninitialized constant Omniauth::Strategies::MyOp` で落ちる。RP は、次のコミットで `autoload_lib_once` と inflector にする（PLAN.md の Step 3 の案 B）
+- 扱い: RS・OP は追随。RP は採用しない（`autoload_lib_once` に置き換える）
+- 出典: rails/rails#49032、`railties-7.1.6/CHANGELOG.md`、Rails ガイド v7.1 の「Rails アップグレードガイド」の 2.3「config.autoload_libとconfig.autoload_lib_onceについて」
+- コミット: RS・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-11: `config.cache_classes` が `config.enable_reloading` になる
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ（development・test・production）
+- 何が変わるか: `cache_classes = false/true` が `enable_reloading = true/false` になる。`enable_reloading` は `!cache_classes` を表す同じ設定で、値は変わらない
+- なぜ: リロードするかどうかをそのまま表す名前にした（rails/rails#44870）
+- 3 アプリへの影響: ない
+- 扱い: 追随
+- 出典: rails/rails#44870、`railties-7.1.6/CHANGELOG.md`（「Define `config.enable_reloading` to be `!config.cache_classes`」）
+- コミット: RS・RP・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-12: development・test で `raise_on_missing_callback_actions = true`
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ（development・test）
+- 何が変わるか: `before_action` などの `only:`・`except:` が、ないアクションを指すとエラーになる
+- なぜ: 名前の打ち間違いでコールバックが黙って効かないことを防ぐ（rails/rails#43487）
+- 3 アプリへの影響: 3 アプリのコントローラーに `only:`・`except:` はない。devise・doorkeeper のコントローラーを含め、minitest と E2E は通った
+- 扱い: 追随
+- 出典: rails/rails#43487、`actionpack-7.1.6/CHANGELOG.md`（「Allow raising an error when a callback's only/unless symbols aren't existing methods.」）
+- コミット: RS・RP・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-13: test の `show_exceptions` が `false` から `:rescuable` になる
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ（test）
+- 何が変わるか: テストの中で、`ActiveRecord::RecordNotFound` のような応答に変えられる例外は、例外のまま上がらずに 404 などの応答になる。ほかの例外は今と同じく上がる。7.1 で非推奨になった `false` の値もなくなる
+- なぜ: テストでも本番に近い応答を確かめられるようにした（rails/rails#45867）
+- 3 アプリへの影響: 例外を期待するテストはない（`assert_raises` を使っていない）。minitest は通った
+- 扱い: 追随
+- 出典: rails/rails#45867、`actionpack-7.1.6/CHANGELOG.md`、Rails ガイド v7.1 の「Rails アップグレードガイド」の 2.13「コントローラーテスト、結合テスト、システムテストの例外処理方法が新しくなった」
+- コミット: RS・RP・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-14: development で `active_job.verbose_enqueue_logs = true`
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ（development）
+- 何が変わるか: ジョブを積んだときに、呼び出し元の行をログに出す
+- なぜ: どこからジョブが積まれたかをログで分かるようにした（rails/rails#47839）
+- 3 アプリへの影響: ジョブを使っていないので出ない
+- 扱い: 追随
+- 出典: rails/rails#47839、`activejob-7.1.6/CHANGELOG.md`
+- コミット: RS・RP・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-15: production.rb の雛形
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ（production。動作保証の外で、雛形に追従するだけ）
+- 何が変わるか: `force_ssl = true` が有効（#47852）。ログは常に STDOUT（#47138。`RAILS_LOG_TO_STDOUT` と `log_formatter` の行が消える）。ログのレベルは `RAILS_LOG_LEVEL`（#47143）。`public_file_server.enabled` の行がコメントになり既定の有効のままになる（#47137）。`assume_ssl`（#47139）と `config.hosts` の例（#47447）のコメントが増える。`require_master_key` の説明などのコメントが変わる
+- なぜ: Rails 7.1 で、コンテナや PaaS で動かす前提の既定にした
+- 3 アプリへの影響: development と test には効かない
+- 扱い: 追随
+- 出典: rails/rails#47852・#47138・#47143・#47137・#47139・#47447、`railties-7.1.6/CHANGELOG.md`（「Enable force_ssl=true in production by default」）
+- コミット: RS・RP・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-16: コメントと書き方だけの変化
+
+- 種類: `app:update` の雛形 / 対象: 下のとおり
+- 何が変わるか（値は変わらない）: `filter_parameter_logging.rb` の説明（3 アプリ。#49347。`:code` と日本語のコメントは戻した）、RS の `cors.rb` の「AJAX」→「Ajax」、RP・OP の CSP の例の `style-src`（#46141）、RP・OP の permissions policy の例のブロック引数 `f` → `policy` と見出しのコメント（#44144）、`consider_all_requests_local` の空白、test.rb の eager load・reloading の説明（#46648 ほか）
+- なぜ: 雛形の説明と例の更新
+- 3 アプリへの影響: ない
+- 扱い: 追随
+- 出典: rails/rails#49347・#46141・#44144・#46648
+- コミット: RS・RP・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-17: `bin/setup` の `system!` が `system(*args, exception: true)` になる
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: コマンドが失敗したとき、`abort` の独自のメッセージの代わりに、Ruby の例外（失敗したコマンドと終了コード）で止まる
+- なぜ: 失敗の原因を分かりやすくした（rails/rails#46064）
+- 3 アプリへの影響: 失敗したときのメッセージの形だけ。E2E・CI は `bin/setup` を使わない
+- 扱い: 追随
+- 出典: rails/rails#46064
+- コミット: RS・RP・OP（`apply rails app:update for Rails 7.1`）
+
+### DEF-7.1-18: `active_storage:update` のマイグレーション
+
+- 種類: `app:update` の雛形 / 対象: 3 アプリ
+- 何が変わるか: `active_storage:update` が Active Storage のマイグレーションを 3 本足す（`add_service_name_to_active_storage_blobs`、`create_active_storage_variant_records`、`remove_not_null_on_active_storage_blobs_checksum`）
+- なぜ: Active Storage を使うアプリのテーブルを、新しい版に合わせるため
+- 3 アプリへの影響: 3 アプリとも Active Storage を使っていない（テーブルもない）
+- 扱い: 採用しない（Step 1 と同じ扱い。`scripts/restore-app-config` が消す）
+- 出典: `railties-7.1.6/lib/rails/tasks/framework.rake`（`app:update` が `active_storage:update` を流す）
+- コミット: なし
