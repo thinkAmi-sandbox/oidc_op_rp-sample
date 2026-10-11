@@ -1804,7 +1804,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 ## Step 2-b: Ruby 3.2 以上を必要とする周辺 gem（2026-10-10〜2026-10-11）
 
-- ブランチ / PR: `upgrade/step2b-ruby32-gems` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step2b-ruby32-gems` / [#27](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/27)
 - バージョン: Ruby 3.2.11・Rails 7.0.10（変更なし）。OP の doorkeeper-openid_connect 1.10.1 → 1.10.5。3 アプリの zeitwerk 2.6.18 → 2.7.5 → 2.8.3、byebug 12.0.0 → 13.0.0、simplecov 0.22.0 → 1.2.0、brakeman 7.1.1 → 8.0.6。byebug の依存の reline 0.6.0・io-console 0.6.0（一時固定）が lock に入り、simplecov の依存だった docile・simplecov-html・simplecov_json_formatter が lock から消えた
 - 追随した gem の既定値・雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 2-b）」に記録した（DEF-7.0-48〜50）。業務的な挙動の変化（B）は起きなかった
 - gem を上げる手順で分かったことは、TIPS.md の「gem の更新」と「rails c を確かめる」にまとめた（スキル化の材料。PLAN.md の 13 章）
