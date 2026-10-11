@@ -43,6 +43,7 @@
 | DEF-7.1-33 | SQLite の文字列の厳しいモード | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-34 | 必須の `belongs_to` の検証が、外部キーが変わったときだけ問い合わせる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-35 | トランザクションのブロックを `return` などで抜けると、コミットする | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-36 | テストの HTML の読み方が HTML5 になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ（test） | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -421,3 +422,15 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: activerecord の CHANGELOG（「Bring back the historical behavior of committing transaction on non-local return.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.8.42「config.active_record.commit_transaction_on_non_local_return」
 - コミット: RS・RP・OP（`enable the database defaults of Rails 7.1`）
+
+### グループ 3: テストだけ
+
+### DEF-7.1-36: テストの HTML の読み方が HTML5 になる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 3）/ 対象: RS・RP・OP（test）
+- 何が変わるか: `config.dom_testing_default_html_version = :html5`。`assert_select`・`assert_dom_equal` などが、応答の HTML を Nokogiri の HTML5 のパーサーで読む（今までは HTML4）。アプリの応答は変わらない。設定の値の比較: `Rails::Dom::Testing.default_html_version` が :html4 → :html5（3 アプリ・test と development）
+- なぜ: 今のブラウザと同じ HTML5 の規則で、テストでも HTML を読むようにした（rails/rails#48682）
+- 3 アプリへの影響: `assert_select` を使うのは RP の 3 ファイル（ログイン・introspection・セッション）と OP の 2 ファイル（認可エンドポイント・認可コードフロー）で、どれも通った。応答のスナップショットは本文を文字列で比べるので、パーサーに関係しない
+- 扱い: 追随
+- 出典: rails/rails#48682、`rails-dom-testing-2.3.0/README.md`、`rails-dom-testing-2.3.0/lib/rails/dom/testing/railtie.rb`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.2.25「config.dom_testing_default_html_version」
+- コミット: RS・RP・OP（`parse test HTML as HTML5 as in Rails 7.1`）
