@@ -50,8 +50,10 @@ end
 restore_setting.call('config/environments/test.rb', /^\s*config\.active_support\.deprecation\s*=/)
 
 # 2. filter_parameter_logging.rb（:code と、伏せる対象の理由のコメント。DEF-7.0-10）
-#    配列は、HEAD にあって雛形にない要素を末尾に足す。コメントは、雛形のコメントの後に、HEAD でこのリポジトリが足した行
-#    （日本語を含む行。雛形のコメントは英語）を入れる
+#    配列は、このリポジトリが足した要素（CUSTOM_FILTER_ELEMENTS）のうち、雛形にないものを末尾に足す。HEAD にあって雛形にない
+#    ほかの要素は、雛形が消したものとして戻さずに知らせる（雛形への追随なので、残すなら一覧に足す）。
+#    コメントは、雛形のコメントの後に、HEAD でこのリポジトリが足した行（日本語を含む行。雛形のコメントは英語）を入れる
+CUSTOM_FILTER_ELEMENTS = [':code'].freeze
 filter_path = 'config/initializers/filter_parameter_logging.rb'
 filter_head = head_file.call(filter_path)
 if filter_head
@@ -63,7 +65,9 @@ if filter_head
     failures << "#{filter_path}: filter_parameters の配列が見つからない"
   else
     elements = ->(text) { text.split(',').map(&:strip).reject(&:empty?) }
-    missing = elements.call(head_match[1]) - elements.call(current_match[1])
+    head_only = elements.call(head_match[1]) - elements.call(current_match[1])
+    missing = head_only & CUSTOM_FILTER_ELEMENTS
+    dropped = head_only - CUSTOM_FILTER_ELEMENTS
     head_lines = filter_head[0...head_match.begin(0)].lines
     custom_comments = []
     custom_comments.unshift(head_lines.pop) while head_lines.last&.match?(/^#/)
@@ -74,6 +78,7 @@ if filter_head
     current = current.sub(current_match[0]) { "#{custom_comments.join}#{replaced}" }
     File.write(filter_path, current)
     puts "#{filter_path}: 足した要素 #{missing.inspect}、戻したコメント #{custom_comments.size} 行"
+    puts "#{filter_path}: 雛形で消えた要素 #{dropped.inspect}（戻していない。差分で確かめる）" if dropped.any?
   end
 else
   puts "#{filter_path}: HEAD にない（飛ばす）"
@@ -84,7 +89,8 @@ end
 app_path = 'config/application.rb'
 app_head = head_file.call(app_path)
 if app_head
-  trailing = app_head.split(/^end\n/, -1).last.to_s
+  last_end = app_head.rindex(/^end$/)
+  trailing = last_end ? app_head[(last_end + 3)..].sub(/\A\n/, '') : ''
   if trailing.strip.empty?
     puts "#{app_path}: 最後の end の後の行は HEAD にない"
   else
