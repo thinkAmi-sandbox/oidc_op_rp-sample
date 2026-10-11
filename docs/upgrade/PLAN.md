@@ -868,7 +868,7 @@ oxlint / oxfmt の導入条件:
 - [ ] 無視リストを空にした設定で bundler-audit を流し、解消した advisory を無視リストから消した
 - [ ] lock に入れた default gem と、一時固定した gem の版が、意図せず動いていない（7 章）
 - [ ] `bin/rails zeitwerk:check` が通る（Step 1 以降）
-- [ ] `db:drop db:setup` で空から作り直して E2E が通る（E2E の起動時に E2E 用の DB で毎回行われる。RS は `schema.rb` がないので `db:drop db:create`）
+- [ ] `db:drop` → `db:setup` で空から作り直して E2E が通る（E2E の起動時に E2E 用の DB で毎回行われる。Step 3 から別のプロセスで流す。RS は `schema.rb` がないので `db:drop` → `db:create`）
 - [ ] 公開物の安全チェック（`scripts/check-public-safety --staged`）が通る
 - [ ] CI（GitHub Actions）が通る（Step 0-g 以降）
 - [ ] 手動確認用の環境（TIPS.md の「手動確認用の環境」のファイル）のハッシュが、作業の前後で同じ（手動確認をした Step は、手動確認の後の値を新しい基準にする）

@@ -34,20 +34,25 @@ run() {
 
 cd "$(dirname "$0")/../../$app"
 
+# db:drop と db:setup（db:create）は別のプロセスで流す。Rails 7.1 から SQLite は WAL で開き、1 つのプロセスで
+# 続けて流すと、作り直した DB にスキーマが入らない（docs/upgrade/LOG.md の Step 3）
 case "$app" in
   rails_open_id_provider)
     # ID トークンの署名鍵。手動確認用の鍵と共用し、なければ作る（秘密鍵は gitignore 対象で、コミットしない）
     if [ ! -f jwtRS256.key ]; then
       run ruby -ropenssl -e 'File.write("jwtRS256.key", OpenSSL::PKey::RSA.new(4096).to_pem, perm: 0o600)'
     fi
-    run bin/rails db:drop db:setup
+    run bin/rails db:drop
+    run bin/rails db:setup
     ;;
   rails_relying_party_of_backend)
-    run bin/rails db:drop db:setup
+    run bin/rails db:drop
+    run bin/rails db:setup
     ;;
   rails_resource_server)
     # RS は DB を使わず、schema.rb もないので db:setup はできない。空の DB だけ作る
-    run bin/rails db:drop db:create
+    run bin/rails db:drop
+    run bin/rails db:create
     ;;
 esac
 

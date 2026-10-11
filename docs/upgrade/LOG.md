@@ -2049,6 +2049,12 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
   - RP の検査（CSRF の失敗のテストを含む）と E2E が通った。設定の値と起動の途中の読み込み、eager load の警告は前と同じ
 - Rails の前の 4 つの gem を上げた後、手動確認用の環境の 9 ファイルのハッシュは作業の開始時と同じ
 
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| Rails 7.1.6 にすると、E2E のサーバーの起動を待つところで 120 秒のタイムアウトになった。OP はすべての要求に `ActiveRecord::PendingMigrationError` を返した（E2E 用の DB にテーブルがない）。`e2e/scripts/start-server.sh` は `bin/rails db:drop db:setup` を 1 つのプロセスで流していた | アプリの `tmp/` に作った確かめ用の DB で再現した。1 つのプロセスで `db:drop db:setup` を流すと最後に DB のファイルがなく、`db:setup` だけや、`db:drop` と `db:setup` を別のプロセスで流すとテーブルが入る。Rails 7.1 は SQLite を WAL で開き（rails/rails#49349。`activerecord-7.1.6/lib/active_record/connection_adapters/sqlite3_adapter.rb:733`）、`db:drop` が `-wal`・`-shm` も消す（#49435 の修正）。同じプロセスに残った接続との組み合わせが原因の見込みで、内部の経路までは確かめていない。人間に確かめ、Rails 7.1.6 の lock の前に、3 アプリの `db:drop` と `db:setup`（RS は `db:create`）を別のプロセスで流すようにした。Rails 7.0.10 のまま E2E が通ることを確かめてからコミットした |
+
 ### スキルについて気づいたこと
 
 research:
