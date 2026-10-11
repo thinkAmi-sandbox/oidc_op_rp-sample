@@ -13,43 +13,6 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 - ブランチ / PR: `upgrade/...` / <PR へのリンク>
 - バージョン: Ruby a.b.c → x.y.z / Rails a.b.c → x.y.z
 
-### `app:update` で採用したもの・戻したもの
-
-3 アプリで `yes a | bin/rails app:update` を流し、`scripts/restore-app-config` で独自設定を戻してから、差分を人間が確かめた。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`app:update` の雛形」。
-
-| ファイル | 判断 | 理由 |
-|---|---|---|
-| `config/application.rb` の `config.autoload_lib` | RS・OP は採用、RP は採用しない | RS・OP の `lib` に読み込む Ruby のファイルはない。RP は `Omniauth::Strategies::MyOp` の `NameError` で `zeitwerk:check` が落ちるので、次のコミットで `autoload_lib_once` と inflector にした（DEF-7.1-10） |
-| development・test・production の `enable_reloading` | 採用 | `cache_classes` と同じ設定（DEF-7.1-11） |
-| development・test の `raise_on_missing_callback_actions` | 採用 | `only:`・`except:` を使っていない（DEF-7.1-12） |
-| test の `show_exceptions = :rescuable` | 採用 | 非推奨の `false` がなくなる。例外を期待するテストはない（DEF-7.1-13） |
-| development の `verbose_enqueue_logs` | 採用 | ジョブを使っていない（DEF-7.1-14） |
-| production.rb | 採用 | 雛形に追従するだけ（DEF-7.1-15） |
-| コメント、`bin/setup` | 採用 | DEF-7.1-16・17 |
-| test の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code` とコメント | 戻した | アプリの独自設定（`scripts/restore-app-config`） |
-| `active_storage:update` のマイグレーション 3 本 | 採用しない | Active Storage を使っていない（DEF-7.1-18） |
-| `new_framework_defaults_7_1.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
-
-- RP の独自ストラテジー: `config/application.rb` に `config.autoload_lib_once(ignore: %w(assets tasks))` と `Rails.autoloaders.once.inflector.inflect("omniauth" => "OmniAuth")` を足し、`config/initializers/omniauth.rb` の `require` を消した（作業計画の案 B のまま）。once のローダーが `lib/omniauth/strategies/my_op.rb` を `OmniAuth::Strategies::MyOp` として扱い、main のローダーには `lib` がない（リロードしない）ことを確かめた
-- 設定の値の比較（3 アプリの test・development）で変わったのは、DEF-7.1-12〜14 の値だけ。`autoload_lib_once` の前後では同じ。3 アプリの検査と E2E は、各コミットで通った
-
-### `new_framework_defaults_7_1.rb` を有効にした順番
-
-グループと順番は人間が決めた。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた（RP を含め、起動の途中の読み込みで効かない設定はなかった）。解説への返事の後に、アプリごとにコミットした。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`load_defaults`（`new_framework_defaults_7_1.rb`）」。
-
-| 順 | グループ | 設定 | 結果 |
-|---|---|---|---|
-| 1 | 使っていない機能 | 14 項目（暗号化、トランザクションのコールバック、関連の名前、`attr_readonly`、`serialize`、Marshal の形式、`has_secure_token`、BigDecimal のジョブの引数、キャッシュの有効期限、query log tags、`Parameters` の `==`） | 変わらない（DEF-7.1-19〜32） |
-| 2 | DB の扱い | SQLite の文字列の厳しいモード、`belongs_to` の検証、トランザクションの `return` | 変わらない（DEF-7.1-33〜35） |
-| 3 | テストだけ | `dom_testing_default_html_version` | テストの HTML の読み方だけ（DEF-7.1-36） |
-| 4 | ログ | `precompile_filter_parameters`、`debug_exception_log_level` | 伏せる結果は同じ。ログのレベルの表示だけ（DEF-7.1-37・38） |
-| 6 | 応答のヘッダー | `default_headers` | `X-Download-Options` がなくなる。スナップショットを作り直した（DEF-7.1-39） |
-| 7 | Cookie・メッセージの形式 | `message_serializer`、`use_message_serializer_for_metadata` | OP のセッション Cookie の形式が変わる。7.1 は古い形式も読める（DEF-7.1-40・41） |
-
-- グループ 1 で `action_text.sanitizer_vendor` を有効にすると、3 アプリとも `uninitialized constant Rails::HTML (NameError)` で起動しなかった。sprockets-rails を入れていないアプリでは、initializer の時点で rails-html-sanitizer が読み込まれていない（rails/rails#51246）。Rails 7.1.6 の `load_defaults 7.1` は `require "action_view/helpers"` してから値を決める（#51267）ので、2 つの `sanitizer_vendor` は `load_defaults 7.1` に任せた（人間が判断。グループ 5 はなくなった）
-- グループ 4 の `log_file_size` は、initializer で有効にしても、ロガーが `initialize_logger` で先に作られているので、ログのファイルの上限は 1 MB のままだった。`load_defaults 7.1` に任せた（人間が判断）
-- `compare-config` は、7.1 の設定のいくつかでクラスの値を書き出さなかったので、`scripts/lib/dump_config.rb` に 14 の値を足した（`2c74e3f`）。暗号化の `support_sha1_for_non_deterministic_encryption` は読み出す口がないので、previous の数で見た
-
 ### 作業計画からの変更点
 
 ### `app:update` で採用したもの・戻したもの
@@ -2019,7 +1982,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 コードレビューの後に、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り（件数は上と同じ）、手動確認用の環境の 9 ファイルのハッシュが作業の開始時と同じことを確かめた。作り直した worktree は、確かめた後で消した。
 
-## Step 3: Rails 7.1（2026-10-11〜）
+## Step 3: Rails 7.1（2026-10-11）
 
 - ブランチ / PR: `upgrade/step3-rails71` / （PR 作成後に記入）
 - バージョン: Ruby 3.2.11（変更なし）/ Rails 7.0.10 → 7.1.6
@@ -2043,6 +2006,17 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 順番は、PLAN.md の Step 3 のチェックリストのとおり（brakeman → jwt → puma → omniauth-rails_csrf_protection → Rails 7.1.6 → activerecord-session_store → rack-mini-profiler → `app:update` → RP の `autoload_lib_once` → `new_framework_defaults_7_1.rb` → `load_defaults 7.1`）。
 
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| RS の jwt は 2.10.3 のまま（作業計画は「3 アプリ」） | RS の jwt は oauth2 の依存（間接の gem）で、直接の gem の方針の対象外だった。RS のコミットの前に気づき、人間に確かめた（PLAN.md の Step 3 の「着手後に決めたこと」） |
+| Rails 7.1.6 の lock の前に、E2E の起動で `db:drop` と `db:setup`（RS は `db:create`）を別のプロセスで流すようにした | 1 つのプロセスで流すと、作り直した DB にスキーマが入らなかった（下の「遭遇した問題」。人間が判断） |
+| activerecord-session_store 2.3.0 を、Rails 7.1.6 の直後ではなく同じコミットで上げた | 2.2.0 のままだと、Rails 7.1 でセッション Cookie から `SameSite=Lax` が消える（DEF-7.1-06。人間が判断） |
+| `new_framework_defaults_7_1.rb` のグループ 5（`sanitizer_vendor`）をなくし、`log_file_size` とあわせて `load_defaults 7.1` に任せた | `sanitizer_vendor` の行は initializer の時点で `NameError` になり、`log_file_size` は initializer では効かない（下の「`new_framework_defaults_7_1.rb` を有効にした順番」。人間が判断） |
+| `load_defaults 7.1` のコミットで、`backtrace_silencers.rb` に残す理由のコメントを足した | templates.md の「残す独自設定のコメント」に合わせた。7.0 のときはコミットメッセージにだけ書いていた（人間が承認） |
+| verify の手動確認で、手動確認用の環境の守るファイルを 14 にした | Rails 7.1 で development の DB が WAL になり、RS の DB にテーブルができた（DEF-7.1-47・48。人間が判断） |
+
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切った後）に、9 ファイルのハッシュを控えた。件数は Step 2-b の手動確認の後と同じ（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）。スキル化の PR では手動確認をしていないので、基準は Step 2-b の手動確認の後のまま。
@@ -2065,6 +2039,53 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | rack-mini-profiler | 4.0.1 → 5.0.0 | RP・OP。Gemfile を `~> 4.0` → `~> 5.0` にして `bundle update rack-mini-profiler --conservative`。lock で動いたのはこの gem だけ。generator の雛形は 4.0.1 と同じ。高度なデバッグ機能が development で既定で無効になった（DEF-7.1-09） |
 
 - ダウンロードした `.gem` の SHA-256 は、すべて rubygems.org の値と同じ（`scripts/verify-gem-checksums <app> --changed <上げる前のコミット>`）
+
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update` を流し、`scripts/restore-app-config` で独自設定を戻してから、差分を人間が確かめた。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| `config/application.rb` の `config.autoload_lib` | RS・OP は採用、RP は採用しない | RS・OP の `lib` に読み込む Ruby のファイルはない。RP は `Omniauth::Strategies::MyOp` の `NameError` で `zeitwerk:check` が落ちるので、次のコミットで `autoload_lib_once` と inflector にした（DEF-7.1-10） |
+| development・test・production の `enable_reloading` | 採用 | `cache_classes` と同じ設定（DEF-7.1-11） |
+| development・test の `raise_on_missing_callback_actions` | 採用 | `only:`・`except:` を使っていない（DEF-7.1-12） |
+| test の `show_exceptions = :rescuable` | 採用 | 非推奨の `false` がなくなる。例外を期待するテストはない（DEF-7.1-13） |
+| development の `verbose_enqueue_logs` | 採用 | ジョブを使っていない（DEF-7.1-14） |
+| production.rb | 採用 | 雛形に追従するだけ（DEF-7.1-15） |
+| コメント、`bin/setup` | 採用 | DEF-7.1-16・17 |
+| test の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code` とコメント | 戻した | アプリの独自設定（`scripts/restore-app-config`） |
+| `active_storage:update` のマイグレーション 3 本 | 採用しない | Active Storage を使っていない（DEF-7.1-18） |
+| `new_framework_defaults_7_1.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- RP の独自ストラテジー: `config/application.rb` に `config.autoload_lib_once(ignore: %w(assets tasks))` と `Rails.autoloaders.once.inflector.inflect("omniauth" => "OmniAuth")` を足し、`config/initializers/omniauth.rb` の `require` を消した（作業計画の案 B のまま）。once のローダーが `lib/omniauth/strategies/my_op.rb` を `OmniAuth::Strategies::MyOp` として扱い、main のローダーには `lib` がない（リロードしない）ことを確かめた
+- 設定の値の比較（3 アプリの test・development）で変わったのは、DEF-7.1-12〜14 の値だけ。`autoload_lib_once` の前後では同じ。3 アプリの検査と E2E は、各コミットで通った
+
+### `new_framework_defaults_7_1.rb` を有効にした順番
+
+グループと順番は人間が決めた。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた（RP を含め、起動の途中の読み込みで効かない設定はなかった）。解説への返事の後に、アプリごとにコミットした。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`load_defaults`（`new_framework_defaults_7_1.rb`）」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 使っていない機能 | 14 項目（暗号化、トランザクションのコールバック、関連の名前、`attr_readonly`、`serialize`、Marshal の形式、`has_secure_token`、BigDecimal のジョブの引数、キャッシュの有効期限、query log tags、`Parameters` の `==`） | 変わらない（DEF-7.1-19〜32） |
+| 2 | DB の扱い | SQLite の文字列の厳しいモード、`belongs_to` の検証、トランザクションの `return` | 変わらない（DEF-7.1-33〜35） |
+| 3 | テストだけ | `dom_testing_default_html_version` | テストの HTML の読み方だけ（DEF-7.1-36） |
+| 4 | ログ | `precompile_filter_parameters`、`debug_exception_log_level` | 伏せる結果は同じ。ログのレベルの表示だけ（DEF-7.1-37・38） |
+| 6 | 応答のヘッダー | `default_headers` | `X-Download-Options` がなくなる。スナップショットを作り直した（DEF-7.1-39） |
+| 7 | Cookie・メッセージの形式 | `message_serializer`、`use_message_serializer_for_metadata` | OP のセッション Cookie の形式が変わる。7.1 は古い形式も読める（DEF-7.1-40・41） |
+
+- グループ 1 で `action_text.sanitizer_vendor` を有効にすると、3 アプリとも `uninitialized constant Rails::HTML (NameError)` で起動しなかった。sprockets-rails を入れていないアプリでは、initializer の時点で rails-html-sanitizer が読み込まれていない（rails/rails#51246）。Rails 7.1.6 の `load_defaults 7.1` は `require "action_view/helpers"` してから値を決める（#51267）ので、2 つの `sanitizer_vendor` は `load_defaults 7.1` に任せた（人間が判断。グループ 5 はなくなった）
+- グループ 4 の `log_file_size` は、initializer で有効にしても、ロガーが `initialize_logger` で先に作られているので、ログのファイルの上限は 1 MB のままだった。`load_defaults 7.1` に任せた（人間が判断）
+- `compare-config` は、7.1 の設定のいくつかでクラスの値を書き出さなかったので、`scripts/lib/dump_config.rb` に 14 の値を足した（`2c74e3f`）。暗号化の `support_sha1_for_non_deterministic_encryption` は読み出す口がないので、previous の数で見た
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| 3 アプリの `config/environments/test.rb` の `config.action_dispatch.show_exceptions = false`（Rails 7.1 で非推奨。例外が middleware まで届いたときだけ警告が出る） | `app:update` の雛形の `:rescuable` にした（DEF-7.1-13）。テストの出力に Rails 7.1 の DEPRECATION は出ていない。OP の `auth_time_from_resource_owner`（doorkeeper-openid_connect。IMP-011）は前からのもの |
+
+### 意図的な仕様変更
+
+なし。応答のスナップショット・E2E・verify の手動確認で、業務的な挙動の変化は見つからなかった。応答とファイルの変化はすべて既定値・雛形への追随として解説し、人間の返事を得た（[defaults/rails-7.1.md](defaults/rails-7.1.md) の DEF-7.1-01〜48）
 
 ### 前後の比較
 

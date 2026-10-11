@@ -679,7 +679,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - [x] rails-defaults（グループ 1〜4・6・7。DEF-7.1-19〜41）
 - [x] rails-load-defaults（DEF-7.1-42〜46。RuboCop の `TargetRailsVersion` 7.1）
 - [x] verify（手動確認で DEF-7.1-47・48 を見つけた。CI は push の後）
-- [ ] pr
+- [x] pr
 
 着手時の作業計画で決めたこと（人間が承認。論点は 1 つずつ確かめた）:
 
