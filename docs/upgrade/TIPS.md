@@ -50,8 +50,13 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 ## gem の更新
 
 - `bundle update <gem> --conservative` で上げ、`git diff -U0 Gemfile.lock | grep -E '^[-+]    [a-z]'` で、変わった gem を毎回見る
-- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords）と、一時固定した gem（benchmark・securerandom・faraday-net_http など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
+- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console）と、一時固定した gem（benchmark・securerandom・faraday-net_http・reline など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
+  - Gemfile に既にある gem を固定するときは、行を足さずに既にある行に版を書き、後で元に戻す（Step 2-b の brakeman）。作業の前に Gemfile を scratchpad にコピーしておき、コピーで戻すと確実
+  - 依存で入る gem が default gem と同じ名前のとき（Step 2-b の byebug 13 の reline・io-console）は、default gem の版で要件を満たせるならその版に（ダウンロードもビルドもしない）、満たせないなら要件を満たす最小の版に固定する。固定しないと最新の版（io-console は C 拡張）が入る
+- 落とした `.gem`（`vendor/bundle/ruby/<ABI の版>/cache/<gem>-<版>.gem`）の SHA-256 を、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json` の `sha` と比べる
+- 上げたときに動く gem は、アプリのディレクトリで `bundle lock --update <gem> --conservative --print` を実行すると、lock を書かずに解決の結果だけが標準出力に出る。`diff Gemfile.lock <出力>` で比べる。Plan モードでも使える（Step 2-b）
+- `--conservative` だけでは、その gem は最新の版（メジャーをまたぐ）まで上がる。同じマイナーの最新にとどめるなら `--patch` を足す（Step 2-b の doorkeeper-openid_connect は、`--conservative` だけでは 2.0.0、`--patch` を足すと 1.10.5）
 - 一時固定が要るかは、epic の lock と Gemfile を scratchpad にコピーし、`BUNDLE_GEMFILE` をそのコピーに向けて `bundle lock --update <gem> --conservative` を実行すると分かる（gem は入れず、依存の解決だけを行う）
   - コピーの前後を `diff` で比べるときは、行頭の記号が `< ` / `> ` の 2 文字になるので、`grep -E '^[<>]     [a-z]'`（空白 5 つ）で gem の行を拾う。`git diff` 用の `^[-+]    [a-z]`（空白 4 つ）では何も拾えず、変化がないように見える
 - lock にない gem を足すときは `bundle lock --update <gem>` が使えない（`Could not find gem`）。Gemfile に足して `bundle lock`（入れるときは `bundle install`）を実行する。版の制約がないと最新のメジャー版が入るので、一時固定する（Step 0-f-3 の jwt）
@@ -75,6 +80,13 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - コピーした `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json?platform=<プラットフォーム>` の `sha` と比べる（Step 2 では `Gem::Package.new(<ファイル>).spec` で名前・版・プラットフォームを読んで比べた）
 - 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行（Ruby の非推奨の警告は既定で出ないので、`RUBYOPT=-W:deprecated` を付けた minitest と、development の `bin/rails runner 'Rails.application.eager_load!'` も流す）、応答と E2E のスナップショット、起動の途中に読み込み済みの部品（下の「設定の値と応答の比較」の `@loaded`。`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後の 3 か所を、test と development で書き出す）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
 - brakeman の EOLRuby の警告は、Ruby の版がメッセージにだけ入り、fingerprint は変わらないので、無視リストに当たり続ける（無視リストのメッセージは古い版のまま残る）
+
+## rails c を確かめる（Step 2-b）
+
+- lock に reline が入ると、`bin/rails c` の irb（default gem。lock にない）も lock の reline を読む。reline や irb が変わる gem を上げたら、実際に `rails c` を起動して入力を試す
+- Claude Code の Bash には端末も `TERM` もない。`TERM` がないと reline 0.3.2 が terminfo を引けずに落ちる（`TERM=xterm-256color` を付ける）。reline は起動時にカーソル位置の問い合わせ（`ESC[6n`）を送って返事を待つので、`script` コマンドに入力をパイプで流すだけでは止まったままになる
+- Python の `pty.fork` で `bin/rails c` を起動し、出力に `ESC[6n` が来たら `ESC[1;1R` を返し、入力を `\r` 付きで 1 行ずつ送ると動かせる（Step 2-b ではこの形のドライバーを scratchpad に置いた）。`Reline::VERSION`・`IRB::VERSION`・`IRB.CurrentContext.io.class` を `puts` し、複数行の入力（`if true` … `end`）と Tab の補完を試す。development は `DATABASE_URL=sqlite3:db/e2e.sqlite3` を付ける
+- 同じドライバーで、`bin/rails runner` の中で `byebug` を呼び、`next`・`continue` を送ると、デバッガーの入力も確かめられる
 
 ## 設定の値と応答の比較（Rails を上げる Step）
 
