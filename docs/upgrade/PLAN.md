@@ -631,13 +631,13 @@ Step 2 が epic に入ってから調べ、作業計画を出して承認を得�
 
 Step 2-b が epic に入ってから確かめ直し、作業計画を出して承認を得た（2026-10-11）。`/rails-upgrade` のスキルと、Rails のマイナーを上げるときの道具を作る。gem は上げず、アプリのコードと lock は変えない。スキルの方向と構成は 13 章。経緯は LOG.md の「スキル化」。
 
-- [ ] `scripts/compare-config`（設定の値と、起動の途中に読み込み済みの部品の書き出しと前後の比較）
-- [ ] `scripts/resolve-lock`（旧 lock の gem を固定し、指定した gem だけを外して解決させる）
-- [ ] `scripts/restore-app-config`（`app:update` の後に、アプリの独自設定を戻す）
-- [ ] `scripts/check-console`（`rails c` を擬似端末で起動して入力を試す）
-- [ ] `scripts/verify-gem-checksums`（キャッシュの `.gem` の SHA-256 を rubygems.org の値と比べる）
-- [ ] `scripts/commit-per-app`（ほかのアプリの変更を退避し、検査してからコミットする）
-- [ ] スキルの汎用の核（`.claude/skills/rails-upgrade/`）と、リポジトリ固有の設定（`.claude/rails-upgrade-project.md`）
+- [x] `scripts/compare-config`（設定の値と、起動の途中に読み込み済みの部品の書き出しと前後の比較）
+- [x] `scripts/resolve-lock`（旧 lock の gem を固定し、指定した gem だけを外して解決させる）
+- [x] `scripts/restore-app-config`（`app:update` の後に、アプリの独自設定を戻す）
+- [x] `scripts/check-console`（`rails c` を擬似端末で起動して入力を試す）
+- [x] `scripts/verify-gem-checksums`（キャッシュの `.gem` の SHA-256 を rubygems.org の値と比べる）
+- [x] `scripts/commit-per-app`（ほかのアプリの変更を退避し、検査してからコミットする）
+- [x] スキルの汎用の核（`.claude/skills/rails-upgrade/`）と、リポジトリ固有の設定（`.claude/rails-upgrade-project.md`）
 - [ ] スキルを試す（新しいセッションで、引数なしと `pr`）
 - 着手時の作業計画で決めたこと（人間が承認）
   - スキルの方向: 知識のある担当者が判断の要る所だけを確かめ、それ以外は AI が再現性のある形で進める。担当者だけでは完了せず、細部を知らないレビュアーが PR を見て OK を出したら完了とするフローを前提に、「担当者が説明できる状態の PR を、毎回同じ形で作る」ことをスキルの役割にする（作業計画への返事の対話で決めた。13 章の 1）
@@ -738,6 +738,8 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 | erb（default gem。lock にない） | — | Step 4 で CVE-2026-41316 の解消を確かめる | CVE-2026-41316（erb `<= 6.0.3`）は、Ruby 3.1.7 の erb 2.2.3 も 3.2.11 の 4.0.2 も対象。3 アプリに信頼できないデータを `Marshal.load` する経路はないので、Gemfile に足さずに記録だけにした（Step 2 で人間が判断）。Ruby 3.3.12 の default gem は 4.0.3.1、3.4.11 は 4.0.4.1（どちらも修正版）。lock にないので bundler-audit は検出しない |
 
 ## 8. 各 Step 共通の手順
+
+スキル化の PR から、この手順は `/rails-upgrade` のスキル（作業ごとの入口の条件・手順・関門・出口と、提示と記録の型。13 章）で進める。下の手順は、スキルが指す決まりとして残す。
 
 1. **調査（Plan モード）**: Rails 公式アップグレードガイドの該当箇所、ruby-jp の各バージョンのナレッジページ、railsdiff.org、`bundle outdated`、メジャー更新する gem の CHANGELOG を確認し、Step の作業計画を出す。**人間の承認を待つ**
    - 調べた事実と根拠（版の要件、CHANGELOG の該当箇所、テストや E2E で守られているか）は、作業計画（リポジトリの外のファイル）だけに残さない。承認を得たら、その Step の節に「調べたこと（着手時に確かめ直す）」として移す。後のサブステップや Step のために調べた分も、それぞれの節に移す
