@@ -11,7 +11,7 @@ inherit_mode:
 
 AllCops:
   TargetRubyVersion: 3.2
-  TargetRailsVersion: 7.0
+  TargetRailsVersion: 7.1
   # 新しいルールは、rubocop を更新するコミットで内容を見てから有効にする
   NewCops: disable
   SuggestExtensions: false
