@@ -1756,6 +1756,13 @@ gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で�
 - 3 アプリには、信頼できないデータを `Marshal.load` する経路がない。アプリのコード（app・lib・config）に `Marshal` はなく、Cookie は JSON で直列化し（DEF-7.0-16）、RP のセッションストアも JSON、キャッシュは test・development とも `:null_store`（development は `tmp/caching-dev.txt` がない）
 - 人間の判断で、Gemfile に erb を足さずに記録だけにした。Ruby 3.3.12 の default gem の erb は 4.0.3.1、3.4.11 は 4.0.4.1（修正版。GitHub のタグの `lib/erb/version.rb` で確かめた）なので、Step 4 で解消を確かめる（PLAN.md 7 章の erb の行）。default gem の erb は lock にないので、bundler-audit は検出しない
 
+### 作業計画からの変更点
+
+- RS の jwt を上げなかった。作業計画は jwt を「3 アプリ（RS は oauth2 の依存）」としていたが、決めたことの論点 4（直接の gem だけが方針の対象）と食い違っていた。3 アプリの lock を上げて検査を通した後、RS のコミットメッセージを書く段階で気づき、止まって人間に確かめた
+  - 人間の質問に答えて、2.10.3 のままのリスクを確かめた。2.10.3 は CVE-2026-45363（GHSA-c32j-vqhx-rx3x、HMAC の空の鍵での検証のすり抜け）の修正版で、ほかの advisory はない。RS は jwt の処理を通らない（oauth2 2.0.25 の `lib/oauth2/strategy/assertion.rb` が `require` し、使わない assertion のグラントの `JWT.encode` だけが呼ぶ）。3 系の強化（RSA 2048 ビット以上、厳しい base64、検証前の payload の禁止）は検証する側のもので、RS には当たらない
+  - ruby-jwt の `2-10-stable` は、2.10.2 以降は 2 回のバックポート（2025-06-29、2026-05-22 の CVE の修正）だけで、将来の修正が戻される保証はない。人間は、jwt だけを例外にするのではなく、epic の最後の段階で間接の gem もまとめて上げることを考えたいとし、伊藤さん式と ruby-jp のアップグレードガイドの間接の gem の扱いを調べた（PLAN.md の 14 章）
+  - 人間の判断で、RS の lock の変更を戻し、2.10.3 のままにした。間接の gem をまとめて上げる段階で上げる
+
 ### 前後の比較
 
 Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動の途中に読み込み済みの部品（`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後。test・development）を書き出し、各アプリを上げた後と比べた。
@@ -1896,7 +1903,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 ## スキル化: `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（2026-10-11）
 
-- ブランチ / PR: `upgrade/skill-rails-upgrade` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/skill-rails-upgrade` / [#28](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/28)
 - バージョン: Ruby 3.2.11・Rails 7.0.10（変更なし）。gem は上げていない。アプリのコードと lock も変えていない
 - この節は、スキル化の PR で決めた記録の書き方（research の出口で節を作り、作業ごとに足していく。PLAN.md の 13 章の 3）にならい、作業の途中から書いている
 
@@ -1974,3 +1981,246 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | この PR で足した決まり（チェックリストの項目の先頭に作業名）に、この PR の「スキル化」のチェックリストのスクリプトとスキルの行が従っていない | 直さない。スキル化は、スキルの作業（gems・ruby など）の外で行った Step で、当てはまる作業名がない。作業名のある verify と pr の項目には付けた |
 
 コードレビューの後に、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り（件数は上と同じ）、手動確認用の環境の 9 ファイルのハッシュが作業の開始時と同じことを確かめた。作り直した worktree は、確かめた後で消した。
+
+## Step 3: Rails 7.1（2026-10-11）
+
+- ブランチ / PR: `upgrade/step3-rails71` / （PR 作成後に記入）
+- バージョン: Ruby 3.2.11（変更なし）/ Rails 7.0.10 → 7.1.6
+- `/rails-upgrade` のスキルを実際の作業に使う最初の Step。スキルの手順・型・設定で、足りない・合わない・迷ったところは、作業を止めずに控えて、この節の最後の「スキルについて気づいたこと」に書く（スキルを直すかは人間が判断する）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade research` で、Plan モードで調べた（サブエージェント 2 つ: アプリと gem のコードの Rails 7.1 への影響、Rails 7.1 と周辺 gem の一次の出典）。lock の解決は、scratchpad の lock のコピーに `scripts/resolve-lock`・`bundle lock --print` をかけて試した。作業計画を出し、論点を 1 つずつ人間と確かめてから承認を得た。調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 3: Rails 7.1」に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| brakeman 8.1.0 の時期 | Step 3 の最初に上げる。公開から 2 週間の決まりの例外 | 計画では「Step 3 の最初」だったが、着手の日に公開から 10 日目だった。8.1.1 も advisory も出ておらず、先送りしても 2 週間たつ日（10-15）より前に次の Step に着手する見込みが高い（人間が判断） |
+| secret_key_base のファイル | rails-lock で各アプリを 7.1 で初めて起動する前に、`tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーする（元は残す）。TIPS.md の守るファイルを 12 にする | Rails 7.1 は `tmp/local_secret.txt` だけを読む（rails/rails#48471。ガイドへの追記は #52083）。コピーなら手動確認用の環境を作り直さず、7.0 以前のブランチでも同じ鍵で動く。人間が根拠（PR とガイドの節）を確かめてから同意した |
+| connection_pool | 2.5.5 に一時固定し、Step 5 で見直す | 3.0 はキーワード引数だけで、Rails 7.1.6 の Redis・Memcache のキャッシュストアと合わない（rails/rails#56291）。Rails 7.2 も `< 3` に固定した（#56620） |
+| 直接の gem の方針 | Ruby が対応していて特に不具合がなければ、Gemfile に書いた直接の gem は、上げられる時点で最新版に上げる。間接の gem は対象外 | 人間の方針。jwt 3.x の時期を確かめる中で出た。間接の gem は Rails や直接の gem の要件で動き、default gem に合わせた固定は意図したもの（人間が範囲を決めた） |
+| jwt | Step 3 で 3.3.0（Rails を上げる前） | 方針による。当初の見立て（Step 3 では上げない）は取り下げた。3.0〜3.3 の破壊的な変更は、このリポジトリの使い方に当たらない見込み。gems の手順 1 で、RP の `my_op.rb` のオプションでの検証の効き方を gem のソースで確かめる |
+| puma | Step 3 で 8.0.2（7.x は経由しない） | 方針による。advisory 2 件（CVE-2026-47736・47737）が解消する。7.0・8.0 の破壊的な変更のうち、効くのは keep-alive の既定値と応答ヘッダー名の小文字化だけ |
+| omniauth-rails_csrf_protection | Step 3 で 2.0.1（7 章の「Step 7」を前倒し） | 方針による。Rails 8.1 未満では 1.0.2 と同じ処理 |
+| doorkeeper-openid_connect 2.0.0 | Step 3 に入れず、直後のサブステップ 3-b で、意図的な仕様変更として扱う | マイグレーション（#243）と discovery の応答の変化（#333）があり、方針の「特に不具合がない」に当たらない |
+| 手動確認の時期 | verify で 1 回。途中で前の Cookie やセッションに影響する変化が見つかったら、止まって相談し直す | 前の Cookie を読めなくする変更がない見込み（secret はコピー、`message_serializer` は古い形式も読める） |
+
+順番は、PLAN.md の Step 3 のチェックリストのとおり（brakeman → jwt → puma → omniauth-rails_csrf_protection → Rails 7.1.6 → activerecord-session_store → rack-mini-profiler → `app:update` → RP の `autoload_lib_once` → `new_framework_defaults_7_1.rb` → `load_defaults 7.1`）。
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| RS の jwt は 2.10.3 のまま（作業計画は「3 アプリ」） | RS の jwt は oauth2 の依存（間接の gem）で、直接の gem の方針の対象外だった。RS のコミットの前に気づき、人間に確かめた（PLAN.md の Step 3 の「着手後に決めたこと」） |
+| Rails 7.1.6 の lock の前に、E2E の起動で `db:drop` と `db:setup`（RS は `db:create`）を別のプロセスで流すようにした | 1 つのプロセスで流すと、作り直した DB にスキーマが入らなかった（下の「遭遇した問題」。人間が判断） |
+| activerecord-session_store 2.3.0 を、Rails 7.1.6 の直後ではなく同じコミットで上げた | 2.2.0 のままだと、Rails 7.1 でセッション Cookie から `SameSite=Lax` が消える（DEF-7.1-06。人間が判断） |
+| `new_framework_defaults_7_1.rb` のグループ 5（`sanitizer_vendor`）をなくし、`log_file_size` とあわせて `load_defaults 7.1` に任せた | `sanitizer_vendor` の行は initializer の時点で `NameError` になり、`log_file_size` は initializer では効かない（下の「`new_framework_defaults_7_1.rb` を有効にした順番」。人間が判断） |
+| `load_defaults 7.1` のコミットで、`backtrace_silencers.rb` に残す理由のコメントを足した | templates.md の「残す独自設定のコメント」に合わせた。7.0 のときはコミットメッセージにだけ書いていた（人間が承認） |
+| verify の手動確認で、手動確認用の環境の守るファイルを 14 にした | Rails 7.1 で development の DB が WAL になり、RS の DB にテーブルができた（DEF-7.1-47・48。人間が判断） |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切った後）に、9 ファイルのハッシュを控えた。件数は Step 2-b の手動確認の後と同じ（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）。スキル化の PR では手動確認をしていないので、基準は Step 2-b の手動確認の後のまま。
+
+- rails-lock で、人間に確かめて 3 アプリの `tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーし、守るファイルを 12 にした（コピーの直後にハッシュを控え、元の 9 ファイルのハッシュが変わっていないことを確かめた）
+- rails-defaults の後（`3d85c46` の時点）に、12 ファイルのハッシュが作業の開始時（`local_secret.txt` はコピーの直後）と同じことを確かめた。ハッシュの控えはセッションの scratchpad にしかないので、次のセッションは、始めた時点のハッシュをこの時点の続きとして控え直す
+- rails-load-defaults の始め（`e539059` の時点）に 12 ファイルのハッシュを控え直し、`load_defaults 7.1` のコミット（各アプリの E2E を含む）の後も同じことを確かめた
+- verify の手動確認の直前にも 12 ファイルのハッシュと件数が同じことを確かめた。手動確認で 3 アプリの development DB が初めて Rails 7.1 で開かれ、3 つの DB のハッシュが変わった（RS は DEF-7.1-47 のテーブル、3 つとも DEF-7.1-48 の WAL）。OP・RP には `-wal`・`-shm` が残った。守るファイルに OP・RP の `-wal` を足して 14 にし、手動確認の後のハッシュを新しい基準にした（人間が判断。TIPS.md）
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| brakeman | 8.0.6 → 8.1.0 | 3 アプリ。`bundle update brakeman --conservative`。lock で動いたのは brakeman だけ（racc は 1.5.2 のまま）。公開から 2 週間の決まりの例外（作業計画で人間が判断） |
+| jwt | 2.10.3 → 3.3.0 | RP・OP。`bundle update jwt --conservative`。lock で動いたのは jwt だけ。上げる前に、RP の `my_op.rb` の `JWT.decode` まわりを `jwt-2.10.3/lib/jwt` と v3.3.0 のタグで比べた。`algorithm` のキー、鍵を探すブロックの呼び方、iss・aud・sub・exp・nbf の検証は同じで、`verify_iat` に渡していない leeway が増えただけ。変わったのは、構造の壊れたトークンと鍵がないときの例外クラスだけ（どちらも `JWT::DecodeError` のサブクラス）。既存のテストが nonce・kid・署名の鍵・iss・aud・exp の失敗の例外クラスを確かめているので、先に足すテストはなかった。RS は 2.10.3 のまま（下の「作業計画からの変更点」） |
+| puma | 6.6.1 → 8.0.2 | 3 アプリ。Gemfile を `~> 6.0` → `~> 8.0` にして `bundle update puma --conservative`。lock で動いたのは puma だけ（nio4r は 2.5.9 のまま。C 拡張は 3 アプリでビルドした）。無視リストから CVE-2026-47736・47737 を消した。既定値の変化 3 つ（応答ヘッダー名の小文字化、keep-alive の既定値、既定の bind）を解説し、人間の返事を得て追随した（DEF-7.1-01〜03） |
+| omniauth-rails_csrf_protection | 1.0.2 → 2.0.1 | RP。`bundle update omniauth-rails_csrf_protection --conservative`。lock で動いたのはこの gem だけ。入れた 1.0.2 と 2.0.1 の `token_verifier.rb` を比べ、Action Pack 8.1 未満の枝は 1.0.2 と同じ処理（`undef_method` に `defined?` の確かめが付いただけ）なことを確かめた。8.1 用の枝は Step 7 でもう一度確かめる |
+| Rails | 7.0.10 → 7.1.6 | 3 アプリ（rails-lock）。7.0.10 は 7.0 系の最新なので、先に上げるパッチはなかった。`scripts/resolve-lock --gem 'rails=~> 7.1.6' --rails --unpin rails-dom-testing,erubi --pin cgi=0.3.7,irb=1.6.2,connection_pool=2.5.5,tsort=0.2.0` で解決した lock をアプリに持ち込み、Gemfile を `~> 7.1.6` にして `bundle lock`・`bundle install`。動いたのは Rails の構成 gem と rails-dom-testing 2.0.3 → 2.3.0・erubi 1.10.0 → 1.13.1。増えたのは cgi 0.3.7（RS・OP）・irb 1.6.2・tsort 0.2.0・connection_pool 2.5.5・rack-session 1.0.2・rackup 1.0.1・webrick 1.9.2（cgi・irb は default gem と同じ版で、落としていない）。作業計画に書いていなかった変化として、method_source 1.0.0 が lock から消えた（railties 7.0.10 の依存で、7.1.6 の依存にはない）。無視リストから CVE-2025-55193・CVE-2025-24293 を消し、残りのコメントの版を 7.1.6 に直した。7.1 で初めて起動する前に、人間に確かめて 3 アプリの `tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーした（`cmp` で同じ中身。起動後の `Rails.application.secret_key_base` が元のファイルと同じことを確かめた） |
+| activerecord-session_store | 2.2.0 → 2.3.0 | RP。Rails 7.1.6 と同じコミット（人間が判断）。Rails 7.1.6 だけでは、セッション Cookie の Set-Cookie から `SameSite=Lax` が消えた（DEF-7.1-06）。`bundle update activerecord-session_store --conservative` で、動いたのはこの gem だけ。generator の雛形は 2.2.0 と同じ |
+| rack-mini-profiler | 4.0.1 → 5.0.0 | RP・OP。Gemfile を `~> 4.0` → `~> 5.0` にして `bundle update rack-mini-profiler --conservative`。lock で動いたのはこの gem だけ。generator の雛形は 4.0.1 と同じ。高度なデバッグ機能が development で既定で無効になった（DEF-7.1-09） |
+
+- ダウンロードした `.gem` の SHA-256 は、すべて rubygems.org の値と同じ（`scripts/verify-gem-checksums <app> --changed <上げる前のコミット>`）
+
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update` を流し、`scripts/restore-app-config` で独自設定を戻してから、差分を人間が確かめた。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| `config/application.rb` の `config.autoload_lib` | RS・OP は採用、RP は採用しない | RS・OP の `lib` に読み込む Ruby のファイルはない。RP は `Omniauth::Strategies::MyOp` の `NameError` で `zeitwerk:check` が落ちるので、次のコミットで `autoload_lib_once` と inflector にした（DEF-7.1-10） |
+| development・test・production の `enable_reloading` | 採用 | `cache_classes` と同じ設定（DEF-7.1-11） |
+| development・test の `raise_on_missing_callback_actions` | 採用 | `only:`・`except:` を使っていない（DEF-7.1-12） |
+| test の `show_exceptions = :rescuable` | 採用 | 非推奨の `false` がなくなる。例外を期待するテストはない（DEF-7.1-13） |
+| development の `verbose_enqueue_logs` | 採用 | ジョブを使っていない（DEF-7.1-14） |
+| production.rb | 採用 | 雛形に追従するだけ（DEF-7.1-15） |
+| コメント、`bin/setup` | 採用 | DEF-7.1-16・17 |
+| test の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code` とコメント | 戻した | アプリの独自設定（`scripts/restore-app-config`） |
+| `active_storage:update` のマイグレーション 3 本 | 採用しない | Active Storage を使っていない（DEF-7.1-18） |
+| `new_framework_defaults_7_1.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- RP の独自ストラテジー: `config/application.rb` に `config.autoload_lib_once(ignore: %w(assets tasks))` と `Rails.autoloaders.once.inflector.inflect("omniauth" => "OmniAuth")` を足し、`config/initializers/omniauth.rb` の `require` を消した（作業計画の案 B のまま）。once のローダーが `lib/omniauth/strategies/my_op.rb` を `OmniAuth::Strategies::MyOp` として扱い、main のローダーには `lib` がない（リロードしない）ことを確かめた
+- 設定の値の比較（3 アプリの test・development）で変わったのは、DEF-7.1-12〜14 の値だけ。`autoload_lib_once` の前後では同じ。3 アプリの検査と E2E は、各コミットで通った
+
+### `new_framework_defaults_7_1.rb` を有効にした順番
+
+グループと順番は人間が決めた。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた（RP を含め、起動の途中の読み込みで効かない設定はなかった）。解説への返事の後に、アプリごとにコミットした。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`load_defaults`（`new_framework_defaults_7_1.rb`）」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 使っていない機能 | 14 項目（暗号化、トランザクションのコールバック、関連の名前、`attr_readonly`、`serialize`、Marshal の形式、`has_secure_token`、BigDecimal のジョブの引数、キャッシュの有効期限、query log tags、`Parameters` の `==`） | 変わらない（DEF-7.1-19〜32） |
+| 2 | DB の扱い | SQLite の文字列の厳しいモード、`belongs_to` の検証、トランザクションの `return` | 変わらない（DEF-7.1-33〜35） |
+| 3 | テストだけ | `dom_testing_default_html_version` | テストの HTML の読み方だけ（DEF-7.1-36） |
+| 4 | ログ | `precompile_filter_parameters`、`debug_exception_log_level` | 伏せる結果は同じ。ログのレベルの表示だけ（DEF-7.1-37・38） |
+| 6 | 応答のヘッダー | `default_headers` | `X-Download-Options` がなくなる。スナップショットを作り直した（DEF-7.1-39） |
+| 7 | Cookie・メッセージの形式 | `message_serializer`、`use_message_serializer_for_metadata` | OP のセッション Cookie の形式が変わる。7.1 は古い形式も読める（DEF-7.1-40・41） |
+
+- グループ 1 で `action_text.sanitizer_vendor` を有効にすると、3 アプリとも `uninitialized constant Rails::HTML (NameError)` で起動しなかった。sprockets-rails を入れていないアプリでは、initializer の時点で rails-html-sanitizer が読み込まれていない（rails/rails#51246）。Rails 7.1.6 の `load_defaults 7.1` は `require "action_view/helpers"` してから値を決める（#51267）ので、2 つの `sanitizer_vendor` は `load_defaults 7.1` に任せた（人間が判断。グループ 5 はなくなった）
+- グループ 4 の `log_file_size` は、initializer で有効にしても、ロガーが `initialize_logger` で先に作られているので、ログのファイルの上限は 1 MB のままだった。`load_defaults 7.1` に任せた（人間が判断）
+- `compare-config` は、7.1 の設定のいくつかでクラスの値を書き出さなかったので、`scripts/lib/dump_config.rb` に 14 の値を足した（`2c74e3f`）。暗号化の `support_sha1_for_non_deterministic_encryption` は読み出す口がないので、previous の数で見た
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| 3 アプリの `config/environments/test.rb` の `config.action_dispatch.show_exceptions = false`（Rails 7.1 で非推奨。例外が middleware まで届いたときだけ警告が出る） | `app:update` の雛形の `:rescuable` にした（DEF-7.1-13）。テストの出力に Rails 7.1 の DEPRECATION は出ていない。OP の `auth_time_from_resource_owner`（doorkeeper-openid_connect。IMP-011）は前からのもの |
+
+### 意図的な仕様変更
+
+なし。応答のスナップショット・E2E・verify の手動確認で、業務的な挙動の変化は見つからなかった。応答とファイルの変化はすべて既定値・雛形への追随として解説し、人間の返事を得た（[defaults/rails-7.1.md](defaults/rails-7.1.md) の DEF-7.1-01〜48）
+
+### 前後の比較
+
+上げる前（Step 3 の docs のコミットの後）に、次のものを書き出し、gem を上げるたびに取り直して比べる。
+- `scripts/check-apps` の結果（3 アプリの検査と E2E）
+- `scripts/compare-config dump`（3 アプリの test・development）
+- `RUBYOPT=-W:deprecated` を付けた development の eager load の警告
+- brakeman の JSON の出力
+
+上げる前の値は次のとおり。
+- minitest: RS 11 runs・RP 33 runs・OP 69 runs、0 failures（`CI=1` も同じ）
+- E2E: 10 passed
+- eager load の `warning:`・`DEPRECATION`: 3 アプリとも 0
+- テストの出力の DEPRECATION: OP の `auth_time_from_resource_owner`（IMP-011）だけ
+
+- brakeman 8.1.0
+  - 3 アプリとも終了コード 0。JSON の出力の警告（0 件）と無視した警告（EOL の 2 件）の fingerprint・チェック名・メッセージ、実行したチェックの一覧は、8.0.6 と同じ
+  - 設定の値と起動の途中の読み込み（`compare-config`）、eager load の警告、minitest・E2E の件数とスナップショット、テストの出力の DEPRECATION は、前と同じ
+- jwt 3.3.0（RP・OP）
+  - 3 アプリの lock を上げた状態で、3 アプリの検査と E2E がすべて通った。OP の ID トークン・JWKS・discovery の応答のスナップショットと、E2E の baseline（ID トークンのヘッダー・ペイロード、JWKS）に差分はない
+  - 設定の値と起動の途中の読み込み、eager load の警告、テストの出力の DEPRECATION は、前と同じ
+- puma 8.0.2
+  - 3 アプリの検査と E2E がすべて通った。設定の値と起動の途中の読み込み、eager load の警告、テストの出力の DEPRECATION は、前と同じ。無視リストを空にした bundler-audit で、puma の 2 件が報告されなくなった
+  - 応答のヘッダー: test 環境のアプリを `Puma::Server` に直接通し、RS の `/apples/show`（401）と OP の discovery（200）の生の応答を前後で比べた。ヘッダー名がすべて小文字になり、値と順番は同じ（DEF-7.1-01）。minitest の応答のスナップショットは puma を通らないので変わらない
+  - puma の設定: 6.6.1 と 8.0.2 で `config/puma.rb` を読み込んだ後の値を比べた。`persistent_timeout` 20 → 65、`max_keep_alive` nil → 999、既定の bind が `0.0.0.0` → `[::]`。`bin/rails s` は host に localhost を渡すので、実際の bind は変わらない（DEF-7.1-02・03）
+- omniauth-rails_csrf_protection 2.0.1
+  - RP の検査（CSRF の失敗のテストを含む）と E2E が通った。設定の値と起動の途中の読み込み、eager load の警告は前と同じ
+- Rails の前の 4 つの gem を上げた後、手動確認用の環境の 9 ファイルのハッシュは作業の開始時と同じ
+- Rails 7.1.6（rails-lock）
+  - 最初の検査で、RP 6 件・OP 11 件の応答のスナップショットの差分、bundler-audit（解消した 2 件が無視リストに残っていた）、E2E（下の「遭遇した問題」）が落ちた。RS の minitest、3 アプリの `zeitwerk:check`・起動の途中の読み込み・RuboCop・brakeman は通った
+  - スナップショットの差分は、リダイレクトの本文がなくなったこと（RP 4 件・OP 11 件。DEF-7.1-04）、ルーティングの `redirect` の Content-Type に charset が付いたこと（RP 1 件。DEF-7.1-05）、RP のセッション Cookie から `SameSite=Lax` が消えたこと（RP 4 件。activerecord-session_store 2.3.0 で元に戻した。DEF-7.1-06）。解説して人間の返事を得てから、RP・OP のスナップショットを作り直した。作り直した差分は、この 3 つだけ
+  - minitest の件数は同じで、assertion の数が RS 14 → 15・RP 69 → 71・OP 121 → 123 に増えた。activesupport 7.1 の `assert_nothing_raised` が `assert(true)` を数えるようになったため（`activesupport-7.1.6/lib/active_support/testing/assertions.rb`。3 アプリの `test/eager_load_test.rb` で 1 つずつ）。RP・OP のもう 1 つずつは、どの assertion かまで確かめていない
+  - 書き換えた後に、3 アプリの検査と E2E がすべて通った。brakeman の無視した EOL の警告 2 件は、Rails 7.1.6 でも同じ fingerprint で当たる
+  - development だけのヘッダー: rails-lock の前に書き出し（RS の `/apples/show`、RP のトップ、OP の discovery とログイン画面。E2E 用の DB で `Puma::Server` に通した）、rack-mini-profiler 5.0.0 の作業の始めに Rails 7.1.6 で取り直して比べた。RS の 401 が chunked から Content-Length 付きになり（DEF-7.1-07）、RP のトップの Server-Timing に `transaction.active_record` が増えた（DEF-7.1-08）。RP のトップと OP のログイン画面の Content-Length も変わったが、rack-mini-profiler が本文に入れる `data-ids` に前の要求の ID が積み上がるためで、Rails の版の違いではない。どちらも rails-lock のコミットの後に比べ、解説への返事もコミットの後にもらった
+  - Rails 7.1 は SQLite を WAL で開く（rails/rails#49349）。手動確認用の development の DB は、まだ 7.1 で開いていない（journal mode は `delete` のまま）。verify の手動確認で開くと、DB のファイルが WAL になり、`-wal`・`-shm` のファイルができる見込み
+- rack-mini-profiler 5.0.0（RP・OP）
+  - Step 2-b で心配した、`Rails.env.local?` で development のプロファイラーが無効になることは起きない。Rails 7.1.6 の development では `Rails.env.local?` が true で、`authorization_mode` は `:allow_all` のまま
+  - development の応答ヘッダー（`x-miniprofiler-*`、`__profilin` の Cookie）と、RP のトップのバッジの `<script>` の属性は前と同じ（gem の版のハッシュだけが変わった）。設定の値と起動の途中の読み込み、eager load の警告も前と同じ。RP・OP の検査と E2E が通った
+- `load_defaults 7.1`（rails-load-defaults）
+  - 3 アプリを `config.load_defaults 7.1` にし、`new_framework_defaults_7_1.rb` を消した。rails-defaults で一時的に足した設定はほかになかった
+  - 前の書き出しを取る前に、`load_defaults 7.1` に任せた 5 つの設定のうち 3 つ（`add_autoload_paths_to_load_path`、`action_text.sanitizer_vendor`、`cache_format_version` が効く先の coder）の値を `compare-config` が拾えないと分かり、`scripts/lib/dump_config.rb` に足した（`269d6a0`）。足した後の書き出しを 2 回取り、同じだった
+  - 設定の値（3 アプリの test・development）: 違うのは `load_defaults 7.1` に任せた 5 つの設定だけ（DEF-7.1-42〜46）で、6 つの書き出しで同じ違い。`new_framework_defaults_7_1.rb` で有効にしていた 22 の設定の値と、起動の途中に読み込み済みの部品は変わらない
+  - 3 アプリの検査と E2E がすべて通った。minitest の件数と assertion の数（RS 11・15、RP 33・71、OP 69・123）と E2E（10 passed）は前と同じで、応答のスナップショットの差分はない。development の eager load の警告は前後とも 0
+  - sanitizer を通るのは OP の `doorkeeper/applications/index.html.erb` の `simple_format` だけで、fixtures・手動確認用の DB の値（`sqlite3 -readonly` で読んだ）と改行・`&`・`<script>` を含む値で、HTML4 と HTML5 の出力が同じことを確かめた（DEF-7.1-45）
+  - 7.1.6 の雛形の initializer は 7.0.10 と同じで、消すものはなかった。雛形にない `backtrace_silencers.rb` は残し、先頭に残す理由のコメントを足した（人間が承認。7.0 のときはコミットメッセージにだけ書いていた）
+  - 解説（DEF-7.1-42〜46 と `backtrace_silencers.rb`）に人間の返事を得てから、記録（`173a321`）、RS `47a0dfc`・RP `52bafaa`・OP `7bca31e` の順にコミットした。RuboCop の `TargetRailsVersion` は 7.1 にして、3 アプリで新しい指摘がないことを確かめた（`c0853c8`）
+
+### 手動確認
+
+verify で、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Rails 7.1.6・Puma 8.0.2 が出た。
+
+- 起動の直後に、RS の最初の要求で、手動確認用の RS の development DB に `schema_migrations` と `ar_internal_metadata` が作られた。止まって人間に確かめ、Rails 7.1 の未実行マイグレーションの検査の変化として受け入れた（DEF-7.1-47。下の「遭遇した問題」）
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP のログイン画面も同意画面も出ずに RP に戻った。前回の手動確認（Rails 7.0.10）で作った OP のセッション Cookie（Rails 7.0 の形式の暗号化 Cookie）を、Rails 7.1 の OP が読めた（DEF-7.1-41 の確かめ残し。secret_key_base は `tmp/local_secret.txt` にコピーしたもの）。OP のログは、認可エンドポイントが 302、トークン・userinfo・JWKS が 200。RP のセッションは、ログインで ID が入れ替わった
+- introspection 用 RP: 前回のトークンは revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke（OP は 200）の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回。Step 2-b と同じ
+- サーバーの出力: 3 アプリとも、エラー・warning・DEPRECATION の新しいものはない。RP の `/stylesheets/application.css` のルーティングのエラーは元からのもの
+- 手動確認用の環境: 直前の件数は基準と同じ（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）。手動確認で、OP の development DB は `oauth_access_grants` が 19 → 21 件、`oauth_access_tokens` が 47 → 52 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 12 件のまま（ID 24 の行が 25 に入れ替わった）。増えた行は `-wal` の中にある（サーバーを止めても本体に移らなかった）。署名鍵・`.env`・3 アプリの `tmp/development_secret.txt`・`tmp/local_secret.txt` は変わっていない。以降の基準は手動確認の後の 14 ファイルのハッシュ
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| Rails 7.1.6 にすると、E2E のサーバーの起動を待つところで 120 秒のタイムアウトになった。OP はすべての要求に `ActiveRecord::PendingMigrationError` を返した（E2E 用の DB にテーブルがない）。`e2e/scripts/start-server.sh` は `bin/rails db:drop db:setup` を 1 つのプロセスで流していた | アプリの `tmp/` に作った確かめ用の DB で再現した。1 つのプロセスで `db:drop db:setup` を流すと最後に DB のファイルがなく、`db:setup` だけや、`db:drop` と `db:setup` を別のプロセスで流すとテーブルが入る。Rails 7.1 は SQLite を WAL で開き（rails/rails#49349。`activerecord-7.1.6/lib/active_record/connection_adapters/sqlite3_adapter.rb:733`）、`db:drop` が `-wal`・`-shm` も消す（#49435 の修正）。同じプロセスに残った接続との組み合わせが原因の見込みで、内部の経路までは確かめていない。人間に確かめ、Rails 7.1.6 の lock の前に、3 アプリの `db:drop` と `db:setup`（RS は `db:create`）を別のプロセスで流すようにした。Rails 7.0.10 のまま E2E が通ることを確かめてからコミットした |
+| verify の手動確認で、RS を Rails 7.1 で起動すると、手動確認用の RS の development DB に `schema_migrations` と `ar_internal_metadata` が作られた。前の手動確認（Rails 7.0）では RS の DB は変わらなかった | 7.1 の `CheckPending` が `migration_context.open` を通り、`Migrator` の初期化で 2 つのテーブルを作るためと、`activerecord-7.1.6` と v7.0.10 のソースで確かめた。止まって人間に確かめ、追随として受け入れた（DEF-7.1-47）。元のファイルの写しがないので、手動確認の後のハッシュを新しい基準にした |
+| 手動確認の後、サーバーを止めても OP・RP の `-wal` が残り、本体のファイルのコピーで数えると件数が増えていなかった。WAL になった RS の DB は、`-shm` がないと `sqlite3 -readonly` で開けなかった | Rails 7.1 は SQLite を WAL で開く（DEF-7.1-48）。件数は `-wal` を含めて読み取り専用で数え直した。人間に確かめ、DEF-7.1-48 を記録し、TIPS.md の守るファイルに `-wal` を足して、数え方を書いた |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`5eedf23`）で 36 の検査がすべて通った。各コミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。スナップショットの差分なし。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で毎回作り直している
+- RuboCop（`TargetRailsVersion: 7.1`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）
+- lock: Step 3 の始め（`d4a4a4a`）からの動きは「gem ごとの対応」のとおり。default gem に合わせた一時固定（json 2.6.3・bigdecimal 3.1.3・logger 1.5.3・base64 0.1.1・cgi 0.3.7・ostruct 0.5.5・reline 0.6.0・io-console 0.6.0 ほか）は動いておらず、Step 3 で固定した tsort 0.2.0・irb 1.6.2・connection_pool 2.5.5 は計画どおり
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動し、複数行の入力と Tab の補完が動いた（irb 1.6.2 は lock の版、reline 0.6.0）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: 上の「手動確認」
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 手動確認用の環境で、WAL の development DB をファイルのハッシュで守る方法は壊れやすい（チェックポイントで `-wal` が本体に移って消える・縮む） | 直さない。手動確認用の development DB を開くのは手動確認のときだけで、ほかの検査は E2E 用の DB（`DATABASE_URL`）を使う。手動確認の後はハッシュを基準として取り直すので、手順の間でハッシュが変わるのは誰かが development DB を開いたときで、それを見つけるのが守る目的。中身の比較（`.dump`）は、`-shm` のない WAL の DB を読み取り専用で開けず、手順が複雑になる（人間が判断） |
+| `e2e/scripts/start-server.sh` のコメントが、確かめていない原因（WAL）を事実として書いている | 直した。「見込み」の書き方にして、この節の「遭遇した問題」を指すようにした |
+| `db:drop` と `db:setup` を別のプロセスに分けたのは、原因を突き止めないままの回避 | 直さない。原因の調査は Step 3 の範囲の外。リポジトリで同じプロセスで DB を消して作り直すのは、この起動スクリプトだけ（`git grep` で確かめた。ほかは過去の記録）。後の Step で同じ形の手順を足すときは、この節の「遭遇した問題」を見る（人間が判断） |
+| DEF-7.1-47 の「E2E 用の RS の DB にも同じテーブルができる見込み」は、確かめられる事実になっている | 直した。`rails_resource_server/db/e2e.sqlite3` のコピーで 2 つのテーブルを確かめ、事実として書いた |
+
+コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、手動確認用の環境の 14 ファイルのハッシュが verify の手動確認の後と同じことを確かめた。
+
+### スキルについて気づいたこと
+
+research:
+
+1. research の手順 4 は、設定の「作業ごとの参照」の research の行を指すが、その行には `--print` しかない。Rails のマイナーを上げる Step で使う `scripts/resolve-lock` は、rails-lock の行にしかない。research でも resolve-lock を使った
+2. `resolve-lock` は、解決できないときにエラーに出た gem を `--unpin` に足して流し直す（7.1.6 では rails-dom-testing・erubi の 2 回）。zsh で引数を配列にせずに繰り返すと、`--unpin` の値が 1 語にならず「不明な引数」になった
+3. advisory の確かめ方は、今の lock を無視リストなしで見る方法だけが書いてある。解決した lock（scratchpad）に `bundle-audit check <ディレクトリ>` をかけて、解消と増加を見る方法は書いていない。`--gemfile-lock` はアプリのディレクトリからの相対パスとして扱われた
+4. PLAN.md が時期を「Step 3 の最初」と決めていた brakeman 8.1.0 が、着手の日にまだ 2 週間たっていなかった。計画で決めた時期と 2 週間の決まりが食い違ったときの扱いは、research に書いていない（今回は人間が例外とした）
+5. research の手順 5（非推奨警告）は、今の版の警告しか確かめられない。新しい版の非推奨（`show_exceptions = false` など）は、ソースを読んで見込みを立てるしかない
+6. 守るファイルが Rails の版で変わること（7.1 の `tmp/local_secret.txt`）を、research で確かめる項目がない
+7. Plan モードで research を行ったが、`bundle-audit update` は advisory のデータベース（リポジトリの外）を書き換える
+8. 「直接の gem は、上げられる時点で最新版に上げる」という方針が、research の対話で人間から出た。7 章の振り分けは「時期を決めた gem はその Step で」となっていて、今上げられるメジャーの更新を先送りしていた（jwt・puma・omniauth-rails_csrf_protection）。research の手順 3（周辺 gem の振り分け）は設定の「計画」を指すだけで、この方針を書く場所がない（今回は 7 章の冒頭に足した）
+9. 「質問は 1 回に 1 論点」は、Plan モードの選択式の質問（AskUserQuestion）がフックで止められ、テキストで行った。論点が 9 つあり、計画の承認の前に 9 往復した。今回はそれでよかったが、論点が多いときの進め方（見立てに異論がなさそうなものをまとめて示すか）は書いていない
+10. 設定の「手動確認用の環境」は「9 ファイル」としているが、指す先の TIPS.md の一覧には 6 ファイル（`tmp/development_secret.txt` の 3 つがない）しか書いていなかった。Step 3 の docs のコミットで、`development_secret.txt` と `local_secret.txt` を TIPS.md に足した
+
+gems:
+
+11. 作業計画の中の食い違い（jwt を「3 アプリ」としたことと、論点 4 の「直接の gem だけ」）を、research の出口でも gems の入口でも見つけられず、RS のコミットメッセージを書く段階で気づいた。gems の入口の条件に、上げる gem が作業計画の決まり（方針の範囲）に当たるかを確かめる手順がない
+
+rails-lock:
+
+12. `scripts/resolve-lock` の「消えた gem」は空だったが、アプリに持ち込んで `bundle lock` すると method_source が消えた。resolve-lock は旧 lock の gem をすべて Gemfile に `= 版` で書くので、新しい Rails が依存しなくなった gem も Gemfile の依存として残り、出力に出ない。持ち込んだ後の `git diff` で初めて分かった
+13. rails-lock の手順は「lock の解決 → 照合 → アプリごとのコミット」だけで、次のものを想定していない
+    - 新しい版で初めて起動する前の手動確認用の環境の操作（7.1 の `tmp/local_secret.txt`）
+    - アプリの外の道具（E2E の起動）を直す変更が要ること
+    - 新しい Rails を必要とする gem を、Rails と同じコミットで上げる判断（7 章の「Rails と同時か直後」の「同時」）。今回は、どれも「この手順にないことが要る」で止まって確かめた
+14. 検査が落ちたときの最初の結果（スナップショットの差分が RP 6 件・OP 11 件、bundler-audit、E2E）を、どこまで調べてから止まるかの目安がない。今回は、原因を 3 種類に分けて全体を示し、1 論点ずつ確かめた
+15. rails-lock の手順に、development だけのヘッダーを比べる手順がない（設定の「前後の比較」には「Rails を上げるとき: development だけのヘッダー」とある）。書き出しは取ったが、比べるのを後に回し、Rails 7.1.6 のコミットの後に差分（DEF-7.1-07・08）を見つけた。rails-lock の検査の後、コミットの前に比べる手順が要る
+
+gems（Rails の直後）:
+
+16. Claude Code の hooks の安全チェックは、`git commit` と同じコマンド行の `sed -n` も `--no-verify` として止める（TIPS.md の「コミット」に書いてあるとおり）。docs のコミットと、検査の結果を `sed -n` で読む行を 1 回の呼び出しにまとめて、止められた。コミットの手順（commit.md）にこの注意がなく、設定の「作業ごとの参照」からも TIPS.md の「コミット」を指していない
+
+rails-defaults:
+
+17. rails-defaults の手順は「設定が効いていないときは起動の途中の読み込みを疑う」としているが、`new_framework_defaults_*.rb` の雛形の行そのものが initializer では効かない・動かない場合（`log_file_size` はロガーの作られる時点、`sanitizer_vendor` は定数の読み込み）がある。どちらも `load_defaults` に任せる判断になったが、手順にこの選択肢がない
+18. 書き出しの道具（`compare-config`）が、新しい版の設定のクラスの値を拾えるかは、版ごとに足す必要がある。rails-defaults の手順の最初に、新しい設定の値が書き出されるかを確かめる手順がない（今回はグループ 1 の比較で気づき、途中で足して基準を取り直した）
+
+rails-load-defaults:
+
+19. 18 と同じことが rails-load-defaults にもある。手順 1 は「前の書き出しを取る」だけで、`load_defaults` に任せた設定の値が書き出されるかを確かめる手順がない（今回は取る前に気づき、道具に足してから取った）
+20. 手順 2 の `new_framework_defaults_*.rb` の削除を `git rm` で行うと、削除がステージされたまま残る。commit.md の注意のとおり外そうとしたが、消えたファイルは zsh のグロブ（`rails_*/...`）に当たらず、1 回目は外れていなかった。`scripts/commit-per-app` はアプリのディレクトリをステージするので、手順 2 はステージしない `rm` で足りる
+21. 手順 3 は「消す initializer を決める」だけで、残す initializer（雛形にないファイル）に templates.md の「残す独自設定のコメント」を当てるかが書いていない。前の版（7.0）ではコメントを足していなかった。今回は解説の項目に入れて人間に確かめた
+
+verify:
+
+22. 手動確認の入口の条件は「手動確認用の環境が控えた状態と同じ」だが、新しい版で初めて開くことで手動確認用の環境が変わる（DB の形式、フレームワークが作るテーブル）ことを、手動確認の前に見込む手順がない。今回は、WAL は rails-lock で見込んでいたが、RS のテーブルは見込めず、起動した後に止まって確かめた。起動の前に DB の写しを取っておけば、元に戻す選択肢も残せた
+23. 手動確認用の環境のハッシュで比べる方法は、SQLite が WAL になると、サーバーを止めた後も `-wal` が残り、`-shm` は読むだけで変わるので、そのままでは使えない。設定の「手動確認用の環境」は、DB の形式の変化を想定していない

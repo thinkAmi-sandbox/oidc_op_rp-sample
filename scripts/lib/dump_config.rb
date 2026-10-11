@@ -137,6 +137,63 @@ extras = {
   'Integer#to_s(:delimited)' => -> { 1000.to_s(:delimited) },
   'key generator の digest' => lambda {
     Rails.application.key_generator.instance_variable_get(:@key_generator).instance_variable_get(:@hash_digest_class)
+  },
+  # Rails 7.1 の new_framework_defaults_7_1.rb の設定で、上の config.<名前> の節にクラスの値が出ないもの（Step 3）
+  'ActiveRecord::Encryption.config.hash_digest_class' => -> { ActiveRecord::Encryption.config.hash_digest_class },
+  # support_sha1_for_non_deterministic_encryption は読み出せず、主鍵があるときだけ SHA-1 の鍵を previous に足す
+  'ActiveRecord::Encryption.config.previous_schemes の数' => -> { ActiveRecord::Encryption.config.previous_schemes.size },
+  'ActiveJob.use_big_decimal_serializer' => -> { ActiveJob.use_big_decimal_serializer },
+  'ActiveSupport::Cache::Store.raise_on_invalid_cache_expiration_time' => lambda {
+    ActiveSupport::Cache::Store.raise_on_invalid_cache_expiration_time
+  },
+  'ActionController::Parameters.allow_deprecated_parameters_hash_equality' => lambda {
+    ActionController::Parameters.allow_deprecated_parameters_hash_equality
+  },
+  'ActiveRecord::QueryLogs.tags_formatter' => -> { ActiveRecord::QueryLogs.tags_formatter.class },
+  'SQLite3Adapter.strict_strings_by_default' => lambda {
+    require 'active_record/connection_adapters/sqlite3_adapter'
+    ActiveRecord::ConnectionAdapters::SQLite3Adapter.strict_strings_by_default
+  },
+  'Rails::Dom::Testing.default_html_version' => lambda {
+    require 'rails/dom/testing'
+    Rails::Dom::Testing.default_html_version
+  },
+  'ActiveSupport::Messages::Codec.default_serializer' => -> { ActiveSupport::Messages::Codec.default_serializer },
+  'ActiveSupport::Messages::Metadata.use_message_serializer_for_metadata' => lambda {
+    ActiveSupport::Messages::Metadata.use_message_serializer_for_metadata
+  },
+  'ActionView::Helpers::SanitizeHelper.sanitizer_vendor' => -> { ActionView::Helpers::SanitizeHelper.sanitizer_vendor },
+  'env_config の action_dispatch.debug_exception_log_level' => lambda {
+    Rails.application.env_config['action_dispatch.debug_exception_log_level']
+  },
+  'config.filter_parameters' => -> { Rails.application.config.filter_parameters },
+  'filter_parameters で伏せた結果' => lambda {
+    sample = { 'code' => 'x', 'code_verifier' => 'x', 'client_secret' => 'x', 'access_token' => 'x', 'id_token' => 'x',
+               'password' => 'x', 'state' => 'x', 'name' => 'x' }
+    ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters).filter(sample)
+  },
+  'ログのファイルの上限（バイト）' => lambda {
+    loggers = Rails.logger.respond_to?(:broadcasts) ? Rails.logger.broadcasts : [Rails.logger]
+    loggers.map { |l| l.instance_variable_get(:@logdev)&.instance_variable_get(:@shift_size) }
+  },
+  # load_defaults 7.1 に任せた設定で、上の config.<名前> の節にクラスの値が出ないもの（Step 3）
+  'config.add_autoload_paths_to_load_path' => -> { Rails.application.config.add_autoload_paths_to_load_path },
+  # gem の置き場所（vendor/bundle）もアプリのディレクトリの中にあるので除く
+  '$LOAD_PATH のアプリのディレクトリ' => lambda {
+    $LOAD_PATH.select { |path| path.to_s.start_with?("#{app_dir}/") && !path.to_s.start_with?(bundle_dir) }
+  },
+  'config.log_file_size' => -> { Rails.application.config.log_file_size },
+  'Rails.cache のクラスと coder の serializer' => lambda {
+    coder = Rails.cache.instance_variable_get(:@coder)
+    [Rails.cache.class, coder.class, coder.instance_variable_get(:@serializer),
+     coder.instance_variable_get(:@legacy_serializer)]
+  },
+  'ActionText::ContentHelper.sanitizer' => lambda {
+    ActionText::ContentHelper.sanitizer.class if defined?(ActionText::ContentHelper)
+  },
+  'ActionView の sanitizer' => lambda {
+    [ActionView::Base.full_sanitizer.class, ActionView::Base.link_sanitizer.class,
+     ActionView::Base.safe_list_sanitizer.class]
   }
 }
 extras.each { |label, block| lines << "#{label} = #{read.call(&block)}" }

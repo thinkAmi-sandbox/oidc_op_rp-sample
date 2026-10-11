@@ -1,3 +1,7 @@
+# Rails 7.0 から雛形にないファイルだが残す。BACKTRACE 環境変数でバックトレースの絞り込みを外す処理は、
+# Rails 7.1 の railties になく、このファイルだけが担う。Step 5（Rails 7.2）で見直す
+# （docs/upgrade/defaults/rails-7.0.md の DEF-7.0-37、docs/upgrade/defaults/rails-7.1.md の「load_defaults 7.1」）
+
 # Be sure to restart your server when you modify this file.
 
 # You can add backtrace silencers for libraries that you're using but don't wish to see in your backtraces.

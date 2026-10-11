@@ -50,7 +50,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 ## gem の更新
 
 - `bundle update <gem> --conservative` で上げ、`git diff -U0 Gemfile.lock | grep -E '^[-+]    [a-z]'` で、変わった gem を毎回見る
-- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console）と、一時固定した gem（benchmark・securerandom・faraday-net_http・reline など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
+- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb）と、一時固定した gem（benchmark・securerandom・faraday-net_http・reline・tsort・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
   - Gemfile に既にある gem を固定するときは、行を足さずに既にある行に版を書き、後で元に戻す（Step 2-b の brakeman）。作業の前に Gemfile を scratchpad にコピーしておき、コピーで戻すと確実
   - 依存で入る gem が default gem と同じ名前のとき（Step 2-b の byebug 13 の reline・io-console）は、default gem の版で要件を満たせるならその版に（ダウンロードもビルドもしない）、満たせないなら要件を満たす最小の版に固定する。固定しないと最新の版（io-console は C 拡張）が入る
@@ -117,8 +117,11 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 
 - 手動確認用のローカル環境（各アプリの development DB、`.env`、OP の署名鍵）は gitignore 対象。作業の前後で、次のファイルのハッシュが一致することを `shasum` で確かめる
   - `rails_open_id_provider/db/development.sqlite3`、`rails_relying_party_of_backend/db/development.sqlite3`、`rails_resource_server/db/development.sqlite3`
+  - `rails_open_id_provider/db/development.sqlite3-wal`、`rails_relying_party_of_backend/db/development.sqlite3-wal`（Step 3 の verify から。Rails 7.1 は SQLite を WAL で開き、サーバーを止めても `-wal` が残って、書き込んだ行がその中にある。DEF-7.1-48。`-shm` は読み取り専用で開いても更新日時が変わるので、ハッシュは比べない）
   - `rails_open_id_provider/jwtRS256.key`
   - `rails_relying_party_of_backend/.env`、`rails_resource_server/.env`
+  - 3 アプリの `tmp/development_secret.txt`（Rails 7.0 までの development・test の secret_key_base）
+  - 3 アプリの `tmp/local_secret.txt`（Rails 7.1 からの secret_key_base。Step 3 の rails-lock で、各アプリを 7.1 で初めて起動する前に `development_secret.txt` からコピーする。PLAN.md の Step 3）
 - RP のトップページを開くと、セッションの行が増えて development DB が変わる。OP の discovery と、トークンなしでの RS へのリクエストは DB を変えない
 - `.claude/launch.json` の設定で、3 アプリをプレビューから起動できる。プレビューは起動時にトップページを開くので、RP は手動確認のとき以外はプレビューで起動しない
 - development のアプリを `rails runner` から `Rack::MockRequest` で呼ぶときは、`HTTP_HOST` に `localhost:<ポート>` を渡す（ないと HostAuthorization に 403 で止められる）。手動確認用の DB を変えないよう、`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付ける
@@ -126,6 +129,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - ブラウザペインが画面に出ていないと、AI からは表示できない（`tabs_context` が「hidden」と返す）。手動確認を頼む前に、人間にペインを開いてもらう
 - プレビューのサーバーの標準出力は `preview_logs` で読む。`search` は部分一致で、正規表現は使えない
 - 手動確認でログインすると、RP と OP の development DB に行が増えてハッシュが変わる。手動確認の直前にハッシュが作業前と一致することを確かめ、前後の件数を読み取り専用の `sqlite3 -readonly` で数えて記録する（Step 0-f-2）。以降の基準は手動確認の後のハッシュ
+- Step 3 の verify から、development DB は WAL になっている（DEF-7.1-48）。件数は `-wal` の中も含めて数えるため、本体のファイルだけをコピーして数えない。`sqlite3 -readonly` は `-shm` があれば開ける。`-shm` がない WAL の DB は `unable to open database file` になるので、本体と `-wal` を一緒に scratchpad にコピーして数える
 
 ## LOG.md の書き方
 
