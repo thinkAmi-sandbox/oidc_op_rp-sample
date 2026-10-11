@@ -5,7 +5,6 @@ content-type: application/json; charset=utf-8
 referrer-policy: strict-origin-when-cross-origin
 www-authenticate: Bearer realm="Doorkeeper", error="invalid_request", error_description="The request utilizes more than one mechanism for authenticating the client."
 x-content-type-options: nosniff
-x-download-options: noopen
 x-frame-options: SAMEORIGIN
 x-permitted-cross-domain-policies: none
 x-request-id: <REQUEST_ID>
