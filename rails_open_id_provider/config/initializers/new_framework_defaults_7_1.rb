@@ -76,7 +76,7 @@ Rails.application.config.active_record.run_commit_callbacks_on_first_saved_insta
 # For example, it is possible to create an index for a non existing column.
 # See https://www.sqlite.org/quirks.html#double_quoted_string_literals_are_accepted for more details.
 #++
-# Rails.application.config.active_record.sqlite3_adapter_strict_strings_by_default = true
+Rails.application.config.active_record.sqlite3_adapter_strict_strings_by_default = true
 
 ###
 # Disable deprecated singular associations names.
@@ -175,7 +175,7 @@ Rails.application.config.active_record.raise_on_assign_to_attr_readonly = true
 # The previous behavior was to validate the presence of the parent record, which performed an extra query
 # to get the parent every time the child record was updated, even when parent has not changed.
 #++
-# Rails.application.config.active_record.belongs_to_required_validates_foreign_key = false
+Rails.application.config.active_record.belongs_to_required_validates_foreign_key = false
 
 ###
 # Enable precompilation of `config.filter_parameters`. Precompilation can
@@ -219,7 +219,7 @@ Rails.application.config.active_record.run_after_transaction_callbacks_in_order_
 ###
 # Whether a `transaction` block is committed or rolled back when exited via `return`, `break` or `throw`.
 #++
-# Rails.application.config.active_record.commit_transaction_on_non_local_return = true
+Rails.application.config.active_record.commit_transaction_on_non_local_return = true
 
 ###
 # Controls when to generate a value for <tt>has_secure_token</tt> declarations.
