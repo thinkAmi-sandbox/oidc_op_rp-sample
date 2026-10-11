@@ -24,6 +24,10 @@ unpin = JSON.parse(unpin_json)
 pins = JSON.parse(pins_json)
 
 gemfile = File.read('Gemfile', encoding: 'UTF-8')
+# 出力先にコピーした Gemfile で解決するので、Gemfile の場所からの相対パスの参照があると、出力先から読もうとして壊れる
+relative = gemfile.lines.grep(/^\s*(gemspec\b|eval_gemfile\b|ruby\s+file:|.*\bpath:)/)
+abort "Gemfile に相対パスの参照があり、コピーでは解決できない:\n#{relative.join}" unless relative.empty?
+
 lock_text = File.read('Gemfile.lock', encoding: 'UTF-8')
 old_lock = Bundler::LockfileParser.new(lock_text)
 
@@ -34,7 +38,8 @@ gem_line = ->(name) { /^(\s*gem\s+['"]#{Regexp.escape(name)}['"])((?:\s*,\s*['"]
 
 requirements.each do |name, requirement|
   abort "Gemfile に gem '#{name}' の行がない" unless gemfile.match?(gem_line.call(name))
-  gemfile = gemfile.sub(gem_line.call(name)) { "#{Regexp.last_match(1)}, '#{requirement}'" }
+  quoted = requirement.split(',').map { |part| "'#{part.strip}'" }.join(', ')
+  gemfile = gemfile.gsub(gem_line.call(name)) { "#{Regexp.last_match(1)}, #{quoted}" }
 end
 
 appended = []
@@ -43,7 +48,8 @@ versions.sort.each do |name, version|
 
   if gemfile.match?(gem_line.call(name))
     # 既にある要件はそのまま残し、`= 版` を足す（Bundler は要件をすべて満たす版を選ぶ）
-    gemfile = gemfile.sub(gem_line.call(name)) { "#{Regexp.last_match(1)}, '= #{version}'#{Regexp.last_match(2)}" }
+    # 同じ gem をプラットフォームやグループごとに書いた行があれば、どの行も固定する
+    gemfile = gemfile.gsub(gem_line.call(name)) { "#{Regexp.last_match(1)}, '= #{version}'#{Regexp.last_match(2)}" }
   else
     appended << "gem '#{name}', '= #{version}'"
   end
