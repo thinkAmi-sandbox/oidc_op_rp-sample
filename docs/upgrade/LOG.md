@@ -2003,6 +2003,32 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 作業の開始時（ブランチを切った後）に、9 ファイルのハッシュを控えた。件数は Step 2-b の手動確認の後と同じ（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）。スキル化の PR では手動確認をしていないので、基準は Step 2-b の手動確認の後のまま。
 
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| brakeman | 8.0.6 → 8.1.0 | 3 アプリ。`bundle update brakeman --conservative`。lock で動いたのは brakeman だけ（racc は 1.5.2 のまま）。公開から 2 週間の決まりの例外（作業計画で人間が判断） |
+
+- ダウンロードした `.gem` の SHA-256 は、すべて rubygems.org の値と同じ（`scripts/verify-gem-checksums <app> --changed <上げる前のコミット>`）
+
+### 前後の比較
+
+上げる前（Step 3 の docs のコミットの後）に、次のものを書き出し、gem を上げるたびに取り直して比べる。
+- `scripts/check-apps` の結果（3 アプリの検査と E2E）
+- `scripts/compare-config dump`（3 アプリの test・development）
+- `RUBYOPT=-W:deprecated` を付けた development の eager load の警告
+- brakeman の JSON の出力
+
+上げる前の値は次のとおり。
+- minitest: RS 11 runs・RP 33 runs・OP 69 runs、0 failures（`CI=1` も同じ）
+- E2E: 10 passed
+- eager load の `warning:`・`DEPRECATION`: 3 アプリとも 0
+- テストの出力の DEPRECATION: OP の `auth_time_from_resource_owner`（IMP-011）だけ
+
+- brakeman 8.1.0
+  - 3 アプリとも終了コード 0。JSON の出力の警告（0 件）と無視した警告（EOL の 2 件）の fingerprint・チェック名・メッセージ、実行したチェックの一覧は、8.0.6 と同じ
+  - 設定の値と起動の途中の読み込み（`compare-config`）、eager load の警告、minitest・E2E の件数とスナップショット、テストの出力の DEPRECATION は、前と同じ
+
 ### スキルについて気づいたこと
 
 research:

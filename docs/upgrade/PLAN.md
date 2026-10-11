@@ -667,7 +667,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 
 スキル化の PR が epic に入ってから、`/rails-upgrade research` で調べた。作業計画を出し、承認を得た（2026-10-11）。Ruby 3.2.11 のまま Rails を 7.1.6 に上げる。Rails の前に、今の Rails で上げられる直接の gem を上げ、Rails の直後に、Rails 7.1 を必要とする gem を上げる。経緯と作業の記録は LOG.md の Step 3。
 
-- [ ] gems: brakeman 8.1.0（3 アプリ）
+- [x] gems: brakeman 8.1.0（3 アプリ）
 - [ ] gems: jwt 3.3.0（3 アプリ。RS は oauth2 の依存）
 - [ ] gems: puma 8.0.2（3 アプリ。Gemfile `~> 6.0` → `~> 8.0`）
 - [ ] gems: omniauth-rails_csrf_protection 2.0.1（RP）
