@@ -2249,14 +2249,14 @@ verify:
 
 | 変更 | 理由 |
 |---|---|
-| マイグレーションの前に、annotate が `test/fixtures/users.yml` に足した注釈を、別のコミットにした（`8d1a987`） | E2E 用の DB で `db:migrate` を流すと、annotate（`lib/tasks/auto_annotate_models.rake`、`'exclude_fixtures' => 'false'`）が users テーブルの注釈を `users.yml` に足した。`users.yml` は Step 0-d-2 で、OP の最後のマイグレーション（2021 年）より後に作ったので、初めて annotate が流れた。消しても `db:migrate` のたびに戻ってくるので、残して、マイグレーションとは理由を分けた（人間が判断） |
+| マイグレーションの前に、annotate が `test/fixtures/users.yml` に足した注釈を、別のコミットにした（`04cafce`） | E2E 用の DB で `db:migrate` を流すと、annotate（`lib/tasks/auto_annotate_models.rake`、`'exclude_fixtures' => 'false'`）が users テーブルの注釈を `users.yml` に足した。`users.yml` は Step 0-d-2 で、OP の最後のマイグレーション（2021 年）より後に作ったので、初めて annotate が流れた。消しても `db:migrate` のたびに戻ってくるので、残して、マイグレーションとは理由を分けた（人間が判断） |
 | gem を上げるコミットは、`scripts/commit-per-app` を使わず、同じ手順を手で行った | `commit-per-app` はステージ済みの変更があると止まり、アプリの外（`e2e/baseline/discovery.json`）をステージしない。RS・RP に変更がなく退避が要らないので、OP の検査と E2E を流してから、ファイルを指定してコミットした |
 
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの後）に、14 ファイルのハッシュを控えた。件数は Step 3 の手動確認の後と同じ（OP `oauth_access_grants` 21・`oauth_access_tokens` 52、RP `sessions` 12・`op_users` 1）。件数は、本体と `-wal` を scratchpad にコピーして数えた。
 
-- gems の 3 つのコミットの後（`18d6f16` の時点）も、14 ファイルのハッシュは作業の開始時と同じ。schema.rb の書き出しとマイグレーションは E2E 用の DB で行い、手動確認用の DB には触れていない
+- gems の 3 つのコミットの後（`04e9396` の時点）も、14 ファイルのハッシュは作業の開始時と同じ。schema.rb の書き出しとマイグレーションは E2E 用の DB で行い、手動確認用の DB には触れていない
 - verify の手動確認の直前に、3 アプリのサーバーが止まっていて、14 ファイルのハッシュと件数が作業の開始時と同じことを確かめた。OP の development DB の本体と `-wal` を `rails_open_id_provider/tmp/manual_check_backup/` に写し、写しのハッシュが元と同じこと、写しのコピーで件数が同じで `integrity_check` が ok なことを確かめた（写しは、PR が epic に入った後に、確かめてから消す）
 - 人間に確かめてから、手動確認用の OP の development DB に `bin/rails db:migrate` を流した。annotate は「Model files unchanged.」で、schema.rb・`test/fixtures/users.yml` に差分はなく、`db:migrate:status` は up。`db:migrate` が閉じるときにチェックポイントが起き、`-wal` が 0 バイトになった（中身は本体に移った）。件数は同じ（`oauth_access_grants` 21・`oauth_access_tokens` 52）で、`oauth_applications` の 3 行の新しい列は NULL。ハッシュが変わったのは OP の DB の本体と `-wal` だけ
 
@@ -2269,8 +2269,8 @@ verify:
 schema.rb とマイグレーション（OP）:
 
 - `adf94ad`: `DATABASE_URL=sqlite3:db/e2e.sqlite3 bin/rails db:schema:dump` で、schema.rb を Rails 7.1 の形で書き出しただけのコミット（DEF-7.1-51）。research で test の DB のコピーから試しに書き出したものと同じ。今の schema.rb と新しい形の schema.rb を、それぞれ空の DB に `db:schema:load` で読み込み、`sqlite_master` の SQL が同じことを確かめた
-- `8d1a987`: annotate が `test/fixtures/users.yml` に足した注釈（上の「作業計画からの変更点」）
-- `18d6f16`: `rails generate doorkeeper:openid_connect:add_post_logout_redirect_uris` が作ったマイグレーションを、出力のまま入れた。前の doorkeeper-openid_connect のマイグレーション（`20210812142144`）と同じく `frozen_string_literal` はなく、RuboCop は `db/` を見ない。E2E 用の DB で `db:migrate` を流し、schema.rb の差分は列の行と版の日付だけ。`db:migrate:status` で up を確かめた。test の DB にも列ができた（`maintain_test_schema`）
+- `04cafce`: annotate が `test/fixtures/users.yml` に足した注釈（上の「作業計画からの変更点」）
+- `04e9396`: `rails generate doorkeeper:openid_connect:add_post_logout_redirect_uris` が作ったマイグレーションを、出力のまま入れた。前の doorkeeper-openid_connect のマイグレーション（`20210812142144`）と同じく `frozen_string_literal` はなく、RuboCop は `db/` を見ない。E2E 用の DB で `db:migrate` を流し、schema.rb の差分は列の行と版の日付だけ。`db:migrate:status` で up を確かめた。test の DB にも列ができた（`maintain_test_schema`）
 
 ### 意図的な仕様変更
 
@@ -2278,7 +2278,7 @@ PLAN.md の 6 章の「Step 3-b」の 3 つ。gems で、実際の差分を人�
 
 - discovery（`8abc86d`）: `discovery.txt`・`oauth_authorization_server.txt` の本文の `token_endpoint_auth_methods_supported` と `subject_types_supported` の間に `"authorization_response_iss_parameter_supported": false` の 1 行が増えた。E2E の `e2e/baseline/discovery.json` にも同じキーが増えた（キーは辞書順なので `authorization_endpoint` の次）。ほかの行は同じ
 - webfinger（`8abc86d`）: `webfinger.txt` に `access-control-allow-origin: *` が増え、`content-type` が `application/json; charset=utf-8` → `application/jrd+json; charset=utf-8` になった（charset は Rails が付ける）。本文は同じ
-- `post_logout_redirect_uris` の列（`18d6f16`）: OP の `oauth_applications` に null 可の text の列が増えた。既にある行は NULL。応答のスナップショット（applications の画面を含む）は変わらない。手動確認用の DB は verify で migrate する
+- `post_logout_redirect_uris` の列（`04e9396`）: OP の `oauth_applications` に null 可の text の列が増えた。既にある行は NULL。応答のスナップショット（applications の画面を含む）は変わらない。手動確認用の DB は verify で migrate する
 
 ### 前後の比較
 
@@ -2315,7 +2315,7 @@ verify で、マイグレーションを流した後に `.claude/launch.json` �
 
 verify で、PLAN.md の 10 章の完了条件を確かめた。
 
-- `scripts/check-apps`（3 アプリと E2E）: HEAD（`f81dc06`）で 36 の検査がすべて通った。各コミットの前には、OP と E2E で流した
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`5266ef9`）で 36 の検査がすべて通った。各コミットの前には、OP と E2E で流した
 - minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
 - E2E: 10 passed。E2E の baseline の差分は、意図的な仕様変更の `discovery.json` だけ（作り直してコミットした）。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で毎回作り直していて、新しい schema.rb から `post_logout_redirect_uris` の列ができる
 - RuboCop・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）。bundler-audit の無視リストは変わらない（この Step で解消した advisory はない）
@@ -2324,6 +2324,17 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 - 公開物の安全チェック: 各コミットの hooks で通った
 - CI: push の後に確かめる（push は人間が行う）
 - 手動確認用の環境: 上の「手動確認用の環境」と「手動確認」
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 注釈とマイグレーションのコミットのメッセージが、コミットの時点ではまだ行っていない verify の migrate を現在形で書いている（CLAUDE.md の「まだ存在しないものを現在形で書かない」） | 直した。push の前だったので、2 つのメッセージを予定と分かる形に書き直した（`8d1a987` → `04cafce`、`18d6f16` → `04e9396`。後に続く docs のコミットのハッシュも変わった）。ファイルの中身は書き直す前と同じ。この節のハッシュを新しいものに直した（人間が判断） |
+| TIPS.md の「手動確認用の環境」に、OP の DB の写しと、migrate で `-wal` が空になることが書かれていない | 直した。TIPS.md に、写しの場所と消す時期（PR が epic に入った後に、人間に確かめてから。それまで `tmp/` を消さない）と、DB を正常に閉じた後に `-wal` が空になりうることを足した（人間が判断） |
+| 新しいマイグレーションに `# frozen_string_literal: true` がない | 直さない。gem の generator の出力のまま入れると決めていて、前の doorkeeper-openid_connect のマイグレーション（`20210812142144`）とも同じ。既にあるマイグレーションの形はそろっておらず、RuboCop は `db/` を見ない。`db/` を RuboCop の対象にするときにまとめて見直す（人間が判断） |
+| `post_logout_redirect_uris` の列を確かめる minitest がない（後の版の gem が列のないときの分岐を外したら、E2E の起動の失敗でしか気づけない） | 直さない。列を足したので、列のないときの分岐はもう通らない。列が NULL のアプリの保存は、E2E の起動の seeds（`Doorkeeper::Application.find_or_create_by!`）が gem の検証を通して行い、minitest は fixtures で読み込む。OP はこの列を読み書きせず、記録する OP の挙動がない。ログアウトの機能を作るときに、そこでテストを書く（人間が判断） |
+
+コードレビューの後（書き直した後の HEAD）も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、手動確認用の環境の 14 ファイルのハッシュが verify の手動確認の後と同じことを確かめた。
 
 ### スキルについて気づいたこと
 

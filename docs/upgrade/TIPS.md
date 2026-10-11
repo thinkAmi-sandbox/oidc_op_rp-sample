@@ -130,6 +130,8 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - プレビューのサーバーの標準出力は `preview_logs` で読む。`search` は部分一致で、正規表現は使えない
 - 手動確認でログインすると、RP と OP の development DB に行が増えてハッシュが変わる。手動確認の直前にハッシュが作業前と一致することを確かめ、前後の件数を読み取り専用の `sqlite3 -readonly` で数えて記録する（Step 0-f-2）。以降の基準は手動確認の後のハッシュ
 - Step 3 の verify から、development DB は WAL になっている（DEF-7.1-48）。件数は `-wal` の中も含めて数えるため、本体のファイルだけをコピーして数えない。`sqlite3 -readonly` は `-shm` があれば開ける。`-shm` がない WAL の DB は `unable to open database file` になるので、本体と `-wal` を一緒に scratchpad にコピーして数える
+- `db:migrate` のように、DB を開いて書き込み、正常に閉じる操作の後は、`-wal` が空（0 バイト）になることがある（Step 3-b で、手動確認用の OP の DB に migrate を流したとき）。中身は本体に移っていて、データは失われていない。件数はこれまでどおり、本体と `-wal` のコピーで数える
+- 手動確認用の OP の development DB の写し（本体と `-wal`）が `rails_open_id_provider/tmp/manual_check_backup/` にある（Step 3-b の verify で、migrate の前に取った）。Step 3-b の PR が epic に入った後に、人間に確かめてから消す。それまで `bin/rails tmp:clear` などの `tmp/` を消す操作をしない
 
 ## LOG.md の書き方
 
