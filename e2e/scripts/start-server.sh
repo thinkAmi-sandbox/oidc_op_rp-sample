@@ -34,8 +34,9 @@ run() {
 
 cd "$(dirname "$0")/../../$app"
 
-# db:drop と db:setup（db:create）は別のプロセスで流す。Rails 7.1 から SQLite は WAL で開き、1 つのプロセスで
-# 続けて流すと、作り直した DB にスキーマが入らない（docs/upgrade/LOG.md の Step 3）
+# db:drop と db:setup（db:create）は別のプロセスで流す。Rails 7.1 では、1 つのプロセスで続けて流すと、作り直した DB に
+# スキーマが入らなかった。SQLite の WAL と、同じプロセスに残った接続の組み合わせが原因の見込みで、内部の経路までは
+# 確かめていない（docs/upgrade/LOG.md の Step 3 の「遭遇した問題」）
 case "$app" in
   rails_open_id_provider)
     # ID トークンの署名鍵。手動確認用の鍵と共用し、なければ作る（秘密鍵は gitignore 対象で、コミットしない）
