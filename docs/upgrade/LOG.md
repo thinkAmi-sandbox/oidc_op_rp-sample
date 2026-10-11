@@ -1826,7 +1826,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 ### 作業計画からの変更点
 
-- simplecov は、計画で「DEF-7.0-50 の候補（記録するかも含めて確かめる）」としていた。出力の変化を解説し、DEF-7.0-50 として記録して追随すると人間が決めた。最新の 1.3.2 は Ruby 3.3 以上が必要で今は入らないので、1.3 系の変化（対象のファイルがないグループを省く、`rails` プロファイルのグループの並び）を確かめて DEF-7.0-50 に書き、1.3 は計画どおり Step 4 にした（人間の質問への回答）
+- simplecov は、計画で「DEF-7.0-50 の候補（記録するかも含めて確かめる）」としていた。出力の変化を解説し、DEF-7.0-50 として記録して追随すると人間が決めた。最新の 1.3.2 は Ruby 3.3 以上が必要で今は入らないので、1.3 系の変化（対象のファイルがないグループを省く、`rails` プロファイルのグループの並び）を確かめて DEF-7.0-50 に書き、1.3 は Step 4（Ruby 3.3）の後に上げることにした（人間の質問への回答。コードレビューで、Step 4 は Ruby だけを上げるので、その後のサブステップと書き直した）
 - brakeman 8.0.6 で `RenderRCE` のチェックが増えた。警告の結果は変わらないので、DEF にせず、この節とコミットメッセージに記録した（人間が判断）
 - 記録の後に、IMP-011 に、1.10.2 で増えた `auth_time_from_access_token`（grant ごとの `auth_time`。`max_age` の判定には使われない）も選べることを書き足した（人間が承認）
 
@@ -1850,6 +1850,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - 応答のスナップショット（minitest）と E2E のスナップショット: どの gem でも差分なし
 - `-W:deprecated` を付けた development の eager load（`bin/rails runner 'Rails.application.eager_load!'`）: zeitwerk 以降の各段で、3 アプリとも `warning:` の行は 0
 - テストの出力の警告: 前後とも OP の `auth_time_from_resource_owner` の DEPRECATION（IMP-011）だけ。1.10.5 でも文言は同じ
+- byebug 13 を require しただけでは reline を読まない: コードレビューの後に、RS の development と test で `bin/rails runner` から `defined?(Reline)` が nil で、読み込み済みの readline 系のファイルは thor の `line_editor/readline.rb` だけなことを確かめた（byebug 13 は `byebug` を呼んだときに reline を読む）
 - `bin/rails c`（byebug 13）: 擬似端末で起動して確かめた（TIPS.md の「rails c を確かめる」）。上げる前は reline 0.3.2・irb 1.6.2、上げた後は lock の reline 0.6.0・io-console 0.6.0 と default gem の irb 1.6.2 を読み、どちらも `IRB::RelineInputMethod` で、複数行の入力（`if true` … `end`）は `=> 42` を返した。`already activated` などの警告はない。違ったのは、`Rails.versi` に Tab を 1 回送ったとき、0.6.0 では `Rails.version` に補完され、0.3.2 では補完されなかったことだけ（擬似端末での模擬の結果で、原因は確かめていない）
 - byebug: `bin/rails runner` の中で `byebug` を呼ぶと、12.0.0 でも 13.0.0 でも同じ位置（`rails runner` が文字列を評価した後の railties の行）で止まり、`next` の行き先も同じで、`continue` で抜けた。入力を読むのが Readline から Reline 0.6.0 になった
 - simplecov: カバレッジの値（RS 33/33・RP 112/112・OP 14/14 で、どれも 100%）、集計の対象のファイル（RS 7・RP 15・OP 8）、`.last_run.json` は同じ。結果の行と `coverage/` の中身が変わった（DEF-7.0-50）
@@ -1879,3 +1880,14 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - RuboCop: 3 アプリとも `no offenses detected`。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test（`CI=1` 付きも）・development で `✅Congratulations!`。bundler-audit: `No vulnerabilities found`。無視リストを空にした bundler-audit で、無視リストの ID はすべて今も報告される。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`
 - `bin/rails c` は擬似端末で、`bin/rails s` は手動確認で、3 アプリとも起動した
 - 手動確認用の環境: 上の「手動確認」
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| PLAN.md 7 章と DEF-7.0-50 が simplecov 1.3 を「Step 4」で上げるとしているが、Step 4 は Ruby だけを上げる Step で、CLAUDE.md の「一度に上げるのは 1 つだけ」と食い違う | 「Step 4（Ruby 3.3）の後の周辺 gem のサブステップ」に直した（PLAN.md の Step 2-b と 7 章、DEF-7.0-50、この節の「作業計画からの変更点」） |
+| PLAN.md の Step 2-b の rack-mini-profiler の行が、5.0.0 でバッジ・ヘッダーが出なくなることを事実として書いているが、確かめたのは `Rails.env.local?` が false になることだけ | ソースを読んでの推論（5.0.0 は入れていない）と書いた。Step 3 で上げるときに確かめる |
+| byebug 13 を require しただけでは reline を読まない、という記述（PLAN.md・コミットメッセージ）を確かめた記録がない | 確かめて、上の「前後の比較」に書いた |
+| brakeman 8.1.0 の時期の「次の Step の最初」が、gem を上げないスキル化の PR を指すのか Step 3 を指すのか曖昧 | 「Step 3 の最初」に直した（PLAN.md の Step 2-b と 7 章） |
+| PLAN.md の Step 2-b の zeitwerk の行が、サブエージェントの API の突き合わせと、自分で確かめたことを区別していない | 区別して書いた |
+| TIPS.md の「rails c を確かめる」の擬似端末のドライバーが scratchpad にしかなく、後の Step で再現できない | 直さない。13 章の振り分け（3 アプリに固有の道具は `scripts/`）に照らして、スキルを作る PR で `scripts/` に置くかを決める |

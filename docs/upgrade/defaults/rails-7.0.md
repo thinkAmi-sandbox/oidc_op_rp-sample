@@ -637,6 +637,6 @@ Ruby 3.2 以上を必要とする周辺 gem を上げたときに起きた、gem
 - なぜ: 1.0.0 で結果の行を stderr に出すようにし、JSON の formatter を本体に取り込んで既定の HTML の formatter が `coverage.json` も書くようにし、docile への依存をやめ、simplecov-html を本体に取り込んだ。1.1.0 で HTML のレポートを 1 ファイルで完結する `index.html` にした。1.2.0 で、成功した実行ごとに `coverage/.history.json` に履歴を残すようにした（既定で 100 件まで。`history_limit 0` で止められる）。`rails` プロファイルは、フィルタの書き方が `add_filter` から `skip` になり（対象は同じ）、`merge_subprocesses true` が入った
 - 3 アプリへの影響: アプリの挙動は変わらない。`coverage/` は gitignore の対象。CI（`.github/workflows/ci.yml`）と `scripts/check-apps` は結果の行を読まない（minitest の件数は Minitest の stdout から取る）。最低カバレッジを設定していないので、`bin/rails test` の終了コードは変わらない。テストの中で fork しないので、`merge_subprocesses` は効かない。起動の途中の読み込みは前後で同じ
 - 扱い: 追随（設定は足さない。`.history.json` も止めない）
-- 後の版で変わること: 1.3 は Ruby 3.3 以上が必要なので、Step 4 で上げる。1.3.0 で、対象のファイルがないグループをレポートから省き、`rails` プロファイルのグループをアルファベット順にする（HTML のレポートのタブだけが変わる見込み）
+- 後の版で変わること: 1.3 は Ruby 3.3 以上が必要なので、Step 4（Ruby 3.3）の後の周辺 gem のサブステップで上げる。1.3.0 で、対象のファイルがないグループをレポートから省き、`rails` プロファイルのグループをアルファベット順にする（HTML のレポートのタブだけが変わる見込み）
 - 出典: simplecov の CHANGELOG（1.0.0 の Breaking Changes・Enhancements、1.1.0 の Breaking Changes、1.2.0 の Upgrade notes、1.3.0 の Upgrade notes）、`simplecov-1.2.0/lib/simplecov/profiles/rails.rb`。Rails ガイドに該当の節はない（v7.0 の「Rails テスティングガイド」にも simplecov の説明はない）
 - コミット: RS・RP・OP（`update simplecov to 1.2.0`）
