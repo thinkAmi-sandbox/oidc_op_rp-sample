@@ -140,7 +140,7 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 種類: Rails の既定値（`load_defaults` によらない）/ 対象: RS（development。OP・RP の DB には元からこのテーブルがある）
 - 何が変わるか: development の要求で未実行のマイグレーションを確かめる `ActiveRecord::Migration::CheckPending` が、DB に `schema_migrations` と `ar_internal_metadata` がなければ作る。RS にはマイグレーションも `schema.rb` もなく、手動確認用の RS の development DB はテーブルのない DB だった。verify の手動確認で RS を Rails 7.1 で起動し、最初の要求で 2 つのテーブルが作られた（中身は空）。前の手動確認（Rails 7.0）では、RS の DB のハッシュは変わっていなかった
 - なぜ: 未実行のマイグレーションの確かめ方が、`migration_context.needs_migration?`（`schema_migrations` がなければ空として扱う）から `migration_context.open.pending_migrations` に変わった。`open` が作る `Migrator` は、初期化のときに 2 つのテーブルを作る（`activerecord-7.1.6/lib/active_record/migration.rb` の `pending_migrations` と `Migrator#initialize`。7.0.10 の `check_pending!` は `needs_migration?` だった）。マルチ DB で未実行のマイグレーションの検査を直した一連の変更の 1 つ（rails/rails#46399 のコミット `e9d835f05a` で `pending_migrations` を使うようになった）。どの変更で `open` を通るようになったかまでは突き止めていない
-- 3 アプリへの影響: RS のコードは DB を使わない（モデルがない）ので、応答と業務的な挙動は変わらない。E2E 用の RS の DB（`db:create` だけ）にも同じテーブルができる見込みで、E2E は通る。手動確認用の RS の DB は元のバイト列に戻せない（写しを取っていなかった）ので、手動確認の後のハッシュを新しい基準にした（人間が判断）
+- 3 アプリへの影響: RS のコードは DB を使わない（モデルがない）ので、応答と業務的な挙動は変わらない。E2E 用の RS の DB（`db:create` だけ）にも、E2E の起動の後に同じ 2 つのテーブルがある（`rails_resource_server/db/e2e.sqlite3` のコピーで確かめた）。E2E は通る。手動確認用の RS の DB は元のバイト列に戻せない（写しを取っていなかった）ので、手動確認の後のハッシュを新しい基準にした（人間が判断）
 - 扱い: 追随
 - 出典: rails/rails#46399（コミット `e9d835f05a`）、`activerecord-7.1.6/lib/active_record/migration.rb`、Rails 7.0.10 の `activerecord/lib/active_record/migration.rb`（GitHub の v7.0.10 のタグ）。Rails ガイド v7.1（設定・アップグレード・リリースノート）に該当の節はない
 - コミット: なし（Rails 7.1.6 の lock のコミットから起きていた。verify の手動確認で見つけた）
