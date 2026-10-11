@@ -138,8 +138,8 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 
 - 対象: `rails_open_id_provider/config/initializers/doorkeeper_openid_connect.rb`
 - 現状: `auth_time_from_resource_owner` のブロックは値を返さない。そのため、`max_age` を付けた認可要求は、値によらず毎回再認証になる（`max_age=0` は doorkeeper-openid_connect 1.8.11 から。`prompt=none` と組み合わせると 1.10.0 から `login_required`）。1.10.x は、`max_age` を付けた要求があると、`auth_time_from_resource_owner` の非推奨の警告を `Kernel#warn` で 1 回出す（`doorkeeper-openid_connect-1.10.1/lib/doorkeeper/openid_connect/helpers/controller.rb`）。ID トークンに `auth_time` は出ない
-- 改善案: ログインした時刻をセッションに入れ、`auth_time_from_session` で返して、`max_age` を正しく判定させる（1.10.0 の #271。同じユーザーの複数のセッションを区別できない問題への対応）。ID トークンに `auth_time` を出すかどうかもあわせて決める
+- 改善案: ログインした時刻をセッションに入れ、`auth_time_from_session` で返して、`max_age` を正しく判定させる（1.10.0 の #271。同じユーザーの複数のセッションを区別できない問題への対応）。ID トークンに `auth_time` を出すかどうかもあわせて決める。ID トークンの `auth_time` を grant ごとにするなら、doorkeeper-openid_connect 1.10.2 で増えた `auth_time_from_access_token` も選べる（#304・#305。`max_age` の判定には使われない）
 - 経緯: LOG.md の Step 1-b-3-2「意図的な仕様変更」。`prompt`・`max_age` の応答のスナップショットを足したときに、警告と毎回の再認証を確かめた
 - 見送った理由: RP は `max_age` を送らない。ID トークンの項目も変わるので、アップグレード中は挙動を変えない
 - 確かめ方: `rails_open_id_provider/test/integration/response_snapshot_authorization_prompt_test.rb` の `max_age` のスナップショット、ID トークンのテスト（`authorization_code_flow_test.rb`）、E2E のログイン
-- 記録した Step: 1-b-3-2
+- 記録した Step: 1-b-3-2（Step 2-b で書き足した）
