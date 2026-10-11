@@ -2020,6 +2020,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | omniauth-rails_csrf_protection | 1.0.2 → 2.0.1 | RP。`bundle update omniauth-rails_csrf_protection --conservative`。lock で動いたのはこの gem だけ。入れた 1.0.2 と 2.0.1 の `token_verifier.rb` を比べ、Action Pack 8.1 未満の枝は 1.0.2 と同じ処理（`undef_method` に `defined?` の確かめが付いただけ）なことを確かめた。8.1 用の枝は Step 7 でもう一度確かめる |
 | Rails | 7.0.10 → 7.1.6 | 3 アプリ（rails-lock）。7.0.10 は 7.0 系の最新なので、先に上げるパッチはなかった。`scripts/resolve-lock --gem 'rails=~> 7.1.6' --rails --unpin rails-dom-testing,erubi --pin cgi=0.3.7,irb=1.6.2,connection_pool=2.5.5,tsort=0.2.0` で解決した lock をアプリに持ち込み、Gemfile を `~> 7.1.6` にして `bundle lock`・`bundle install`。動いたのは Rails の構成 gem と rails-dom-testing 2.0.3 → 2.3.0・erubi 1.10.0 → 1.13.1。増えたのは cgi 0.3.7（RS・OP）・irb 1.6.2・tsort 0.2.0・connection_pool 2.5.5・rack-session 1.0.2・rackup 1.0.1・webrick 1.9.2（cgi・irb は default gem と同じ版で、落としていない）。作業計画に書いていなかった変化として、method_source 1.0.0 が lock から消えた（railties 7.0.10 の依存で、7.1.6 の依存にはない）。無視リストから CVE-2025-55193・CVE-2025-24293 を消し、残りのコメントの版を 7.1.6 に直した。7.1 で初めて起動する前に、人間に確かめて 3 アプリの `tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーした（`cmp` で同じ中身。起動後の `Rails.application.secret_key_base` が元のファイルと同じことを確かめた） |
 | activerecord-session_store | 2.2.0 → 2.3.0 | RP。Rails 7.1.6 と同じコミット（人間が判断）。Rails 7.1.6 だけでは、セッション Cookie の Set-Cookie から `SameSite=Lax` が消えた（DEF-7.1-06）。`bundle update activerecord-session_store --conservative` で、動いたのはこの gem だけ。generator の雛形は 2.2.0 と同じ |
+| rack-mini-profiler | 4.0.1 → 5.0.0 | RP・OP。Gemfile を `~> 4.0` → `~> 5.0` にして `bundle update rack-mini-profiler --conservative`。lock で動いたのはこの gem だけ。generator の雛形は 4.0.1 と同じ。高度なデバッグ機能が development で既定で無効になった（DEF-7.1-09） |
 
 - ダウンロードした `.gem` の SHA-256 は、すべて rubygems.org の値と同じ（`scripts/verify-gem-checksums <app> --changed <上げる前のコミット>`）
 
@@ -2057,6 +2058,9 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
   - 書き換えた後に、3 アプリの検査と E2E がすべて通った。brakeman の無視した EOL の警告 2 件は、Rails 7.1.6 でも同じ fingerprint で当たる
   - development だけのヘッダー: rails-lock の前に書き出し（RS の `/apples/show`、RP のトップ、OP の discovery とログイン画面。E2E 用の DB で `Puma::Server` に通した）、rack-mini-profiler 5.0.0 の作業の始めに Rails 7.1.6 で取り直して比べた。RS の 401 が chunked から Content-Length 付きになり（DEF-7.1-07）、RP のトップの Server-Timing に `transaction.active_record` が増えた（DEF-7.1-08）。RP のトップと OP のログイン画面の Content-Length も変わったが、rack-mini-profiler が本文に入れる `data-ids` に前の要求の ID が積み上がるためで、Rails の版の違いではない。どちらも rails-lock のコミットの後に比べ、解説への返事もコミットの後にもらった
   - Rails 7.1 は SQLite を WAL で開く（rails/rails#49349）。手動確認用の development の DB は、まだ 7.1 で開いていない（journal mode は `delete` のまま）。verify の手動確認で開くと、DB のファイルが WAL になり、`-wal`・`-shm` のファイルができる見込み
+- rack-mini-profiler 5.0.0（RP・OP）
+  - Step 2-b で心配した、`Rails.env.local?` で development のプロファイラーが無効になることは起きない。Rails 7.1.6 の development では `Rails.env.local?` が true で、`authorization_mode` は `:allow_all` のまま
+  - development の応答ヘッダー（`x-miniprofiler-*`、`__profilin` の Cookie）と、RP のトップのバッジの `<script>` の属性は前と同じ（gem の版のハッシュだけが変わった）。設定の値と起動の途中の読み込み、eager load の警告も前と同じ。RP・OP の検査と E2E が通った
 
 ### 遭遇した問題
 
@@ -2092,3 +2096,7 @@ rails-lock:
     - 新しい Rails を必要とする gem を、Rails と同じコミットで上げる判断（7 章の「Rails と同時か直後」の「同時」）。今回は、どれも「この手順にないことが要る」で止まって確かめた
 14. 検査が落ちたときの最初の結果（スナップショットの差分が RP 6 件・OP 11 件、bundler-audit、E2E）を、どこまで調べてから止まるかの目安がない。今回は、原因を 3 種類に分けて全体を示し、1 論点ずつ確かめた
 15. rails-lock の手順に、development だけのヘッダーを比べる手順がない（設定の「前後の比較」には「Rails を上げるとき: development だけのヘッダー」とある）。書き出しは取ったが、比べるのを後に回し、Rails 7.1.6 のコミットの後に差分（DEF-7.1-07・08）を見つけた。rails-lock の検査の後、コミットの前に比べる手順が要る
+
+gems（Rails の直後）:
+
+16. Claude Code の hooks の安全チェックは、`git commit` と同じコマンド行の `sed -n` も `--no-verify` として止める（TIPS.md の「コミット」に書いてあるとおり）。docs のコミットと、検査の結果を `sed -n` で読む行を 1 回の呼び出しにまとめて、止められた。コミットの手順（commit.md）にこの注意がなく、設定の「作業ごとの参照」からも TIPS.md の「コミット」を指していない
