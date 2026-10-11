@@ -674,8 +674,8 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - [x] rails-lock: Rails 7.1.6（3 アプリ。DEF-7.1-04・05）
 - [x] gems: activerecord-session_store 2.3.0（RP。Rails 7.1.6 と同じコミットで上げた。DEF-7.1-06。下の「着手後に決めたこと」）
 - [x] gems: rack-mini-profiler 5.0.0（RP・OP。Gemfile `~> 4.0` → `~> 5.0`。DEF-7.1-09）
-- [ ] rails-app-update
-- [ ] rails-app-update: RP の autoload_lib_once
+- [x] rails-app-update（DEF-7.1-10〜18）
+- [x] rails-app-update: RP の autoload_lib_once（案 B のまま。案 A には切り替えていない）
 - [ ] rails-defaults
 - [ ] rails-load-defaults
 - [ ] verify

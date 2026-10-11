@@ -13,6 +13,26 @@ Step ごとの判断と、バージョン固有の知識を記録する。計画
 - ブランチ / PR: `upgrade/...` / <PR へのリンク>
 - バージョン: Ruby a.b.c → x.y.z / Rails a.b.c → x.y.z
 
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update` を流し、`scripts/restore-app-config` で独自設定を戻してから、差分を人間が確かめた。項目ごとの解説は [defaults/rails-7.1.md](defaults/rails-7.1.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| `config/application.rb` の `config.autoload_lib` | RS・OP は採用、RP は採用しない | RS・OP の `lib` に読み込む Ruby のファイルはない。RP は `Omniauth::Strategies::MyOp` の `NameError` で `zeitwerk:check` が落ちるので、次のコミットで `autoload_lib_once` と inflector にした（DEF-7.1-10） |
+| development・test・production の `enable_reloading` | 採用 | `cache_classes` と同じ設定（DEF-7.1-11） |
+| development・test の `raise_on_missing_callback_actions` | 採用 | `only:`・`except:` を使っていない（DEF-7.1-12） |
+| test の `show_exceptions = :rescuable` | 採用 | 非推奨の `false` がなくなる。例外を期待するテストはない（DEF-7.1-13） |
+| development の `verbose_enqueue_logs` | 採用 | ジョブを使っていない（DEF-7.1-14） |
+| production.rb | 採用 | 雛形に追従するだけ（DEF-7.1-15） |
+| コメント、`bin/setup` | 採用 | DEF-7.1-16・17 |
+| test の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code` とコメント | 戻した | アプリの独自設定（`scripts/restore-app-config`） |
+| `active_storage:update` のマイグレーション 3 本 | 採用しない | Active Storage を使っていない（DEF-7.1-18） |
+| `new_framework_defaults_7_1.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- RP の独自ストラテジー: `config/application.rb` に `config.autoload_lib_once(ignore: %w(assets tasks))` と `Rails.autoloaders.once.inflector.inflect("omniauth" => "OmniAuth")` を足し、`config/initializers/omniauth.rb` の `require` を消した（作業計画の案 B のまま）。once のローダーが `lib/omniauth/strategies/my_op.rb` を `OmniAuth::Strategies::MyOp` として扱い、main のローダーには `lib` がない（リロードしない）ことを確かめた
+- 設定の値の比較（3 アプリの test・development）で変わったのは、DEF-7.1-12〜14 の値だけ。`autoload_lib_once` の前後では同じ。3 アプリの検査と E2E は、各コミットで通った
+
 ### 作業計画からの変更点
 
 ### `app:update` で採用したもの・戻したもの
