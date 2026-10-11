@@ -61,7 +61,10 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - コピーの前後を `diff` で比べるときは、行頭の記号が `< ` / `> ` の 2 文字になるので、`grep -E '^[<>]     [a-z]'`（空白 5 つ）で gem の行を拾う。`git diff` 用の `^[-+]    [a-z]`（空白 4 つ）では何も拾えず、変化がないように見える
 - lock にない gem を足すときは `bundle lock --update <gem>` が使えない（`Could not find gem`）。Gemfile に足して `bundle lock`（入れるときは `bundle install`）を実行する。版の制約がないと最新のメジャー版が入るので、一時固定する（Step 0-f-3 の jwt）
 - advisory が今の版でも対象かは、`ignore: []` だけの YAML を作り、`bundle-audit check --config <ファイル>` に渡すと分かる
-- Rails のマイナーを上げるときは、Gemfile の rails を変えて `bundle lock` するだけで、`--conservative` を付けても周辺の gem（jwt・devise・doorkeeper-openid_connect など）まで動く。lock のコピーで、旧 lock の gem をすべて Gemfile に `= 版` で固定し、Rails の構成 gem だけを外して解決させると、どうしても動く gem が分かる（Step 1。解決できない gem は Bundler のエラーに名前が出るので、その gem だけ固定を外して繰り返す）。その lock をアプリに持ち込み、Gemfile を戻して `bundle lock` すれば、過去の一時固定と同じ結果になる
+- Rails のマイナーを上げるときは、Gemfile の rails を変えて `bundle lock` するだけで、`--conservative` を付けても周辺の gem（jwt・devise・doorkeeper-openid_connect など）まで動く。lock のコピーで、旧 lock の gem をすべて Gemfile に `= 版` で固定し、Rails の構成 gem だけを外して解決させると、どうしても動く gem が分かる（Step 1）。リポジトリ直下で `scripts/resolve-lock --app <rs|rp|op> --gem rails='~> <版>' --rails` を流す（Step 1 の道具をスキル化の PR でスクリプトにした）
+  - 解決できない gem は Bundler のエラーに名前が出るので、`--unpin <gem>` で固定を外して繰り返す（Step 1 では zeitwerk と、RP・OP の annotate）
+  - 増えた gem が今の Ruby の default gem と同じ名前なら、default gem の版が出る。一時固定するなら `--pin <gem>=<版>` で渡して流し直す
+  - 出力先の lock をアプリに持ち込み、アプリの Gemfile の rails を変えて `bundle lock` すれば、過去の一時固定と同じ結果になる（タグ `rails-6.1-prepared` の worktree で、Step 1 の 3 アプリの lock と同じになることを確かめた）
 - gem の依存と Ruby の要件は、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json` で確かめられる。`.gem` のサイズは `https://rubygems.org/downloads/<gem>-<版>.gem` への HEAD リクエストの `content-length`
 - Gemfile に gem を足す・動かすときは Bundler/OrderedGems に気をつける。RuboCop はコメントを区切りとして扱い（`TreatCommentsAsGroupSeparators`）、自動修正はコメントと gem の対応を崩すことがある（LOG.md の Step 0-e「Gemfile」）
 - 理由付きの `rubocop:disable` が残っている（RS `apples_controller.rb`、RP `introspections_controller.rb`・`my_op.rb`、OP の annotate の rake）。そのコードを書き換えたら、disable が要らなくなっていないか確かめる（`Lint/RedundantCopDisableDirective`）
