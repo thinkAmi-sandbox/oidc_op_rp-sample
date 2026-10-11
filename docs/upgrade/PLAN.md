@@ -670,7 +670,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - [x] gems: brakeman 8.1.0（3 アプリ）
 - [x] gems: jwt 3.3.0（RP・OP。RS は間接の依存なので 2.10.3 のまま。下の「着手後に決めたこと」）
 - [x] gems: puma 8.0.2（3 アプリ。Gemfile `~> 6.0` → `~> 8.0`。DEF-7.1-01〜03）
-- [ ] gems: omniauth-rails_csrf_protection 2.0.1（RP）
+- [x] gems: omniauth-rails_csrf_protection 2.0.1（RP）
 - [ ] rails-lock: Rails 7.1.6（3 アプリ）
 - [ ] gems: activerecord-session_store 2.3.0（RP）
 - [ ] gems: rack-mini-profiler 5.0.0（RP・OP。Gemfile `~> 4.0` → `~> 5.0`）
@@ -802,7 +802,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
 | sqlite3 | 1.4.2 | 0-a で 1.7.3（済。clang 17 で 1.4 系がビルドできないため 0-f から前倒し）→ Step 5 で 2.x | Rails 7.1 までは 1.x のみ、8.0 は 2.1 以上必須 |
 | annotate | 3.1.1 | Step 1 で 3.2.0（済）→ Step 5 で annotaterb に置換 | 3.1.1 は `activerecord < 7.0` で、Rails 7.0 にするには 3.2.0 が要る。3.2.0 も `activerecord < 8.0` で、Rails 8 に対応しない（0-f で gemspec を確認）。当初は「注釈の出力が変わるので 3.2.0 には上げない」としたが、Step 1 の調査で、OP の注釈に関わる差分はないと分かった。annotaterb の 4.23 以上は CI で Ruby 3.3 以上だけを試すので、置き換えは Step 5 のまま |
 | activerecord-session_store | 2.0.0 | 0-f-1 で 2.1.0（済）→ 1-b-3-1 で 2.2.0（済。multi_json が lock から外れた）→ Step 3 で 2.3.0（Rails 7.1.6 の直後。2.3 は Rails 7.1 以上が必要） | 2.2 以上は Rails 7.0 以上が必要。2.1.0 のまま Rails 7.0.10 で解決する（Step 1 の調査） |
-| bootsnap / jbuilder / omniauth-rails_csrf_protection | 1.7.7 / 2.11.2 / 1.0.0 | 0-f-1 で bootsnap 1.26.0・jbuilder 2.13.0（済）→ 1-b-3-1 で jbuilder 2.15.1・omniauth-rails_csrf_protection 1.0.2（済。後者は一時固定で入れた）→ Step 3 で omniauth-rails_csrf_protection 2.0.1（直接の gem の方針で Step 7 から前倒し） | jbuilder 2.14 以上は Rails 7.0 以上が必要。omniauth-rails_csrf_protection 2.0 の変化は Rails 8.1 だけが対象（8.1 未満は 1.0.2 と同じ処理）。Step 7 で 8.1 用の枝に切り替わるときにもう一度確かめる |
+| bootsnap / jbuilder / omniauth-rails_csrf_protection | 1.7.7 / 2.11.2 / 1.0.0 | 0-f-1 で bootsnap 1.26.0・jbuilder 2.13.0（済）→ 1-b-3-1 で jbuilder 2.15.1・omniauth-rails_csrf_protection 1.0.2（済。後者は一時固定で入れた）→ Step 3 で omniauth-rails_csrf_protection 2.0.1（済。直接の gem の方針で Step 7 から前倒し） | jbuilder 2.14 以上は Rails 7.0 以上が必要。omniauth-rails_csrf_protection 2.0 の変化は Rails 8.1 だけが対象（8.1 未満は 1.0.2 と同じ処理）。Step 7 で 8.1 用の枝に切り替わるときにもう一度確かめる |
 | base64 / bigdecimal / mutex_m など | — | Step 4 で警告が出たら明示 → Step 8 で必須 | Ruby 3.4 で標準ライブラリから外れる |
 | a-nti_manner_kick_course | — | 1-b-1 で 0.5.0 を足す → Rails 8.2 以上で外すかを判断（今回の目標の外なので、epic の間は残す） | development・test だけ。Gemfile の先頭に置く。Rails 8.2 で入る Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない。README によると、Rails 7.2 以上は `rails runner 1` の代わりに `rails boot` で起動できる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初 | バージョン固定。更新は単独コミット |

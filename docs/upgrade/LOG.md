@@ -2017,6 +2017,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | brakeman | 8.0.6 → 8.1.0 | 3 アプリ。`bundle update brakeman --conservative`。lock で動いたのは brakeman だけ（racc は 1.5.2 のまま）。公開から 2 週間の決まりの例外（作業計画で人間が判断） |
 | jwt | 2.10.3 → 3.3.0 | RP・OP。`bundle update jwt --conservative`。lock で動いたのは jwt だけ。上げる前に、RP の `my_op.rb` の `JWT.decode` まわりを `jwt-2.10.3/lib/jwt` と v3.3.0 のタグで比べた。`algorithm` のキー、鍵を探すブロックの呼び方、iss・aud・sub・exp・nbf の検証は同じで、`verify_iat` に渡していない leeway が増えただけ。変わったのは、構造の壊れたトークンと鍵がないときの例外クラスだけ（どちらも `JWT::DecodeError` のサブクラス）。既存のテストが nonce・kid・署名の鍵・iss・aud・exp の失敗の例外クラスを確かめているので、先に足すテストはなかった。RS は 2.10.3 のまま（下の「作業計画からの変更点」） |
 | puma | 6.6.1 → 8.0.2 | 3 アプリ。Gemfile を `~> 6.0` → `~> 8.0` にして `bundle update puma --conservative`。lock で動いたのは puma だけ（nio4r は 2.5.9 のまま。C 拡張は 3 アプリでビルドした）。無視リストから CVE-2026-47736・47737 を消した。既定値の変化 3 つ（応答ヘッダー名の小文字化、keep-alive の既定値、既定の bind）を解説し、人間の返事を得て追随した（DEF-7.1-01〜03） |
+| omniauth-rails_csrf_protection | 1.0.2 → 2.0.1 | RP。`bundle update omniauth-rails_csrf_protection --conservative`。lock で動いたのはこの gem だけ。入れた 1.0.2 と 2.0.1 の `token_verifier.rb` を比べ、Action Pack 8.1 未満の枝は 1.0.2 と同じ処理（`undef_method` に `defined?` の確かめが付いただけ）なことを確かめた。8.1 用の枝は Step 7 でもう一度確かめる |
 
 - ダウンロードした `.gem` の SHA-256 は、すべて rubygems.org の値と同じ（`scripts/verify-gem-checksums <app> --changed <上げる前のコミット>`）
 
@@ -2044,6 +2045,9 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
   - 3 アプリの検査と E2E がすべて通った。設定の値と起動の途中の読み込み、eager load の警告、テストの出力の DEPRECATION は、前と同じ。無視リストを空にした bundler-audit で、puma の 2 件が報告されなくなった
   - 応答のヘッダー: test 環境のアプリを `Puma::Server` に直接通し、RS の `/apples/show`（401）と OP の discovery（200）の生の応答を前後で比べた。ヘッダー名がすべて小文字になり、値と順番は同じ（DEF-7.1-01）。minitest の応答のスナップショットは puma を通らないので変わらない
   - puma の設定: 6.6.1 と 8.0.2 で `config/puma.rb` を読み込んだ後の値を比べた。`persistent_timeout` 20 → 65、`max_keep_alive` nil → 999、既定の bind が `0.0.0.0` → `[::]`。`bin/rails s` は host に localhost を渡すので、実際の bind は変わらない（DEF-7.1-02・03）
+- omniauth-rails_csrf_protection 2.0.1
+  - RP の検査（CSRF の失敗のテストを含む）と E2E が通った。設定の値と起動の途中の読み込み、eager load の警告は前と同じ
+- Rails の前の 4 つの gem を上げた後、手動確認用の環境の 9 ファイルのハッシュは作業の開始時と同じ
 
 ### スキルについて気づいたこと
 
