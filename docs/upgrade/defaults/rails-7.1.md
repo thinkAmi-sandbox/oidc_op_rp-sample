@@ -40,6 +40,9 @@
 | DEF-7.1-30 | キャッシュの有効期限の不正な値を、エラーにする | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-31 | query log tags の形式が SQLCommenter になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-32 | `ActionController::Parameters` を Hash と `==` で比べない | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-33 | SQLite の文字列の厳しいモード | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-34 | 必須の `belongs_to` の検証が、外部キーが変わったときだけ問い合わせる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-35 | トランザクションのブロックを `return` などで抜けると、コミットする | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -384,3 +387,37 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: `actionpack-7.1.6/lib/action_controller/metal/strong_parameters.rb`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.9.21
 - コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### グループ 2: DB の扱い
+
+有効にしても、3 アプリの検査と E2E がすべて通り、応答のスナップショット（OP のトークン系は、DB に入ったトークンの項目も比べる）は同じだった。
+
+### DEF-7.1-33: SQLite の文字列の厳しいモード
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 2）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.sqlite3_adapter_strict_strings_by_default = true`。SQL の中の二重引用符の文字列（`"abc"`）を、文字列として受け付けなくなる（識別子だけを表す）。設定の値の比較: `SQLite3Adapter.strict_strings_by_default` が false → true（3 アプリ・test と development）
+- なぜ: SQLite は二重引用符の中身を識別子として探し、見つからなければ文字列として扱うので、列名の打ち間違いが黙って通る（存在しない列に索引を作れてしまう、など）
+- 3 アプリへの影響: 3 アプリに生の SQL はなく、devise・doorkeeper の問い合わせも minitest・E2E で通った。E2E の起動の `db:setup`（schema の読み込み）も通った
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Enable strict strings mode for `SQLite3Adapter`.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.8.53「config.active_record.sqlite3_adapter_strict_strings_by_default」、「Rails アップグレードガイド」の 2.6「SQLite3Adapterが文字列のstrictモードで設定されるようになった」
+- コミット: RS・RP・OP（`enable the database defaults of Rails 7.1`）
+
+### DEF-7.1-34: 必須の `belongs_to` の検証が、外部キーが変わったときだけ問い合わせる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 2）/ 対象: RS・RP・OP（効くのは OP）
+- 何が変わるか: `config.active_record.belongs_to_required_validates_foreign_key = false`。必須の `belongs_to` を持つ行を更新するとき、外部キーの列が変わっていなければ、関連先があるかの SELECT をしない。設定の値の比較: `ActiveRecord.belongs_to_required_validates_foreign_key` が true → false
+- なぜ: 変わっていない関連のために、更新のたびに余分な問い合わせをしていた
+- 3 アプリへの影響: 必須の `belongs_to` は、doorkeeper-openid_connect の `OpenidRequest` の `belongs_to :access_grant` だけ（doorkeeper の `application` は `optional: true`。polymorphic な resource owner は使っていない）。`OpenidRequest` は作るときと消すときだけで更新しない。作るときは外部キーが変わるので、今までどおり確かめる。DB に入るデータは変わらない
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Avoid validating `belongs_to` association if it has not changed.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.8.26「config.active_record.belongs_to_required_validates_foreign_key」
+- コミット: RS・RP・OP（`enable the database defaults of Rails 7.1`）
+
+### DEF-7.1-35: トランザクションのブロックを `return` などで抜けると、コミットする
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 2）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.commit_transaction_on_non_local_return = true`。`transaction do ... end` の中から `return`・`break`・`throw` で抜けたとき、ロールバックせずにコミットする（7.0 では非推奨の警告を出してロールバック）。設定の値の比較: `ActiveRecord.commit_transaction_on_non_local_return` が true になった
+- なぜ: もともと例外のときだけロールバックしていた。Ruby 2.3 の `timeout` が `throw` を使うようになって途中のトランザクションがコミットされる問題が出たため、一時的にロールバックにしていた。`timeout` の側が直ったので、元の動きに戻した
+- 3 アプリへの影響: アプリにトランザクションのブロックはない。doorkeeper の `grant.transaction do`（`doorkeeper-5.9.9/lib/doorkeeper/oauth/authorization_code_request.rb`）の中は `raise` だけで `return` はない。テストの出力に、ロールバックのときに出る非推奨の警告はない
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Bring back the historical behavior of committing transaction on non-local return.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.8.42「config.active_record.commit_transaction_on_non_local_return」
+- コミット: RS・RP・OP（`enable the database defaults of Rails 7.1`）
