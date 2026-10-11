@@ -1,6 +1,18 @@
 # frozen_string_literal: true
 
 Doorkeeper::OpenidConnect.configure do
+  # The issuer identifies this authorization server: it becomes the `iss`
+  # claim in issued ID Tokens and the `issuer` member of the discovery
+  # document.
+  #
+  # If Doorkeeper itself is configured with an `issuer` (added for RFC 8414
+  # Authorization Server Metadata), you can omit this block and the
+  # Doorkeeper-level setting is used for OpenID Connect as well — both
+  # identify the same authorization server. When both are configured, the
+  # value here takes precedence. On Doorkeeper versions without an `issuer`
+  # option, or when neither is configured, OpenID Connect requests fail
+  # with an "issuer not configured" error, so only remove this block once
+  # Doorkeeper's `issuer` is set.
   # =======> 変更開始
   issuer 'http://localhost:3780'
   # issuer do |_resource_owner, _application, _request|
@@ -222,4 +234,30 @@ Doorkeeper::OpenidConnect.configure do
   #   end
   # end
   # <======= 変更終了
+
+  # If you need more control than what `claims` provides, you can implement your own models for ID
+  # Token and User Info. This is useful if you need to respond to business requirements (e.g.,
+  # different apps may need different claim sets) or if you need to transform data before returning
+  # it to external clients.
+  #
+  # Custom classes must inherit from Doorkeeper::OpenidConnect::IdToken /
+  # Doorkeeper::OpenidConnect::UserInfo (validated when the class is first used). The base classes
+  # carry the security-critical behavior — required-claim enforcement, the claim merge order that
+  # keeps the `claims` configuration block from overriding `sub`/`aud`/`exp`, nonce and `at_hash`
+  # handling — so a subclass only overrides what it actually needs. Typical override points:
+  #
+  #   - `claims` — call `super.merge(...)` so the base claims are always present. A key you add
+  #     that collides with a registered claim replaces it, so keep your keys distinct unless
+  #     replacing it is what you mean
+  #   - `audience` (ID Token) — the `aud` claim may be a string or an array per OIDC Core
+  #   - `select_key` (ID Token) — return a Doorkeeper::OpenidConnect::IdToken::SigningKey to sign
+  #     with a different key/algorithm (per-client keys, rotation, multi-tenancy). The `at_hash`
+  #     digest follows the selected algorithm automatically; advertising any additional keys via
+  #     JWKS is the application's responsibility.
+  #
+  # Refer to Doorkeeper::OpenidConnect::IdToken and Doorkeeper::OpenidConnect::UserInfo for more
+  # information and implementation details.
+  #
+  # id_token_class "MyIdToken"
+  # user_info_class "MyUserInfo"
 end

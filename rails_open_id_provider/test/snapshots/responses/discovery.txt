@@ -39,6 +39,7 @@ x-xss-protection: 0
     "client_secret_basic",
     "client_secret_post"
   ],
+  "authorization_response_iss_parameter_supported": false,
   "subject_types_supported": [
     "public"
   ],

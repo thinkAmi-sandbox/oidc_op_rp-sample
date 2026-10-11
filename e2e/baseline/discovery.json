@@ -1,5 +1,6 @@
 {
   "authorization_endpoint": "http://localhost:3780/oauth/authorize",
+  "authorization_response_iss_parameter_supported": false,
   "claim_types_supported": [
     "normal"
   ],
