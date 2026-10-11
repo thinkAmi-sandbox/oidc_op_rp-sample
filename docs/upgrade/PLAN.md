@@ -425,7 +425,7 @@ Step 1 では、3 アプリの主な応答（ステータス・ヘッダー・�
 1-b-3-1（ブランチ `upgrade/step1b-rails70-gems`）:
 
 - [x] PLAN.md 13 章（スキル化の計画）を、Step 1 の振り返りに合わせて見直す（人間が承認）
-- [x] `scripts/check-apps`（3 アプリの検査と E2E をまとめて流す。13 章の 4）
+- [x] `scripts/check-apps`（3 アプリの検査と E2E をまとめて流す。13 章の 5）
 - [x] 先にテストを足す（RP: セッションの JSON の escape、CSRF のトークンのないログインの POST。OP: ユーザー登録・編集の失敗と成功の応答のスナップショット 4 つ、登録でユーザーが増えること、パスワードを変えた後もログインしたままなこと）
 - [x] jbuilder 2.13.0 → 2.15.1（RP → OP）
 - [x] activerecord-session_store 2.1.0 → 2.2.0（RP。DEF-7.0-38）
@@ -627,6 +627,41 @@ Step 2 が epic に入ってから調べ、作業計画を出して承認を得�
 | lock の解決 | — | 3 アプリで `--print` を試すと、どの gem も、その gem（byebug は reline・io-console も、simplecov は依存の 3 つ）だけが動く。何も指定しないと、doorkeeper-openid_connect は 2.0.0、zeitwerk は 2.8.3、brakeman は 8.1.0 になる。`--patch` を付けると doorkeeper-openid_connect は 1.10.5 になる。lock の default gem と一時固定の gem は、どの試行でも動かない |
 | ほかの gem（`bundle outdated`） | — | Ruby 3.2 を必要とする直接の gem は上の表ですべて（web-console 4.3 は Rails 8 も必要で Step 6）。今の Ruby・Rails で上げられるものは、jwt 3.3.0（RP・OP）と間接依存（hashie・responders・i18n・tzinfo・minitest・rack-test など）だけ |
 
+### スキル化
+
+Step 2-b が epic に入ってから確かめ直し、作業計画を出して承認を得た（2026-10-11）。`/rails-upgrade` のスキルと、Rails のマイナーを上げるときの道具を作る。gem は上げず、アプリのコードと lock は変えない。スキルの方向と構成は 13 章。経緯は LOG.md の「スキル化」。
+
+- [x] `scripts/compare-config`（設定の値と、起動の途中に読み込み済みの部品の書き出しと前後の比較）
+- [x] `scripts/resolve-lock`（旧 lock の gem を固定し、指定した gem だけを外して解決させる）
+- [x] `scripts/restore-app-config`（`app:update` の後に、アプリの独自設定を戻す）
+- [x] `scripts/check-console`（`rails c` を擬似端末で起動して入力を試す）
+- [x] `scripts/verify-gem-checksums`（キャッシュの `.gem` の SHA-256 を rubygems.org の値と比べる）
+- [x] `scripts/commit-per-app`（ほかのアプリの変更を退避し、検査してからコミットする）
+- [x] スキルの汎用の核（`.claude/skills/rails-upgrade/`）と、リポジトリ固有の設定（`.claude/rails-upgrade-project.md`）
+- [x] スキルを試す（新しいセッションで、引数なしと `pr`）
+- [x] verify
+- [x] pr
+- 着手時の作業計画で決めたこと（人間が承認）
+  - スキルの方向: 知識のある担当者が判断の要る所だけを確かめ、それ以外は AI が再現性のある形で進める。担当者だけでは完了せず、細部を知らないレビュアーが PR を見て OK を出したら完了とするフローを前提に、「担当者が説明できる状態の PR を、毎回同じ形で作る」ことをスキルの役割にする（作業計画への返事の対話で決めた。13 章の 1）
+  - 2 層: 汎用の核（ワークフロー・関門・型）と、リポジトリ固有の設定に分けて作る。試すのはこのリポジトリだけで、チームでの検証は後に回す（汎用の核は仮説のまま epic に入る）
+  - 作業の一覧: patch を外し、rails-lock と research に含める。record は `pr` にする（13 章の 3）
+  - Step 2-b の scratchpad の道具（起動の途中の読み込みの書き出し、`rails c` の擬似端末のドライバー、SHA-256 の照合、アプリごとに退避して検査してコミットする道具）を `scripts/` に入れる。起動の途中の読み込みの書き出しは `compare-config` に統合する（Step 2-b のコードレビューで、この PR で決めるとした）
+  - CI から `scripts/check-apps` を呼ばない（1-b-3-1 のコードレビューで、この PR で決めるとした。13 章の 5）
+  - Rails に共通の道具（`compare-config`・`resolve-lock` など）も、この PR では `scripts/` に置く。チームへ持ち出すときに、汎用の核へ移すかを決める
+  - スクリプトは、Step 1 と Step 2-b の結果を再現できることを確かめてからコミットする（13 章の 5 の「確かめ方」）
+
+調べたこと（着手時の 2026-10-11）:
+
+| 項目 | 分かったこと |
+|---|---|
+| 13 章の作業の一覧と手作業 | Step 1-b-3・2・2-b を通した結果と比べると、resume に前の PR へのリンクのコミットと手動確認用の環境の控え、research に Plan モードでの lock の試行（`--print`）と非推奨警告の確かめ、gems の関門に追随の解説、verify に `rails c` の確かめ方、record に PR 本文の型とコードレビューの記録がなかった。ruby の関門は Step 2 の前に書いたため「—」のままで、実際は Ruby のダウンロード、default gem の合わせ直しの版、意図しないダウンロード（`--no-cache`）、手動確認の時期が関門だった。patch は一度も通していない（6.1.7.10・7.0.10 とも、その時点の最新パッチだった） |
+| Claude Code のスキル | 公式の文書（code.claude.com の Skills のページ。2026-10-10 更新）による。`.claude/skills/<name>/SKILL.md` が `/<name>` になる（`.claude/commands/` は同じ仕組みに統合された）。frontmatter の `name` は小文字・数字・ハイフンで 64 文字まで、`description` は 1,024 文字まで。`disable-model-invocation: true` で、人間が打ったときだけ動き、説明も常時の文脈に入らない。引数は `$ARGUMENTS`・`$0`。参照ファイルは SKILL.md から 1 段の相対リンクで指し、必要なときに読まれる。SKILL.md は 500 行以下を勧めている。`${CLAUDE_PROJECT_DIR}` は SKILL.md の本文で置き換わる。検査の `claude plugin validate .claude/skills` は 2.1.233 以上で、手元の CLI は 2.1.195 |
+| Step 1 を再現する条件 | タグ `rails-6.1-prepared` は `cedf13d`（PR #20 のマージ）。Ruby 3.1.7（Bundler 2.3.27）は mise に入っている。タグから Step 1 のマージ `20321ed` までの lock の gem は、3 アプリの `vendor/bundle/ruby/3.1.0`（ビルド済みの C 拡張も）にあるか、Ruby 3.1.7 の default gem（bigdecimal・json・logger・drb・mutex_m・base64・ruby2_keywords・cgi）。x86_64 の nokogiri・sqlite3 は手元では要らない |
+| Step 1 のコミット | rails 7.0.10 は RS `fb67546`・RP `a6e2bdf`・OP `8715abf`、`app:update` は RS `e363c55`・RP `8ca0c8c`・OP `8be19a1`（独自設定は同じコミットの中で戻した）、グループ 8 の後は `89fb290`、`load_defaults 7.0` は RS `fd3eb40`・RP `b1f3552`・OP `400ed9c`。`app:update` で戻した独自設定は、3 アプリの `config/environments/test.rb` の `deprecation = :raise`、`config/initializers/filter_parameter_logging.rb` のコメントと `:code`、RP の `config/application.rb` の末尾の serializer の設定（`77c26df` で initializer に移した）。Active Storage のマイグレーション 3 本は採用しなかった |
+| 元になる道具 | Step 1 の scratchpad に、設定の値の書き出し、lock の固定と解決、独自設定の戻しの道具が、Step 2-b の scratchpad に、起動の途中の読み込みの書き出し、`rails c` の擬似端末のドライバー、SHA-256 の照合、アプリごとのコミットの道具が残っていた。アプリごとのコミットの道具は、コミットが失敗すると退避した変更を戻さなかった |
+| Step 1 の書き出しの結果 | Step 1 の scratchpad の書き出しで、`load_defaults 7.0` の前後で違うのは DEF-7.0-24 の値だけ（OP は development だけ）。記録（defaults/rails-7.0.md の「`load_defaults 7.0`」）と同じ |
+| PR 本文 | PR #27 の本文は、概要、既定値・雛形への追随、業務的な挙動の変化、確認したこと、見送ったことの節でできている。コミットへの索引と、レビュアーに見てほしい所の節はない |
+
 ### Step 2〜9
 
 「8. 各 Step 共通の手順」に従う。Step 固有の作業はロードマップの表のとおり。補足:
@@ -706,6 +741,8 @@ Step 2 が epic に入ってから調べ、作業計画を出して承認を得�
 
 ## 8. 各 Step 共通の手順
 
+スキル化の PR から、この手順は `/rails-upgrade` のスキル（作業ごとの入口の条件・手順・関門・出口と、提示と記録の型。13 章）で進める。下の手順は、スキルが指す決まりとして残す。
+
 1. **調査（Plan モード）**: Rails 公式アップグレードガイドの該当箇所、ruby-jp の各バージョンのナレッジページ、railsdiff.org、`bundle outdated`、メジャー更新する gem の CHANGELOG を確認し、Step の作業計画を出す。**人間の承認を待つ**
    - 調べた事実と根拠（版の要件、CHANGELOG の該当箇所、テストや E2E で守られているか）は、作業計画（リポジトリの外のファイル）だけに残さない。承認を得たら、その Step の節に「調べたこと（着手時に確かめ直す）」として移す。後のサブステップや Step のために調べた分も、それぞれの節に移す
 2. **周辺 gem → Rails のパッチ版を最新に → 非推奨警告の解消**: テスト環境で `config.active_support.deprecation = :raise`
@@ -775,66 +812,82 @@ oxlint / oxfmt の導入条件:
 
 ## 13. スキル化の計画
 
-1-b-3 と Step 2（Ruby 3.2）・2-b を手作業で通した後に、`/rails-upgrade` を入口とする 1 つのスキルを作る（作業名を引数で渡し、中身は参照用の別ファイルに分ける）。gem の手順と Ruby の手順も一度手作業で確かめてからまとめるため。スキルと、下の 4 の「スキルを作る PR」のスクリプトを 1 つの PR にし、Step 3 の前に epic に入れる。当初は Step 1 の後に作る計画だったが、Step 1 の後の振り返り（2026-10-09）で、振り分けの基準・作業の分け方・作る時期を見直した。
+1-b-3 と Step 2（Ruby 3.2）・2-b を手作業で通した後に、`/rails-upgrade` を入口とする 1 つのスキルを作る（作業名を引数で渡し、中身は参照用の別ファイルに分ける）。スキルと、下の 5 の「スキル化の PR」のスクリプトを 1 つの PR にし、Step 3 の前に epic に入れる。当初は Step 1 の後に作る計画だったが、Step 1 の後の振り返り（2026-10-09）で振り分けの基準・作業の分け方・作る時期を見直し、スキル化の着手時（2026-10-11）に、スキルの方向と 2 層の構成を人間と決めた。
 
-### 1. 振り分けの基準
+### 1. スキルの方向（スキル化の着手時に人間と決めた）
+
+- 知識のある担当者が、判断の要る所だけを確かめ、それ以外は AI が再現性のある形で進める
+- 担当者だけではアップグレードを完了できない。細部を知らないレビュアーが PR を見て OK を出したら完了とするフローを前提にする。担当者は、なぜ必要かを理解したうえでレビュアーに説明する。スキルの役割は、担当者が説明できる状態の PR を、毎回同じ形で作ること
+- レビュアーの物差しは 1 つ。「業務的な挙動（画面、URL、遷移、システム間のやり取り、DB）が変わっていない。変わるなら意図的な仕様変更として書かれている」
+- Claude が元から持っている一般的な知識（Rails・Bundler の説明）はスキルに書かない。解説は作業のたびに出典付きで作らせる。スキルが決めるのは、順番・関門・止まる条件・提示と記録の型
+- 理由をたどる仕組み: 理由の正本はコミット（1 コミット 1 理由）、PR 本文はコミットへの索引、雛形に合わせず残す独自設定は、その場所のコメントに理由を書く。PR をマージコミットで取り込み、コミットのハッシュが残ることが前提（このリポジトリも、人間のチームも同じ）。DEF（defaults/）・LOG.md・IMP（IMPROVEMENTS.md）への記録は、このリポジトリ固有の上乗せ
+- 2 層: 汎用の核（ワークフロー・関門・型）と、リポジトリ固有の設定に分ける。スキル化の PR で分けて作るが、試すのはこのリポジトリだけ（チームでの検証は後に回す）
+
+### 2. 振り分けの基準
 
 | 置き場所 | 書くもの |
 |---|---|
-| スキル | 毎回同じ順で行い、抜けると事故になる手順と、人間に確かめる関門 |
-| リポジトリのスクリプト（`scripts/`） | 3 アプリに固有の道具。スキルから呼ぶ |
+| スキルの汎用の核（`.claude/skills/rails-upgrade/`） | 作業ごとの入口の条件・手順・関門・出口の条件と記録、提示と記録の型。リポジトリの文書の名前は持たず、リポジトリ固有の設定を通して指す |
+| リポジトリ固有の設定（`.claude/rails-upgrade-project.md`） | 文書の場所、アプリの一覧とコミットの順、検査のコマンド、業務的な挙動の定義、記録の上乗せ、手動確認用の環境。中身は指すだけで写さない |
+| リポジトリのスクリプト（`scripts/`） | 3 アプリに固有の道具と、Rails に共通の道具。スキルから呼ぶ。Rails に共通の道具は、チームへ持ち出すときに汎用の核へ移すかを決める |
 | PLAN.md・LOG.md・[defaults/](defaults/) | 人間が決めること、版ごとの知識、一度きりのこと |
 | [TIPS.md](TIPS.md) | コマンドのつまずきと、使えたやり方。スキルは該当の節を指し、中身を写さない |
 
-### 2. 作業
+### 3. 作業と関門
 
-| # | 作業 | 内容 | 人間に確かめる関門 |
-|---|---|---|---|
-| 1 | resume | PLAN.md と LOG.md から次の作業を判断する | — |
-| 2 | research | 調査と Step の作業計画（8 章の 1）。調べたことを PLAN.md の Step の節に移す | 作業計画の承認 |
-| 3 | gems | 周辺 gem の振り分け（7 章）と、1 gem ずつの更新。守られていない挙動のテストを先に足す | ダウンロード、一時固定、B にあたる変化（3 章の 2） |
-| 4 | patch | Rails のパッチ版の最新化と、非推奨警告の解消 | ダウンロード |
-| 5 | rails-lock | Rails のマイナーを上げたときの lock の解決 | default gem を置き換える依存の一時固定、依存で増えた gem のダウンロード |
-| 6 | rails-app-update | `app:update` の振り分け | 差分の確認 |
-| 7 | rails-defaults | `new_framework_defaults_*.rb` をグループごとに有効にする繰り返し | グループの順、各グループの解説への返事 |
-| 8 | rails-load-defaults | `load_defaults` を上げ、`new_framework_defaults_*.rb` と不要になった initializer を消す。`TargetRailsVersion` を上げる | 解説への返事 |
-| 9 | explain-defaults | 既定値への追随の解説と記録（3 章の 2 の手順）。3・6〜8 から呼ぶ | 解説への返事 |
-| 10 | ruby | Ruby のバージョンアップ。Step 2 を手作業で通してから中身を書く | — |
-| 11 | verify | 完了条件（10 章）の確認 | 手動確認の時期 |
-| 12 | record | LOG.md の記録（公開物の記載ルールに沿った置き換え → 安全チェック）、`/code-review`、PR のタイトルと本文の提案（`scripts/check-public-safety --message` を通す） | push と PR の作成（人間が行う） |
+関門は 2 種類に分ける。判断の関門は、担当者が決めるもの。理解の関門は、担当者がレビュアーに説明できるようにするもので、解説への返事がコミットメッセージ（このリポジトリでは DEF の記録）になり、PR の索引からたどれる。関門と関門の間（検査、lock の解決、`app:update` の後の独自設定の戻し、記録と PR 本文の下書き）は、AI が止まらずに進める。
 
-当初の 4（rails-minor）を 5〜8 の 4 つに分け、既定値への追随の解説と記録を 9 として独立させた。作業をまたいで使う手順（下の 3 の「アプリごとのコミット」と「手動確認」）は、参照用のファイルに 1 つずつ書く。
+| # | 作業 | 内容 | 判断の関門 | 理解の関門 |
+|---|---|---|---|---|
+| 1 | resume | PLAN.md と LOG.md から次の作業を判断する。Step の最初に、前の PR へのリンクのコミットと、手動確認用の環境の控えを行う | — | — |
+| 2 | research | 調査と Step の作業計画（8 章の 1）。lock の試行（Plan モードでは `--print`）、非推奨警告の確かめ。調べたことを PLAN.md の Step の節に移す | 作業計画の承認 | — |
+| 3 | gems | 周辺 gem の振り分け（7 章）と、1 gem ずつの更新。守られていない挙動のテストを先に足す。gem ごとの前後の比較、SHA-256 の照合、無視リストの消し込み、gem の雛形への追随 | ダウンロード、一時固定、B にあたる変化（3 章の 2）、未対応の gem の方針 | gem の既定値・雛形への追随 |
+| 4 | ruby | Ruby のバージョンアップ（8 章の 4） | Ruby のダウンロード、default gem の合わせ直しの版、手動確認の時期 | — |
+| 5 | rails-lock | Rails のマイナーを上げたときの lock の解決。今のマイナーの最新パッチでなければ、先に同じ方法でパッチを上げる | default gem を置き換える依存の一時固定、依存で増えた gem のダウンロード | — |
+| 6 | rails-app-update | `app:update` の振り分け | 差分の確認 | 雛形への追随 |
+| 7 | rails-defaults | `new_framework_defaults_*.rb` をグループごとに有効にする繰り返し | グループの順 | 各グループの既定値への追随 |
+| 8 | rails-load-defaults | `load_defaults` を上げ、`new_framework_defaults_*.rb` と不要になった initializer を消す。`TargetRailsVersion` を上げる | — | 既定値への追随 |
+| 9 | verify | 完了条件（10 章）の確認 | 手動確認の時期 | — |
+| 10 | pr | 記録（このリポジトリでは LOG.md）、`/code-review` と指摘の記録、PR のタイトルと本文の提案（PR 本文の型。`scripts/check-public-safety --message` を通す）、PR の後の CI の読み方 | push と PR の作成（人間が行う） | PR 本文が説明できる形になっているか |
 
-### 3. スキルに書く要点（Step 1 で分かったこと）
+当初の 4（rails-minor）を 5〜8 に分け、既定値への追随の解説と記録は、作業をまたぐ手順（`explain.md`）にした。当初の patch（Rails のパッチ版の最新化と非推奨警告）は、一度も通していない（6.1.7.10・7.0.10 とも、その時点の最新パッチだった）ので、rails-lock と research に含めた。当初の record は、PR 本文を作る作業として pr にした。作業をまたぐ手順（理解の関門、コミットの単位、前後の比較、手動確認）は、参照用のファイルに 1 つずつ書く。提示の型（作業計画、質問、ダウンロードの確認、追随の解説、業務的な挙動の変化での停止、コミットの報告、PR 本文、残す独自設定のコメント）は `templates.md` にまとめる。
 
-- rails-lock: `--conservative` を付けても周辺の gem まで動く。旧 lock の gem をすべて固定し、Rails の構成 gem だけを外して解決させ、どうしても動く gem を割り出す（TIPS.md「gem の更新」）。default gem を置き換える依存の一時固定と、依存で増えた gem のダウンロードの確認（Step 1 の ruby2_keywords）を関門にする
-- rails-app-update: `yes a` で全上書き → アプリの独自設定を戻す → 使わない機能のマイグレーションを消す → 差分を人間が確認する
-- rails-defaults: グループを決める → 設定の値を test と development の両方で前後比較する（`on_load` で入る値は、クラスを先に読み込んでから読む）→ 応答のスナップショットの差分を見る → 解説・提案（9）→ 返事 → 記録 → アプリごとのコミット
-- explain-defaults: 項目ごとに「何が変わるか・なぜ・影響・提案」を出典付きで解説 → 返事 → defaults/ への記録の docs のコミット → アプリごとのコミット（メッセージから ID を指す）。根拠に、応答のスナップショットの差分と、起動の途中の読み込みの検査の結果を使う
-- アプリごとのコミット: ほかのアプリの変更を `git stash push -u -- <ディレクトリ>` で退避し、そのアプリだけで minitest・E2E を流してからコミットする。`git rm` のステージ済みの削除が別のコミットに紛れる点に注意する（TIPS.md「コミット」）
-- verify: 10 章（`CI=1` の minitest、無視リストを空にした bundler-audit、lock の default gem の版、手動確認用の環境のハッシュを含む）
+セッションをまたいでも続きから始められるよう、記録（LOG.md）の Step の節は research の出口で作り、各作業の出口で結果を足し、pr で仕上げる。チェックリストの項目には、先頭に作業名を付ける（resume が項目から作業を推測しないようにするため）。どちらも、スキル化の PR で `/rails-upgrade` を試したときに、スキル自身が挙げた穴（Step の途中では、どこまで終わったかを判断する手がかりが記録にない。項目と作業名が結びつかない）から決めた。
+
+### 4. スキルに書く要点（Step 1・2・2-b で分かったこと）
+
+- rails-lock: `--conservative` を付けても周辺の gem まで動くので、旧 lock の gem を固定し、Rails の構成 gem だけを外して解決させる（`scripts/resolve-lock`）
+- rails-app-update: 全上書き → アプリの独自設定を戻す（`scripts/restore-app-config`）→ 使わない機能のマイグレーションを消す → 差分を担当者が確認する
+- rails-defaults: グループを決める → 設定の値を test と development の両方で前後比較する（`scripts/compare-config`）→ 応答のスナップショットの差分を見る → 解説（理解の関門）→ 返事 → 記録 → アプリごとのコミット
+- gems・ruby: 前後の比較（`scripts/compare-config`、`-W:deprecated`、スナップショット、reline や irb が動くときは `scripts/check-console`）と、落とした `.gem` の照合（`scripts/verify-gem-checksums`）。コマンドのつまずきは TIPS.md の「gem の更新」「Ruby を上げる」
+- アプリごとのコミット: ほかのアプリの変更を退避し、そのアプリだけで検査と E2E を流してからコミットする（`scripts/commit-per-app`）
+- verify: 10 章（`CI=1` の minitest、無視リストを空にした bundler-audit、lock の default gem の版、`rails c`、手動確認用の環境のハッシュを含む）
 - 手動確認: ブラウザペインが画面に出ているかを確かめてから、パスワードの入力と同意を人間に頼む。いつ行うかは Step ごとに人間と決める
 
-### 4. リポジトリのスクリプト
+### 5. リポジトリのスクリプト
 
-| スクリプト（名前は仮） | 中身 | 入れる時期・PR | 確かめ方 |
+| スクリプト | 中身 | 入れる時期・PR | 確かめ方 |
 |---|---|---|---|
 | （済）起動の途中の読み込みの検出 | a-nti_manner_kick_course と CI のステップ | 1-b-1 | — |
 | （済）応答のスナップショット | 各アプリの minitest | 1-b-2 | — |
-| `scripts/check-apps` | 3 アプリの検査（RuboCop、`zeitwerk:check`、起動の途中の読み込み（test・development）、minitest（`CI=1` も）、bundler-audit、brakeman）と E2E。アプリと検査を引数で絞れる。CI は変えない | 1-b-3 の PR（gem を上げる前のコミット） | 1-b-3 と Step 2 で使い、CI と同じ結果になること。使いながら直す。CI と同じ検査のコマンドを 2 か所に持つので、CI から `check-apps` を呼ぶかどうかは、スキルを作る PR で決める（1-b-3-1 のコードレビュー） |
-| `scripts/compare-config` | 設定の値の書き出し（test・development。`on_load` の対象のクラスを先に読み込み、非推奨の値は `Deprecation.silence` で読む）と前後の比較 | スキルを作る PR | Step 1 の `load_defaults 7.0` のコミットの前後で流し、違うのが DEF-7.0-24 だけになること |
-| `scripts/resolve-lock` | lock のコピーで、旧 lock の gem を固定し、指定した gem だけを外して解決させ、動く gem を出す | スキルを作る PR | タグ `rails-6.1-prepared` の lock で Rails 7.0.10 を解決し、Step 1 の結果（動くのは zeitwerk と annotate だけ）と同じになること |
-| `scripts/restore-app-config` | `app:update` の後に、アプリの独自設定（一覧はスクリプトが持つ）を戻す | スキルを作る PR | タグ `rails-6.1-prepared` を worktree に出して Rails 7.0.10 で `app:update` を流し、Step 1 の `app:update` のコミットと同じになること |
+| （済）`scripts/check-apps` | 3 アプリの検査（RuboCop、`zeitwerk:check`、起動の途中の読み込み（test・development）、minitest（`CI=1` も）、bundler-audit、brakeman）と E2E。アプリと検査を引数で絞れる | 1-b-3-1 | 1-b-3 と Step 2・2-b で使い、CI と同じ結果になった。CI から呼ぶかは、スキル化の PR で「呼ばない」と決めた（CI に mise がない、CI はステップごとに結果が画面に出る、CI だけの違い（署名鍵、bundler-audit の `--update`）がある）。同じ検査のコマンドが 2 か所にあるので、検査を足すときは両方に足す |
+| `scripts/compare-config` | 起動の途中に読み込み済みの部品（`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後）、起動の時点で読み込み済みのモデル、`filter_parameters`、設定の値（クラスに入った値）を test・development で書き出し、前後を比べる | スキル化の PR | Step 1 の `load_defaults 7.0` のコミットの前後で流し、違うのが DEF-7.0-24 だけになること。Step 2-b の doorkeeper-openid_connect 1.10.5 の前後で流し、違うのが `Doorkeeper::AccessGrant` の読み込みだけになること |
+| `scripts/resolve-lock` | lock のコピーで、旧 lock の gem を固定し、指定した gem だけを外して解決させ、動く gem を出す | スキル化の PR | タグ `rails-6.1-prepared` の lock で Rails 7.0.10 を解決し、Step 1 の結果（動くのは zeitwerk と annotate だけ）と同じになること。一時固定の版を渡して続けると、Step 1 の lock と同じになること |
+| `scripts/restore-app-config` | `app:update` の後に、アプリの独自設定（一覧はスクリプトが持つ）を戻し、使わない機能のマイグレーションを消す | スキル化の PR | タグ `rails-6.1-prepared` の後の Step 1 のコミットを worktree に出して Rails 7.0.10 で `app:update` を流し、Step 1 の `app:update` のコミットと同じになること |
+| `scripts/check-console` | `rails c` を擬似端末で起動して入力を試す（Step 2-b の擬似端末のドライバー） | スキル化の PR | 3 アプリで、Step 2-b の記録と同じ表示になること |
+| `scripts/verify-gem-checksums` | キャッシュの `.gem` の SHA-256 を rubygems.org の値と比べる | スキル化の PR | Step 2 のコードレビューと同じく、3 アプリのキャッシュがすべて一致すること |
+| `scripts/commit-per-app` | ほかのアプリの変更を退避し、そのアプリの検査と E2E を流してからコミットし、退避を戻す | スキル化の PR | 使い捨てのブランチで、成功・検査の失敗・コミットメッセージの検査の失敗のどれでも、退避した変更が戻ること |
 
-Rails のマイナーを上げるときにしか使わない 3 つは、Step 3 より前に実際の作業で試せないので、Step 1 を再現して確かめる。
+Rails のマイナーを上げるときにしか使わない `compare-config`・`resolve-lock`・`restore-app-config` は、Step 3 より前に実際の作業で試せないので、Step 1 を再現して確かめる。
 
-### 5. スキルにしないもの
+### 6. スキルにしないもの
 
 | もの | 置き場所 |
 |---|---|
 | 版の選び方などの判断 | PLAN.md・LOG.md |
 | 版ごとの設定の中身 | defaults/ |
 | 一度きりの修正（RP の serializer の件など） | LOG.md・defaults/ |
+| Rails・Bundler の一般的な知識 | 書かない（解説は作業のたびに出典付きで作る） |
 | push・PR の作成 | 人間 |
 | CI の結果の読み方 | TIPS.md |
 

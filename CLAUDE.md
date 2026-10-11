@@ -11,7 +11,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 
 ## 作業を始めるとき
 
-1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する。コマンドの実行や確認の手順は `docs/upgrade/TIPS.md`（作業のコツ）を参照する
+1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する。コマンドの実行や確認の手順は `docs/upgrade/TIPS.md`（作業のコツ）を参照する。Step の作業は、人間が `/rails-upgrade [作業名]` で始める（スキルは `.claude/skills/rails-upgrade/`、このリポジトリ固有の設定は `.claude/rails-upgrade-project.md`。方向と構成は PLAN.md の 13 章）
 2. 現在のブランチを確認する。作業ブランチは `epic/rails-8.1-upgrade` から切る
 3. クローン直後は `git config core.hooksPath .githooks` を実行して git hooks を有効にする。あわせて `git config blame.ignoreRevsFile .git-blame-ignore-revs` で、見た目だけのコミットを git blame から外す
 4. Ruby は mise で管理する。各アプリの `mise.toml`（`.ruby-version` を読ませる設定）は、初回に各アプリのディレクトリで `mise trust` を実行しないと読まれない

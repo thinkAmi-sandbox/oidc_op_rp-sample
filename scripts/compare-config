@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# 3 アプリの設定の値と、起動の途中に読み込み済みの部品を、test と development で書き出し、前後で比べる。
+# 書き出す中身は scripts/lib/dump_config.rb の先頭のコメント。手順の中での使い方は
+# docs/upgrade/TIPS.md の「設定の値と応答の比較」。
+#
+# 使い方:
+#   scripts/compare-config dump <ラベル>           3 アプリ・test と development を書き出す
+#   scripts/compare-config dump <ラベル> --app rp --env test
+#                                                 アプリ（rs / rp / op）と環境を絞る（どちらも繰り返せる）
+#   scripts/compare-config diff <ラベル1> <ラベル2>  書き出しを比べる。違いがあれば終了コード 1
+#   --root <ディレクトリ>                         アプリのあるリポジトリ（既定はこのスクリプトのリポジトリ。worktree を比べるとき）
+#
+# 書き出しは環境変数 COMPARE_CONFIG_DIR（なければ $TMPDIR/compare-config）の <ラベル>/<アプリ>-<環境>.txt に置く。
+# dump は、同じラベルの前の書き出しを消してから書く（前の書き出しが残って diff に混ざらないようにする）。
+# development は手動確認用の DB に触れないよう、E2E 用の DB（db/e2e.sqlite3）を指す。
+# Ruby は各アプリのディレクトリで mise を通して使う。
+
+set -u
+
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$SCRIPT_ROOT"
+OUT_DIR="${COMPARE_CONFIG_DIR:-${TMPDIR:-/tmp}/compare-config}"
+
+usage() {
+  sed -n '6,13p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+[ $# -ge 1 ] || { usage >&2; exit 2; }
+command="$1"
+shift
+
+apps=()
+envs=()
+labels=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --app)
+      case "${2:-}" in
+        rs) apps+=(rails_resource_server) ;;
+        rp) apps+=(rails_relying_party_of_backend) ;;
+        op) apps+=(rails_open_id_provider) ;;
+        *) echo "--app には rs / rp / op を渡す" >&2; exit 2 ;;
+      esac
+      shift 2
+      ;;
+    --env)
+      case "${2:-}" in
+        test|development) envs+=("$2") ;;
+        *) echo "--env には test / development を渡す" >&2; exit 2 ;;
+      esac
+      shift 2
+      ;;
+    --root)
+      [ -d "${2:-}" ] || { echo "--root にはディレクトリを渡す" >&2; exit 2; }
+      ROOT="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "不明な引数: $1" >&2; usage >&2; exit 2 ;;
+    *) labels+=("$1"); shift ;;
+  esac
+done
+
+[ ${#apps[@]} -gt 0 ] || apps=(rails_resource_server rails_relying_party_of_backend rails_open_id_provider)
+[ ${#envs[@]} -gt 0 ] || envs=(test development)
+
+case "$command" in
+  dump)
+    [ ${#labels[@]} -eq 1 ] || { echo "dump にはラベルを 1 つ渡す" >&2; exit 2; }
+    case "${labels[0]}" in
+      */*|.|..) echo "ラベルに / は使えない" >&2; exit 2 ;;
+    esac
+    dir="$OUT_DIR/${labels[0]}"
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    failed=0
+    for app in "${apps[@]}"; do
+      for env in "${envs[@]}"; do
+        out="$dir/$app-$env.txt"
+        db=()
+        [ "$env" = development ] && db=(DATABASE_URL=sqlite3:db/e2e.sqlite3)
+        if (cd "$ROOT/$app" && env RAILS_ENV="$env" ${db[@]+"${db[@]}"} mise exec -- bundle exec ruby "$SCRIPT_ROOT/scripts/lib/dump_config.rb") >"$out" 2>&1; then
+          echo "OK    $app $env（$out）"
+        else
+          echo "FAIL  $app $env（$out）"
+          failed=1
+        fi
+      done
+    done
+    exit "$failed"
+    ;;
+  diff)
+    [ ${#labels[@]} -eq 2 ] || { echo "diff にはラベルを 2 つ渡す" >&2; exit 2; }
+    before="$OUT_DIR/${labels[0]}"
+    after="$OUT_DIR/${labels[1]}"
+    for d in "$before" "$after"; do
+      [ -d "$d" ] || { echo "書き出しがない: $d" >&2; exit 2; }
+    done
+    status=0
+    for app in "${apps[@]}"; do
+      for env in "${envs[@]}"; do
+        name="$app-$env.txt"
+        if [ ! -f "$before/$name" ] || [ ! -f "$after/$name" ]; then
+          echo "== $app $env: 片方の書き出しがない"
+          status=1
+        elif diff -q "$before/$name" "$after/$name" >/dev/null; then
+          echo "== $app $env: 同じ"
+        else
+          echo "== $app $env: 違う"
+          diff -u "$before/$name" "$after/$name" | tail -n +3
+          status=1
+        fi
+      done
+    done
+    exit "$status"
+    ;;
+  -h|--help) usage ;;
+  *) echo "不明なコマンド: $command" >&2; usage >&2; exit 2 ;;
+esac

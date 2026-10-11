@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# アプリの vendor/bundle の .gem のキャッシュの SHA-256 を、rubygems.org の API の sha と比べる。
+# gem を上げて落とした .gem と、Ruby を上げたときにコピーした .gem を確かめるために使う（Step 2・2-b の道具をスキル化の PR で
+# スクリプトにした）。手順の中での使い方は docs/upgrade/TIPS.md の「gem の更新」「Ruby を上げる」。
+#
+# 使い方:
+#   scripts/verify-gem-checksums rs                     RS（rs / rp / op）のキャッシュの .gem をすべて照合する
+#   scripts/verify-gem-checksums rs --changed <ref>     lock で <ref> から増えた・変わった gem だけを照合する
+#   --root <ディレクトリ>                               アプリのあるリポジトリ（既定はこのスクリプトのリポジトリ）
+#
+# 不一致か、API から取れないものがあれば終了コード 1。rubygems.org の API（JSON）を読む（gem は落とさない）。
+# Ruby は、アプリのディレクトリで mise を通して使う（キャッシュの場所は、その Ruby の ABI の版で決まる）。
+
+set -u
+
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$SCRIPT_ROOT"
+
+usage() {
+  sed -n '6,9p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+app=""
+base_ref=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    rs) app=rails_resource_server; shift ;;
+    rp) app=rails_relying_party_of_backend; shift ;;
+    op) app=rails_open_id_provider; shift ;;
+    --changed)
+      [ -n "${2:-}" ] || { echo "--changed には git の ref を渡す" >&2; exit 2; }
+      base_ref=("$2")
+      shift 2
+      ;;
+    --root)
+      [ -d "${2:-}" ] || { echo "--root にはディレクトリを渡す" >&2; exit 2; }
+      ROOT="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "不明な引数: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+[ -n "$app" ] || { echo "アプリ（rs / rp / op）を渡す" >&2; usage >&2; exit 2; }
+
+cd "$ROOT/$app" || exit 2
+mise exec -- ruby "$SCRIPT_ROOT/scripts/lib/verify_gem_checksums.rb" ${base_ref[@]+"${base_ref[@]}"}

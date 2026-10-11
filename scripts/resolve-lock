@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# lock のコピーで、旧 lock の gem をすべて固定し、指定した gem だけを外して解決させ、lock で動いた gem を出す。
+# Rails のマイナーを上げるとき、`--conservative` を付けても周辺の gem まで動くので、どうしても動く gem を割り出すために使う。
+# アプリの Gemfile・lock は書かない。手順の中での使い方は docs/upgrade/TIPS.md の「gem の更新」。
+#
+# 使い方:
+#   scripts/resolve-lock --app op --gem rails='~> 7.1.6' --rails
+#   scripts/resolve-lock --app op --gem rails='~> 7.1.6' --rails --unpin zeitwerk --pin benchmark=0.3.0
+#   --app <rs|rp|op>          対象のアプリ（1 つ）
+#   --gem <名前>=<要件>        Gemfile の要件を書き換える gem（固定もしない。繰り返せる）
+#   --rails                   Rails の構成 gem（rails・railties・action*・active*）と sprockets 系を固定しない
+#   --unpin <名前>[,<名前>]    固定しない gem（解決できないときに Bundler のエラーに出た gem）
+#   --pin <名前>=<版>[,...]    lock の版の代わりに固定する版（default gem と同じ名前の依存の一時固定など）
+#   --out <ディレクトリ>        出力先（既定は一時ディレクトリ）
+#   --root <ディレクトリ>       アプリのあるリポジトリ（既定はこのスクリプトのリポジトリ。worktree で試すとき）
+#
+# 解決できなければ Bundler のエラーを出して終了コード 1。増えた gem が今の Ruby の default gem と同じ名前なら、
+# default gem の版を添える（一時固定するかを決める材料）。rubygems.org の索引を読む（gem は落とさない）。
+# Ruby・Bundler は、アプリのディレクトリで mise を通して使う。
+
+set -u
+
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$SCRIPT_ROOT"
+
+usage() {
+  sed -n '6,15p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+app=""
+out=""
+requirements=()
+unpin=()
+pins=()
+rails_parts=(rails railties actioncable actionmailbox actionmailer actionpack actiontext actionview
+  activejob activemodel activerecord activestorage activesupport sprockets sprockets-rails)
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --app)
+      case "${2:-}" in
+        rs) app=rails_resource_server ;;
+        rp) app=rails_relying_party_of_backend ;;
+        op) app=rails_open_id_provider ;;
+        *) echo "--app には rs / rp / op を渡す" >&2; exit 2 ;;
+      esac
+      shift 2
+      ;;
+    --gem)
+      case "${2:-}" in
+        ?*=?*) requirements+=("$2") ;;
+        *) echo "--gem には <名前>=<要件> を渡す" >&2; exit 2 ;;
+      esac
+      shift 2
+      ;;
+    --rails) unpin+=("${rails_parts[@]}"); shift ;;
+    --unpin)
+      [ -n "${2:-}" ] || { echo "--unpin には gem の名前を渡す" >&2; exit 2; }
+      IFS=, read -r -a names <<<"$2"
+      unpin+=("${names[@]}")
+      shift 2
+      ;;
+    --pin)
+      [ -n "${2:-}" ] || { echo "--pin には <名前>=<版> を渡す" >&2; exit 2; }
+      IFS=, read -r -a entries <<<"$2"
+      for entry in "${entries[@]}"; do
+        case "$entry" in
+          ?*=?*) pins+=("$entry") ;;
+          *) echo "--pin には <名前>=<版> を渡す: $entry" >&2; exit 2 ;;
+        esac
+      done
+      shift 2
+      ;;
+    --out)
+      [ -n "${2:-}" ] || { echo "--out にはディレクトリを渡す" >&2; exit 2; }
+      out="$2"
+      shift 2
+      ;;
+    --root)
+      [ -d "${2:-}" ] || { echo "--root にはディレクトリを渡す" >&2; exit 2; }
+      ROOT="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "不明な引数: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$app" ] || { echo "--app を渡す" >&2; usage >&2; exit 2; }
+[ -n "$out" ] || out="$(mktemp -d "${TMPDIR:-/tmp}/resolve-lock.XXXXXX")"
+mkdir -p "$out"
+out="$(cd "$out" && pwd)"
+
+# 引数を JSON にして Ruby に渡す（gem の名前と版に、JSON で escape の要る文字は入らない）
+json_object() {
+  local first=1 entry
+  printf '{'
+  for entry in "$@"; do
+    [ $first -eq 1 ] || printf ','
+    first=0
+    printf '"%s":"%s"' "${entry%%=*}" "${entry#*=}"
+  done
+  printf '}'
+}
+json_array() {
+  local first=1 name
+  printf '['
+  for name in "$@"; do
+    [ $first -eq 1 ] || printf ','
+    first=0
+    printf '"%s"' "$name"
+  done
+  printf ']'
+}
+
+cd "$ROOT/$app" || exit 2
+mise exec -- ruby "$SCRIPT_ROOT/scripts/lib/resolve_lock.rb" "$out" \
+  "$(json_object ${requirements[@]+"${requirements[@]}"})" \
+  "$(json_array ${unpin[@]+"${unpin[@]}"})" \
+  "$(json_object ${pins[@]+"${pins[@]}"})"

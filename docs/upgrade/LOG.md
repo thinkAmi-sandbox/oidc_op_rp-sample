@@ -1804,7 +1804,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 ## Step 2-b: Ruby 3.2 以上を必要とする周辺 gem（2026-10-10〜2026-10-11）
 
-- ブランチ / PR: `upgrade/step2b-ruby32-gems` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step2b-ruby32-gems` / [#27](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/27)
 - バージョン: Ruby 3.2.11・Rails 7.0.10（変更なし）。OP の doorkeeper-openid_connect 1.10.1 → 1.10.5。3 アプリの zeitwerk 2.6.18 → 2.7.5 → 2.8.3、byebug 12.0.0 → 13.0.0、simplecov 0.22.0 → 1.2.0、brakeman 7.1.1 → 8.0.6。byebug の依存の reline 0.6.0・io-console 0.6.0（一時固定）が lock に入り、simplecov の依存だった docile・simplecov-html・simplecov_json_formatter が lock から消えた
 - 追随した gem の既定値・雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 2-b）」に記録した（DEF-7.0-48〜50）。業務的な挙動の変化（B）は起きなかった
 - gem を上げる手順で分かったことは、TIPS.md の「gem の更新」と「rails c を確かめる」にまとめた（スキル化の材料。PLAN.md の 13 章）
@@ -1893,3 +1893,84 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | TIPS.md の「rails c を確かめる」の擬似端末のドライバーが scratchpad にしかなく、後の Step で再現できない | 直さない。13 章の振り分け（3 アプリに固有の道具は `scripts/`）に照らして、スキルを作る PR で `scripts/` に置くかを決める |
 
 コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、手動確認用の環境の 9 ファイルのハッシュが手動確認の後と同じことを確かめた。
+
+## スキル化: `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（2026-10-11）
+
+- ブランチ / PR: `upgrade/skill-rails-upgrade` / （PR 作成後に記入）
+- バージョン: Ruby 3.2.11・Rails 7.0.10（変更なし）。gem は上げていない。アプリのコードと lock も変えていない
+- この節は、スキル化の PR で決めた記録の書き方（research の出口で節を作り、作業ごとに足していく。PLAN.md の 13 章の 3）にならい、作業の途中から書いている
+
+### 作業計画で決めたこと
+
+着手時に PLAN.md 8 章の手順で確かめ直し（サブエージェント 2 つ: Claude Code のスキルの仕様、Step 1 を再現する条件）、作業計画を出した。作業計画への返事の対話で、スキルの方向を人間と決め直してから承認を得た。確かめたことと決めたことの一覧は、PLAN.md の 6 章の「スキル化」と 13 章に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| スキルの方向 | 知識のある担当者が判断の要る所だけを確かめ、それ以外は AI が再現性のある形で進める。スキルの役割は、細部を知らないレビュアーに担当者が説明できる状態の PR を、毎回同じ形で作ること | 人間のチームでは、担当者だけではアップグレードを完了できず、レビュアーが PR を見て OK を出したら完了とする。担当者は、なぜ必要かを理解してレビュアーに説明する（人間の説明）。これまでの関門でも、人間は Rails と gem の知識を前提に AI の案を直してきた |
+| Claude の知識 | スキルに一般的な Rails・Bundler の知識を書かない。解説は作業のたびに出典付きで作らせる | スキルには、手順の順番・関門・止まる条件・提示と記録の型だけを書く（人間の前提） |
+| 理由をたどる仕組み | 理由の正本はコミット（1 コミット 1 理由）、PR 本文はコミットへの索引、雛形に合わせず残す設定はその場所のコメントに理由。DEF・LOG.md・IMP はこのリポジトリ固有の上乗せ | 人間のチームには DEF や LOG がない。このリポジトリも人間のチームも、PR をマージコミットで取り込むので、コミットのハッシュが残る（人間に確かめた） |
+| 2 層 | 汎用の核（`.claude/skills/rails-upgrade/`）と、リポジトリ固有の設定（`.claude/rails-upgrade-project.md`）。試すのはこのリポジトリだけ | チームへ持ち出す前提にする。汎用の核は、このリポジトリ以外では試されていない仮説のまま epic に入る（人間が同意） |
+| 作業の一覧 | patch を外し、rails-lock と research に含める。record を pr にする | patch は一度も通していない。PR 本文を作る作業として pr にした |
+| Step 2-b の道具 | `compare-config`（起動の途中の読み込みの書き出しを統合）・`check-console`・`verify-gem-checksums`・`commit-per-app` を `scripts/` に入れる | Step 2-b のコードレビューで、この PR で決めるとした。関門と関門の間の決まった作業は、AI が止まらずに進める |
+| CI から `check-apps` を呼ぶか | 呼ばない。`check-apps` の冒頭のコメントに、検査を足すときは ci.yml にも足すと書く | CI に mise がない、CI はステップごとに結果が画面に出る、CI だけの違い（署名鍵、bundler-audit の `--update`）がある |
+| Rails に共通の道具の置き場所 | この PR では `scripts/` | このリポジトリで試す。チームへ持ち出すときに、汎用の核へ移すかを決める |
+
+### 作業計画からの変更点
+
+- スキルの試行（下の「スキルを試した結果」）の `pr` で、PR 本文の型を 3 か所直した（変更の一覧の 1 行の単位、記録だけのコミットの本文、追随の置き場所）
+- スキルの試行（下の「スキルを試した結果」）で、スキル自身が 2 つの穴を挙げた。人間の承認を得て、記録の Step の節を research の出口で作り、各作業の出口で結果を足していく形にした（それまでは、作業ごとの結果をセッションの中の「記録の下書き」に控え、pr でまとめる形だった）。あわせて、PLAN.md のチェックリストの項目の先頭に作業名を付けることにし、この PR のチェックリストにも verify と pr の項目を足した
+
+### スクリプトの確かめ方と結果
+
+過去の Step の結果を再現できることを確かめてから、1 つずつコミットした。Step 1 は、タグ `rails-6.1-prepared` の後のコミットを scratchpad の worktree に出して再現した（各アプリの `vendor/bundle` は本体へのシンボリックリンク、mise にはコマンドにだけ `MISE_TRUSTED_CONFIG_PATHS` を付けた。OP の署名鍵は worktree の中の使い捨て）。Ruby 3.1.7（Bundler 2.3.27）と、Step 1 の lock の gem はすべて手元にあり、gem・Ruby のダウンロードはなかった。
+
+| スクリプト | 確かめたこと |
+|---|---|
+| `scripts/compare-config` | Step 1 のグループ 8 の後（`89fb290`）と `load_defaults 7.0` の後（`400ed9c`）で、違うのは DEF-7.0-24（`ActionDispatch::Request.return_only_media_type_on_content_type`）の RP の test・development と OP の development だけ（記録と同じ。設定ファイルの値は前後とも同じで、クラスの値だけが違う）。Step 2-b の doorkeeper-openid_connect 1.10.5 の前後（`ac5b6fb`）で、違うのは `Doorkeeper::AccessGrant`（と `Doorkeeper::OpenidConnect::Request`）が起動の時点で読み込まれなくなったことだけ（記録と同じ）。今の 3 アプリで 2 回書き出して同じ |
+| `scripts/resolve-lock` | タグの 3 アプリで Rails 7.0.10 を解決させると、Bundler が zeitwerk（RP・OP は annotate も）を挙げて止まり、外すと、動くのは Rails の構成 gem・zeitwerk 2.6.18・annotate 3.2.0、増えるのは benchmark・securerandom・drb・mutex_m（default gem と同じ名前として版が出る）、消えるのは sprockets 系（Step 1 と同じ）。Step 1 の一時固定の版を `--pin` で渡し、TIPS.md の続き（lock を持ち込み、Gemfile の rails を変えて `bundle lock`）を流すと、3 アプリの Gemfile と lock が `fb67546`・`a6e2bdf`・`8715abf` と同じ。今の epic で流すと、何も動かない |
+| `scripts/restore-app-config` | `7e256b9` で 3 アプリに `yes a \| bin/rails app:update` → このスクリプトを流すと、`e363c55`・`8ca0c8c`・`8be19a1` のそのアプリのファイルと同じ（RP の `config/application.rb` の末尾の serializer の 3 行も戻る）。雛形から deprecation の行を消すと、項目を出して終了コード 1。今の epic で流すと、何も変えない |
+| `scripts/check-console` | 3 アプリの development で、reline 0.6.0・irb 1.6.2・io-console 0.6.0・`IRB::RelineInputMethod`、Tab で `Rails.version` に補完、複数行の入力が `=> 42`（Step 2-b の記録と同じ）。`bin/rails runner` の中の byebug に `next`・`continue` を送れる。すぐに終わるコマンドでは終了コード 1 |
+| `scripts/verify-gem-checksums` | 3 アプリの `ruby/3.2.0/cache` の `.gem` 379 個（重複を除いて 184 個）が、すべて rubygems.org の値と同じ。`--changed 467f288` で、Step 2-b で落とした gem だけを照合する（io-console は default gem を使ったので、キャッシュにないと出る） |
+| `scripts/commit-per-app` | 使い捨てのブランチの worktree で、RP の変更を退避して RS をコミットできた（検査は 11 runs・E2E 10 passed）。RP の RuboCop の指摘ではコミットせず、ホームのパスを含むメッセージでは commit-msg の hook に止められてステージを外し、どちらも退避した OP の変更が戻った。ステージ済みの変更があると止まる。終わった後に worktree とブランチを消した |
+
+### スキルを試した結果
+
+人間が新しいセッションを Plan モードで開き、`/rails-upgrade` を試した。
+
+- 引数なし（resume）: スキル化の途中で、チェックリストの残りが「スキルを試す」だけであること、前の Step の PR（#27）の取り込みと記録へのリンクのコミット（`2da733e`）を読み取り、次の作業を verify → pr とした。ファイルは変えずに止まった。取り込んだ後の次の Step は示さなかった（resume.md にそう書いていなかった）
+- スキル自身が、2 つの穴を挙げた。①チェックリストの項目（「スキルを試す」）とスキルの作業名が結びつかず、作業を推測した ②pr の入口の条件「verify が終わっている」を、Step の途中で記録から判断する手がかりがない。上の「作業計画からの変更点」のとおりに直した。resume.md には、Step の最後の作業なら、取り込んだ後の次の Step も示すことを足した
+- `pr`（Step 2-b の練習）: 「マージ済みの Step 2-b（PR #27）に当てて、PR 本文の下書きだけをチャットに出す。ファイルの変更・コミット・`/code-review`・CI の確認はしない」と添えて試した。下書きは templates.md の「PR 本文」の 6 つの節がそろい、実際の PR #27 の本文にある内容（版の表、GHSA の扱い、DEF-7.0-48〜50、業務的な挙動の変化なし、検査の件数、前後の比較、手動確認、見送ったこと）はすべて入っていた。PR #27 になかった「変更の一覧（コミットへの索引）」と「レビュアーに見てほしい所」が足され、見てほしい所の先頭は、OP の応答に関わる唯一の変更（doorkeeper-openid_connect）だった。下書きの言い回しのうち、LOG.md にないもの（zeitwerk の `nsfile`、initializer の `resource_owner_or_nil`）は、どちらもコミットメッセージにあった。ファイルは変えず、安全チェックを通し、最後に理解の関門として、レビュアーが聞きそうな「なぜ」を 3 つ挙げた
+- `pr` の試行で、型の穴が 3 つ分かった。①変更の一覧をコミットごとに 1 行にすると 28 行になり、15 行は 3 アプリで同じ内容、10 行は記録・計画だけのコミットだった ②記録だけのコミット 10 個のうち 9 個に本文がなく、下書きは「なぜ」を差分と LOG.md から組み立て直した ③追随（A）が変更の一覧の行に埋もれ、PR #27 にあった「既定値・雛形への追随」の節にあたるものがない。人間の承認を得て、①変更の一覧は理由 1 つにつき 1 行（アプリごとのコミットはハッシュを並べ、記録・計画だけのコミットは最後の 1 行）②記録・計画だけのコミットも本文に何のための記録かを書く ③「業務的な挙動の変化」の節に、変わったが業務的な挙動ではないもの（追随）を並べる、に直した（templates.md・commit.md・pr.md）
+
+### 遭遇した問題
+
+1. `compare-config` の最初の版は、`ActiveJob::Base.queue_adapter` の inspect にプロセス ID が入り、2 回の書き出しが毎回違った。単純な型（文字列・数値・配列・ハッシュ・クラスなど）でない値は、クラス名だけを出すようにした
+2. `compare-config` の関連の `inverse_of` の節は、読み込み済みのモデルしか見ないので、Step 2-b の確かめで、gem のモデルの読み込みの変化が「関連が消えた」ように見えた。アプリのモデル（`Rails.root` の下）だけを見るようにした（gem のモデルの読み込みの変化は「読み込み済みのモデル」の行に出る）
+3. `restore-app-config` が、`git show` の出力を環境の既定の文字コード（US-ASCII）で読み、日本語のコメントで `ArgumentError`（invalid byte sequence）になった。UTF-8 として読むようにした
+4. `verify-gem-checksums` の最初の版は、ruby 版の gem のときに API にプラットフォームを渡さず、java 版などのある gem（puma・json・nio4r・racc・date など。3 アプリで 27 個）が不一致に見えた。常に `platform=` を渡すようにした（Step 2 のコードレビューと同じ渡し方。TIPS.md の「gem の更新」に書いた）
+5. Rails 7.1 では `ActiveSupport::Deprecation` をシングルトンとして使うこと自体が非推奨になり、test 環境の `:raise` で止まりうる。Step 3 で使うので、`compare-config` は `Rails.application.deprecators` があればそちらで警告を止める（Rails 7.1 では試していない）
+6. 手元の Claude Code の CLI は 2.1.195 で、スキルを検査する `claude plugin validate .claude/skills`（2.1.233 以上）を使えなかった。frontmatter を Ruby の YAML で読み、`name` とディレクトリ名、SKILL.md の行数、リンク、「設定の◯◯」の見出し、指している TIPS.md・CLAUDE.md の節を、scratchpad のスクリプトで照合した
+
+### 確認結果
+
+- `scripts/check-apps`（3 アプリと E2E）: スキルを作った後に流し、36 の検査がすべて通った。minitest は RS 11 runs・RP 33 runs・OP 69 runs、0 failures（`CI=1` でも同じ）、E2E は 10 passed（Step 2-b と同じ）
+- 手動確認用の環境: 作業の開始時に 9 ファイルのハッシュを控え、件数が Step 2-b の手動確認の後と同じこと（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）を確かめた。スクリプトを確かめた後に、ハッシュが作業の開始時と同じだった
+- verify（スキルを試して直した後）: アプリのディレクトリ・`e2e/`・`.github/` は epic と差分がない（アプリのコードと lock は変えていない）。`scripts/check-apps` の 36 の検査がすべて通り、件数は上と同じ。`bin/rails c` は `scripts/check-console` で 3 アプリとも起動し（上の「スクリプトの確かめ方と結果」）、`bin/rails s` は E2E で起動した。手動確認用の環境の 9 ファイルのハッシュは作業の開始時と同じ。追跡中の全ファイルと、この PR の 15 コミットのメッセージが、公開物の安全チェックを通った。ブラウザでの手動確認は、アプリを変えていないので行っていない
+- 再現に使った scratchpad の worktree（タグ `rails-6.1-prepared` の後と、Step 2-b の前後）は消した。各アプリの `vendor/bundle` は本体へのリンクだったので、本体の gem は残っている
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `compare-config` の出力先は既定で固定のディレクトリで、dump が同じラベルのディレクトリを空にしないので、アプリを絞って取り直すと、ほかのアプリの前の書き出しが残って diff に混ざる（冒頭のコメントの「なければ一時ディレクトリ」とも食い違う） | dump の始めに同じラベルのディレクトリを消すようにし、`/` を含むラベルを断るようにした。コメントを直した。3 アプリで取った後に OP だけを取り直すと、RS は「片方の書き出しがない」になることを確かめた |
+| `compare-config` が arity 0 のメソッドしか読まないので、`delegate` などで引数が `(...)` になった読み出し（arity -1）は黙って飛ばされ、設定が効かなくなっても「同じ」に見えうる | 引数なしで呼べるもの（arity 0 と -1）を読むようにした。Step 1 と Step 2-b の再現（違うのは DEF-7.0-24 だけ、`Doorkeeper::AccessGrant` の読み込みだけ）と、今の 3 アプリで 2 回同じになることを確かめ直した |
+| `check-console` は `CONSOLE_STEPS` を渡すと、子プロセスが落ちても終了コード 0 になる | 終了の状態が 0 でなければ終了コード 1 にした。`exit 3` で終わるコマンドで 1 になること、byebug で 0 になることを確かめた |
+| 擬似端末のドライバーが、出力の末尾 200 バイトに `>` があればプロンプトとみなすので、起動の途中の出力（`=>` など）で、irb の準備の前に入力を送りうる | 端末の制御文字を除いた出力の末尾が `>` か `(byebug)` で終わるまで待つようにした。3 アプリで Step 2-b の記録と同じ表示になることを確かめ直した |
+| `restore-app-config` が、HEAD にあって新しい雛形にない filter_parameters の要素をすべて戻すので、雛形が消した要素も独自の設定として戻してしまう | 戻すのを、スクリプトの一覧（`:code`）にある要素だけにし、ほかの要素は「雛形で消えた要素」として知らせるようにした。雛形から `:ssn` を消すと、戻さずに知らせることと、Step 1 の 3 アプリの再現を確かめ直した |
+| `restore-app-config` が `config/application.rb` の最後の `end` の後の行を `split(/^end\n/)` で取るので、末尾に改行のないファイルでは、ほとんど全体を末尾に足しうる | 最後の `end` の行の位置から取るようにした |
+| `resolve-lock` が、同じ gem の最初の行だけを固定するので、プラットフォームやグループごとに書いた 2 行目以降が固定されない | どの行も固定するようにした（このリポジトリの Gemfile に該当の行はない） |
+| `resolve-lock` に `--gem rails='>= 7.0.10, < 7.1'` のようにカンマを含む要件を渡すと、1 つの文字列として Gemfile に書かれ、Bundler が読めない | 要件を分けて書くようにした。今の OP で解決できることを確かめた |
+| `resolve-lock` は Gemfile のコピーで解決するので、Gemfile の場所からの相対パスの参照（`gemspec`、`eval_gemfile`、`ruby file:`、`path:`）が壊れる | 該当の行があれば、lock を読む前に行を出して止まるようにした（このリポジトリの Gemfile にはない）。`gemspec` を足した Gemfile のコピーで、終了コード 1 になることを確かめた。Step 1 の 3 アプリの lock の再現を確かめ直した |
+| この PR で足した決まり（チェックリストの項目の先頭に作業名）に、この PR の「スキル化」のチェックリストのスクリプトとスキルの行が従っていない | 直さない。スキル化は、スキルの作業（gems・ruby など）の外で行った Step で、当てはまる作業名がない。作業名のある verify と pr の項目には付けた |
+
+コードレビューの後に、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り（件数は上と同じ）、手動確認用の環境の 9 ファイルのハッシュが作業の開始時と同じことを確かめた。作り直した worktree は、確かめた後で消した。

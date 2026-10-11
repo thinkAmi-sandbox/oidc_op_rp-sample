@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# アプリの `bin/rails c` を擬似端末で起動し、入力を送って、起動と入力ができることを確かめる。
+# Claude Code の Bash には端末がないので、`rails c` をそのまま流せない（docs/upgrade/TIPS.md の「rails c を確かめる」）。
+# 擬似端末のドライバーは scripts/lib/drive_console.py（Step 2-b の道具をスキル化の PR でスクリプトにした）。
+#
+# 使い方:
+#   scripts/check-console rs                      RS（rs / rp / op）の development で bin/rails c
+#   scripts/check-console rs --env test           環境を変える
+#   scripts/check-console rs -- bin/rails runner 'byebug; 1'
+#                                                 -- の後のコマンドを起動する（送る入力は環境変数 CONSOLE_STEPS）
+#   --root <ディレクトリ>                         アプリのあるリポジトリ（既定はこのスクリプトのリポジトリ）
+#
+# 既定の入力は、reline・irb・io-console の版と入力の方式の表示、Tab の補完、複数行の入力（if true … end）、exit。
+# CONSOLE_STEPS には JSON の文字列の配列を渡す（例: '["next\r", "continue\r"]'）。
+# 出力の全体は環境変数 CHECK_CONSOLE_LOG_DIR（なければ一時ディレクトリ）に残し、要約を出す。
+# 既定の入力で、表示の行と `=> 42` が出て、終了の状態が 0 なら終了コード 0（CONSOLE_STEPS のときは、終了の状態だけを見る）。
+# development は手動確認用の DB に触れないよう、E2E 用の DB（db/e2e.sqlite3）を指す。
+
+set -u
+
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$SCRIPT_ROOT"
+LOG_DIR="${CHECK_CONSOLE_LOG_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/check-console.XXXXXX")}"
+
+usage() {
+  sed -n '6,11p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+app=""
+env_name=development
+command=(bin/rails c)
+while [ $# -gt 0 ]; do
+  case "$1" in
+    rs) app=rails_resource_server; shift ;;
+    rp) app=rails_relying_party_of_backend; shift ;;
+    op) app=rails_open_id_provider; shift ;;
+    --env)
+      case "${2:-}" in
+        test|development) env_name="$2" ;;
+        *) echo "--env には test / development を渡す" >&2; exit 2 ;;
+      esac
+      shift 2
+      ;;
+    --root)
+      [ -d "${2:-}" ] || { echo "--root にはディレクトリを渡す" >&2; exit 2; }
+      ROOT="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    --)
+      shift
+      [ $# -gt 0 ] || { echo "-- の後にコマンドを渡す" >&2; exit 2; }
+      command=("$@")
+      break
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "不明な引数: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+[ -n "$app" ] || { echo "アプリ（rs / rp / op）を渡す" >&2; usage >&2; exit 2; }
+
+mkdir -p "$LOG_DIR"
+log="$LOG_DIR/$app-$env_name.log"
+db=()
+[ "$env_name" = development ] && db=(DATABASE_URL=sqlite3:db/e2e.sqlite3)
+
+cd "$ROOT/$app" || exit 2
+# reline は TERM がないと terminfo を引けずに落ちる
+result="$(env TERM=xterm-256color RAILS_ENV="$env_name" ${db[@]+"${db[@]}"} \
+  python3 -I "$SCRIPT_ROOT/scripts/lib/drive_console.py" "$log" mise exec -- "${command[@]}")"
+
+# 端末の制御文字を除いて要約する
+plain="$(LC_ALL=C sed -E $'s/\x1b\\[[0-9;?]*[A-Za-z]//g; s/\r//g' "$log")"
+echo "== $app $env_name: ${command[*]}（出力: $log）"
+echo "$result"
+if [ -n "${CONSOLE_STEPS:-}" ]; then
+  echo "$plain" | tail -20
+  echo "$result" | grep -q '^child_status 0$' || { echo "終了の状態が 0 でない"; exit 1; }
+  exit 0
+fi
+
+status=0
+check_line="$(echo "$plain" | grep -o 'CHECK reline=.* input=[A-Za-z:]*' | grep -v '#{' | tail -1)"
+if [ -n "$check_line" ]; then echo "$check_line"; else echo "版の表示の行が出ていない"; status=1; fi
+if echo "$plain" | grep -q '=> 42'; then echo '複数行の入力: => 42'; else echo '複数行の入力の結果（=> 42）が出ていない'; status=1; fi
+if echo "$plain" | grep -q 'Rails\.version'; then echo 'Tab の補完: Rails.version'; else echo 'Tab の補完: 補完されていない'; fi
+echo "$result" | grep -q '^child_status 0$' || { echo "終了の状態が 0 でない"; status=1; }
+exit "$status"

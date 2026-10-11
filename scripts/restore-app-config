@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# `bin/rails app:update` で雛形に上書きされたアプリの独自設定を、HEAD（app:update の前のコミット）から戻し、
+# app:update が足した使わない機能のマイグレーションを消す。戻す設定の一覧は scripts/lib/restore_app_config.rb が持つ。
+# 使う場面は docs/upgrade/PLAN.md の 13 章の rails-app-update（Step 1 の app:update で手で戻したものをスクリプトにした）。
+#
+# 使い方（アプリのディレクトリで `yes a | bin/rails app:update` を流した後に、リポジトリ直下で）:
+#   scripts/restore-app-config rs                 RS（rs / rp / op）
+#   scripts/restore-app-config --root <dir> rs    アプリのあるリポジトリを指す（worktree で試すとき）
+#
+# 戻す先の行が雛形に見つからなければ、その項目を出して終了コード 1（雛形が変わったので、手で戻して一覧を直す）。
+# 最後にそのアプリの変更の一覧を出す。一覧にない独自設定は戻さないので、差分は人間が確かめる。
+
+set -u
+
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$SCRIPT_ROOT"
+
+usage() {
+  sed -n '6,8p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+app=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    rs) app=rails_resource_server; shift ;;
+    rp) app=rails_relying_party_of_backend; shift ;;
+    op) app=rails_open_id_provider; shift ;;
+    --root)
+      [ -d "${2:-}" ] || { echo "--root にはディレクトリを渡す" >&2; exit 2; }
+      ROOT="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "不明な引数: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+[ -n "$app" ] || { echo "アプリ（rs / rp / op）を渡す" >&2; usage >&2; exit 2; }
+
+cd "$ROOT/$app" || exit 2
+mise exec -- ruby "$SCRIPT_ROOT/scripts/lib/restore_app_config.rb"
+status=$?
+
+echo
+echo "== $app の変更（差分は git diff で確かめる）"
+git status --short -- .
+exit "$status"
