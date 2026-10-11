@@ -2224,3 +2224,45 @@ verify:
 
 22. 手動確認の入口の条件は「手動確認用の環境が控えた状態と同じ」だが、新しい版で初めて開くことで手動確認用の環境が変わる（DB の形式、フレームワークが作るテーブル）ことを、手動確認の前に見込む手順がない。今回は、WAL は rails-lock で見込んでいたが、RS のテーブルは見込めず、起動した後に止まって確かめた。起動の前に DB の写しを取っておけば、元に戻す選択肢も残せた
 23. 手動確認用の環境のハッシュで比べる方法は、SQLite が WAL になると、サーバーを止めた後も `-wal` が残り、`-shm` は読むだけで変わるので、そのままでは使えない。設定の「手動確認用の環境」は、DB の形式の変化を想定していない
+
+## Step 3-b: doorkeeper-openid_connect 2.0.0（2026-10-11）
+
+- ブランチ / PR: `upgrade/step3b-doorkeeper-oidc20` / （PR 作成後に記入）
+- バージョン: Ruby 3.2.11（変更なし）/ Rails 7.1.6（変更なし）/ doorkeeper-openid_connect 1.10.5 → 2.0.0（OP）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade research` で、Plan モードで調べた（gem の 1.10.5...2.0.0 の差分はサブエージェント 1 つ。要点は自分で gem のソースで確かめた）。lock は `bundle lock --print` で、書かずに試した。作業計画を出し、論点を 1 つずつ人間と確かめてから承認を得た。調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 3-b」に書いた。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| `post_logout_redirect_uris` のマイグレーション（#243） | 入れる。意図的な仕様変更（DB の列） | gem の CHANGELOG が「Migration required」と書いたアップグレードの手順で、境目 1（gem の雛形への追随）の側にあたる。コードは列がなくても動くが、その分岐は移行のためのもの。機能のコードは列がなくても読み込まれ、列は置き場所を足すだけなので、境目 5 の「使っていない機能を動かし始める」にはあたらない（人間が判断） |
+| discovery の `authorization_response_iss_parameter_supported: false`（#333） | 意図的な仕様変更として受け入れる | 設定では消せない。値は OP の挙動のとおり（認可応答に `iss` を付けない）。RP・RS は discovery を読まない（人間が判断） |
+| webfinger の `Content-Type` と `Access-Control-Allow-Origin: *`（#350） | 意図的な仕様変更として受け入れる | research で新しく見つかった。設定では戻せない。RP・RS・E2E は webfinger を呼ばない。公開の情報だけを返す応答（人間が判断） |
+| 手動確認用の OP の development DB | verify の手動確認の直前に 1 回だけ migrate する。その前に本体と `-wal` を `rails_open_id_provider/tmp/manual_check_backup/` に写す。写しは PR が epic に入った後に、確かめてから消す | マイグレーションのファイルが入ると、development の OP は migrate するまで `PendingMigrationError` になる。Step 3 の「スキルについて気づいたこと」の 22 を踏まえ、元に戻す選択肢を残す（人間が判断） |
+
+- コミットは OP だけで、gem を上げる → schema.rb を Rails 7.1 の形で書き出す → マイグレーションの順にする。schema.rb の書き出しの形の変化（`Schema[6.1]` → `Schema[7.1]` ほか）は research で新しく見つかった。マイグレーションと理由を分けるため、書き出すだけのコミットにする
+- 応答のスナップショットと E2E の baseline は、gems の作業で実際の差分を示し、人間に確かめてから作り直す
+- ダウンロード: doorkeeper-openid_connect 2.0.0（55,808 バイト、2026-09-22 公開）。人間が承認した
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの後）に、14 ファイルのハッシュを控えた。件数は Step 3 の手動確認の後と同じ（OP `oauth_access_grants` 21・`oauth_access_tokens` 52、RP `sessions` 12・`op_users` 1）。件数は、本体と `-wal` を scratchpad にコピーして数えた。
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+
+### 意図的な仕様変更
+
+PLAN.md の 6 章の「Step 3-b」の 3 つ（`post_logout_redirect_uris` の列、discovery の `authorization_response_iss_parameter_supported`、webfinger のヘッダー）。結果は各作業の出口で足す。
+
+### 遭遇した問題
+
+### 確認結果
