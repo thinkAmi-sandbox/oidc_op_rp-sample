@@ -668,7 +668,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 スキル化の PR が epic に入ってから、`/rails-upgrade research` で調べた。作業計画を出し、承認を得た（2026-10-11）。Ruby 3.2.11 のまま Rails を 7.1.6 に上げる。Rails の前に、今の Rails で上げられる直接の gem を上げ、Rails の直後に、Rails 7.1 を必要とする gem を上げる。経緯と作業の記録は LOG.md の Step 3。
 
 - [x] gems: brakeman 8.1.0（3 アプリ）
-- [ ] gems: jwt 3.3.0（3 アプリ。RS は oauth2 の依存）
+- [x] gems: jwt 3.3.0（RP・OP。RS は間接の依存なので 2.10.3 のまま。下の「着手後に決めたこと」）
 - [ ] gems: puma 8.0.2（3 アプリ。Gemfile `~> 6.0` → `~> 8.0`）
 - [ ] gems: omniauth-rails_csrf_protection 2.0.1（RP）
 - [ ] rails-lock: Rails 7.1.6（3 アプリ）
@@ -718,6 +718,9 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
 - `backtrace_silencers.rb` は 3 アプリとも残す。`BACKTRACE` 環境変数を railties が扱うのは 7.2 からなので、Step 5 で見直す
 - `new_framework_defaults_7_1.rb` のグループと順は、rails-defaults の関門で決める。記録は `docs/upgrade/defaults/rails-7.1.md`（`DEF-7.1-<連番>`）
 - 手動確認は verify で 1 回にする。途中で前の Cookie やセッションに影響する変化が見つかったら、止まって時期を相談し直す
+- 着手後に決めたこと（人間が判断）
+  - RS の jwt は 2.10.3 のままにする。作業計画は jwt を「3 アプリ」としていたが、RS の jwt は oauth2 の依存（間接の gem）で、直接の gem の方針の対象外だった（RS のコミットの前に気づいた）
+  - 2.10.3 は CVE-2026-45363 の修正版で、ほかの advisory はない。RS は jwt の処理を通らない（oauth2 の assertion のグラントだけが `JWT.encode` を使う）。ruby-jwt の `2-10-stable` はバックポートだけで、将来の修正が戻されないおそれはある。そのため、間接の gem は epic の最後の段階でまとめて上げることを考える（14 章）
 
 調べたこと（着手時の 2026-10-11）。調べた材料は次のとおりで、ソースと CHANGELOG はサブエージェント 2 つで調べ、要点は自分で確かめた。
 - rubygems の API と `bundle outdated`
@@ -782,7 +785,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
 |---|---|---|---|
 | mail | 2.7.1 | 0-a で 2.8.1（済）→ 0-d-3 で 2.9.1（済） | 0-a は Ruby 3.1 で起動するために必要。`--conservative` でも 2.9 系になるので一時的に固定して 2.8.1 にした。0-d-3 は advisory の修正 |
 | nokogiri | 1.12.3 | 0-a で 1.18.10（済）→ Step 2 で 1.19.4（済。advisory 12 件を解消） | 1.12 は Ruby 3.1 のネイティブ版がない。1.19 系は Ruby 3.2 以上が必要 |
-| jwt（RP は直接使う。RS は oauth2 経由の間接依存。OP はテストが直接使い、doorkeeper-openid_connect 1.8.4 以上の依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま）→ 0-f-3 で OP に 2.10.3（済。test グループに明記。一時固定で入れた）→ Step 3 で 3.3.0（3 アプリ。Rails 7.1 にする前） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる。3.x は Ruby 3.2 を必要としないので Step 2-b の対象外とした。Step 3 の着手時に、直接の gem の方針で上げると決めた。3.0〜3.3 の破壊的な変更（RSA 2048 ビット以上、claim の検証の API の削除、厳しい base64、例外の階層）は、このリポジトリの使い方に当たらない見込み |
+| jwt（RP は直接使う。RS は oauth2 経由の間接依存。OP はテストが直接使い、doorkeeper-openid_connect 1.8.4 以上の依存） | 2.2.3 | 0-a で RP を 2.5.0（済）→ 0-f-2 で 2.10.3（済。RP は Gemfile に明記、RS は間接のまま）→ 0-f-3 で OP に 2.10.3（済。test グループに明記。一時固定で入れた）→ Step 3 で RP・OP を 3.3.0（済。Rails 7.1 にする前）。RS（間接の依存）は 2.10.3 のまま、間接の gem をまとめて上げるときに上げる（14 章） | RP の `lib/omniauth/strategies/my_op.rb` が直接使うのに Gemfile にない。OpenSSL 3 への対応は 2.5.0 から。advisory（CVE-2026-45363）の修正版は 2.10.3 / 3.2.0。oauth2 を 2.x にしても RS の jwt は上がらないので、RS は oauth2 1.4.7 のうちに jwt を上げる。3.x は Ruby 3.2 を必要としないので Step 2-b の対象外とした。Step 3 の着手時に、直接の gem の方針で上げると決めた。3.0〜3.3 の破壊的な変更（RSA 2048 ビット以上、claim の検証の API の削除、厳しい base64、例外の階層）は、このリポジトリの使い方に当たらない見込み |
 | json-jwt（OP、doorkeeper-openid_connect 経由） | 1.13.0 | 0-a で 1.14.0（済）→ 0-f-3 で外れた（済） | OpenSSL 3 への対応は 1.14.0 から。CVE-2023-51774 は未修正だったが、OP は署名だけで decode しないため影響なし。doorkeeper-openid_connect 1.8.4 で jwt に置き換わった。OP の minitest は、0-f-3 で gem を上げる前に ruby-jwt に書き直した |
 | nio4r / msgpack | 2.5.8 / 1.4.2 | 0-a で 2.5.9 / 1.4.5（済）。msgpack は 0-d-3 で 1.8.5（済） | 0-a は clang 17 で C 拡張がビルドできないため、同じマイナー内のパッチ版に更新。0-d-3 は advisory の修正 |
 | thor（railties 経由） | 1.1.0 | 0-f-1 で 1.5.0（済） | 1.1.0 は Ruby 3.1 で `DidYouMean::SPELL_CHECKERS.merge!` の非推奨警告が出る（起動には影響なし）。1.2.0 で出なくなった。railties 6.1 は `~> 1.0` |
@@ -976,6 +979,7 @@ Rails のマイナーを上げるときにしか使わない `compare-config`・
 ## 14. 未決事項
 
 - [ ] 最終的に Ruby 4.0 まで上げるか（Step 8 完了時に判断）
+- [ ] 間接の依存の gem（Gemfile.lock にだけある gem）を、epic の最後の段階でまとめて上げるか。時期、まとめ方（一度に 1 つの決まりとの折り合い）、default gem に合わせた一時固定の扱いを、人間と相談して決める（Step 3 の着手後に人間が提案。RS の jwt 2.10.3 はそのときに上げる）。伊藤さん式（Qiita「永久保存版！？伊藤さん式・Railsアプリのアップグレード手順」の 4-d・7）は、引数なしの `bundle update` で、結果として間接の gem もまとめて上げる。ruby-jp の「Railsアップグレードガイド」「Rubyアップグレードガイド」は、gem の更新の手順を個別の記事へのリンクに任せていて、間接の gem の記述はない（Step 3 で調べた）
 - [x] advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（7 章の表）を、いつ上げるか（Step 0-d-1 で人間が判断）: 脆弱性の修正だけのサブステップ 0-d-3 を設け、0-d-2 の後、0-e の前に上げる
 - [x] `rails_open_id_provider/jwtRS256.key.example` の扱い（Step 0-c で判断）: 鍵の中身のないプレースホルダーで、どこからも参照されていなかったため、`.pub.example` と一緒に削除した
 

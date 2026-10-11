@@ -1756,6 +1756,13 @@ gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で�
 - 3 アプリには、信頼できないデータを `Marshal.load` する経路がない。アプリのコード（app・lib・config）に `Marshal` はなく、Cookie は JSON で直列化し（DEF-7.0-16）、RP のセッションストアも JSON、キャッシュは test・development とも `:null_store`（development は `tmp/caching-dev.txt` がない）
 - 人間の判断で、Gemfile に erb を足さずに記録だけにした。Ruby 3.3.12 の default gem の erb は 4.0.3.1、3.4.11 は 4.0.4.1（修正版。GitHub のタグの `lib/erb/version.rb` で確かめた）なので、Step 4 で解消を確かめる（PLAN.md 7 章の erb の行）。default gem の erb は lock にないので、bundler-audit は検出しない
 
+### 作業計画からの変更点
+
+- RS の jwt を上げなかった。作業計画は jwt を「3 アプリ（RS は oauth2 の依存）」としていたが、決めたことの論点 4（直接の gem だけが方針の対象）と食い違っていた。3 アプリの lock を上げて検査を通した後、RS のコミットメッセージを書く段階で気づき、止まって人間に確かめた
+  - 人間の質問に答えて、2.10.3 のままのリスクを確かめた。2.10.3 は CVE-2026-45363（GHSA-c32j-vqhx-rx3x、HMAC の空の鍵での検証のすり抜け）の修正版で、ほかの advisory はない。RS は jwt の処理を通らない（oauth2 2.0.25 の `lib/oauth2/strategy/assertion.rb` が `require` し、使わない assertion のグラントの `JWT.encode` だけが呼ぶ）。3 系の強化（RSA 2048 ビット以上、厳しい base64、検証前の payload の禁止）は検証する側のもので、RS には当たらない
+  - ruby-jwt の `2-10-stable` は、2.10.2 以降は 2 回のバックポート（2025-06-29、2026-05-22 の CVE の修正）だけで、将来の修正が戻される保証はない。人間は、jwt だけを例外にするのではなく、epic の最後の段階で間接の gem もまとめて上げることを考えたいとし、伊藤さん式と ruby-jp のアップグレードガイドの間接の gem の扱いを調べた（PLAN.md の 14 章）
+  - 人間の判断で、RS の lock の変更を戻し、2.10.3 のままにした。間接の gem をまとめて上げる段階で上げる
+
 ### 前後の比較
 
 Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動の途中に読み込み済みの部品（`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後。test・development）を書き出し、各アプリを上げた後と比べた。
@@ -2008,6 +2015,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | gem | バージョン | 対応 |
 |---|---|---|
 | brakeman | 8.0.6 → 8.1.0 | 3 アプリ。`bundle update brakeman --conservative`。lock で動いたのは brakeman だけ（racc は 1.5.2 のまま）。公開から 2 週間の決まりの例外（作業計画で人間が判断） |
+| jwt | 2.10.3 → 3.3.0 | RP・OP。`bundle update jwt --conservative`。lock で動いたのは jwt だけ。上げる前に、RP の `my_op.rb` の `JWT.decode` まわりを `jwt-2.10.3/lib/jwt` と v3.3.0 のタグで比べた。`algorithm` のキー、鍵を探すブロックの呼び方、iss・aud・sub・exp・nbf の検証は同じで、`verify_iat` に渡していない leeway が増えただけ。変わったのは、構造の壊れたトークンと鍵がないときの例外クラスだけ（どちらも `JWT::DecodeError` のサブクラス）。既存のテストが nonce・kid・署名の鍵・iss・aud・exp の失敗の例外クラスを確かめているので、先に足すテストはなかった。RS は 2.10.3 のまま（下の「作業計画からの変更点」） |
 
 - ダウンロードした `.gem` の SHA-256 は、すべて rubygems.org の値と同じ（`scripts/verify-gem-checksums <app> --changed <上げる前のコミット>`）
 
@@ -2028,6 +2036,9 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - brakeman 8.1.0
   - 3 アプリとも終了コード 0。JSON の出力の警告（0 件）と無視した警告（EOL の 2 件）の fingerprint・チェック名・メッセージ、実行したチェックの一覧は、8.0.6 と同じ
   - 設定の値と起動の途中の読み込み（`compare-config`）、eager load の警告、minitest・E2E の件数とスナップショット、テストの出力の DEPRECATION は、前と同じ
+- jwt 3.3.0（RP・OP）
+  - 3 アプリの lock を上げた状態で、3 アプリの検査と E2E がすべて通った。OP の ID トークン・JWKS・discovery の応答のスナップショットと、E2E の baseline（ID トークンのヘッダー・ペイロード、JWKS）に差分はない
+  - 設定の値と起動の途中の読み込み、eager load の警告、テストの出力の DEPRECATION は、前と同じ
 
 ### スキルについて気づいたこと
 
@@ -2043,3 +2054,7 @@ research:
 8. 「直接の gem は、上げられる時点で最新版に上げる」という方針が、research の対話で人間から出た。7 章の振り分けは「時期を決めた gem はその Step で」となっていて、今上げられるメジャーの更新を先送りしていた（jwt・puma・omniauth-rails_csrf_protection）。research の手順 3（周辺 gem の振り分け）は設定の「計画」を指すだけで、この方針を書く場所がない（今回は 7 章の冒頭に足した）
 9. 「質問は 1 回に 1 論点」は、Plan モードの選択式の質問（AskUserQuestion）がフックで止められ、テキストで行った。論点が 9 つあり、計画の承認の前に 9 往復した。今回はそれでよかったが、論点が多いときの進め方（見立てに異論がなさそうなものをまとめて示すか）は書いていない
 10. 設定の「手動確認用の環境」は「9 ファイル」としているが、指す先の TIPS.md の一覧には 6 ファイル（`tmp/development_secret.txt` の 3 つがない）しか書いていなかった。Step 3 の docs のコミットで、`development_secret.txt` と `local_secret.txt` を TIPS.md に足した
+
+gems:
+
+11. 作業計画の中の食い違い（jwt を「3 アプリ」としたことと、論点 4 の「直接の gem だけ」）を、research の出口でも gems の入口でも見つけられず、RS のコミットメッセージを書く段階で気づいた。gems の入口の条件に、上げる gem が作業計画の決まり（方針の範囲）に当たるかを確かめる手順がない
