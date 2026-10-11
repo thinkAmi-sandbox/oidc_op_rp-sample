@@ -78,7 +78,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - `--no-cache` を付けないと、入れた後でアプリのキャッシュを最新にしようとして、キャッシュにない default gem の `.gem` を、`--local` でも rubygems.org から落とす（Step 2 の RS・RP で起きた。LOG.md の Step 2「遭遇した問題」）
   - 入れた後は、`Fetching` の行がないこと、default gem が default gem から読まれること（`Gem.loaded_specs["json"].default_gem?`）を見る
   - コピーした `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json?platform=<プラットフォーム>` の `sha` と比べる（Step 2 では `Gem::Package.new(<ファイル>).spec` で名前・版・プラットフォームを読んで比べた）
-- 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行（Ruby の非推奨の警告は既定で出ないので、`RUBYOPT=-W:deprecated` を付けた minitest と、development の `bin/rails runner 'Rails.application.eager_load!'` も流す）、応答と E2E のスナップショット、起動の途中に読み込み済みの部品（下の「設定の値と応答の比較」の `@loaded`。`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後の 3 か所を、test と development で書き出す）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
+- 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行（Ruby の非推奨の警告は既定で出ないので、`RUBYOPT=-W:deprecated` を付けた minitest と、development の `bin/rails runner 'Rails.application.eager_load!'` も流す）、応答と E2E のスナップショット、起動の途中に読み込み済みの部品と設定の値（`scripts/compare-config`。下の「設定の値と応答の比較」）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
 - brakeman の EOLRuby の警告は、Ruby の版がメッセージにだけ入り、fingerprint は変わらないので、無視リストに当たり続ける（無視リストのメッセージは古い版のまま残る）
 
 ## rails c を確かめる（Step 2-b）
@@ -90,11 +90,13 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 
 ## 設定の値と応答の比較（Rails を上げる Step）
 
-- `new_framework_defaults_*.rb` の設定は、有効にする前後で `rails runner` から実際の値を書き出して比べる。設定ファイルの値ではなく、クラスに入った値（`ActiveRecord::Base.partial_inserts` など）を読む。`on_load` の中で値が入る設定があるので、読む前に `ActionView::Base`・`ActionController::Base`・`ActionDispatch::Request`・`ActiveRecord::Base` などを読み込んでおく。test と development の両方で比べる（development だけで使う gem が、起動の途中にクラスを読み込むことがある。Step 1 の web-console）
+- `new_framework_defaults_*.rb` の設定は、有効にする前後で実際の値を書き出して比べる。リポジトリ直下で `scripts/compare-config dump <前のラベル>` → 設定を変える → `scripts/compare-config dump <後のラベル>` → `scripts/compare-config diff <前> <後>`（Step 1 の道具をスキル化の PR でスクリプトにした）。3 アプリの test と development を書き出す（development だけで使う gem が、起動の途中にクラスを読み込むことがある。Step 1 の web-console）。gem を上げる前後（Step 2-b）と、Ruby を上げる前後（Step 2）にも使う
+  - 設定ファイルの値ではなく、クラスに入った値（`ActiveRecord::Base.partial_inserts` など）を読む。`config.<名前>` の各キーについて、同じ名前のメソッドを持つクラスの値を出し、キーと名前が違う値（`ActionDispatch::Request.return_only_media_type_on_content_type` など）は別の節に出す。`on_load` の中で値が入る設定があるので、値を読む前にフレームワークのクラスを読み込む。非推奨の値で test 環境の `:raise` に止められないよう、非推奨の警告を止めて読む
+  - 新しい設定のキーとメソッドの名前が違うと、クラスの値が出ない（`config.` の行だけが出る）。そのときは `scripts/lib/dump_config.rb` の「設定のキーと名前が違う値」に足す
 - 非推奨のメソッドの値を読むと、test 環境の `deprecation = :raise` で例外になる。`ActiveSupport::Deprecation.silence { ... }` で包む
-- 起動の途中に読み込まれた部品は、`require "./config/application"` の後と、`Rails.application.initializer("probe", before: :load_config_initializers) { ... }` を足して `Rails.application.initialize!` した後に、`ActiveSupport.instance_variable_get(:@loaded)` で値のある名前を見ると分かる。誰が読み込んだかは、`ActiveSupport.on_load(:active_record) { puts caller }` を先に仕込むと分かる（Step 1）
+- 起動の途中に読み込まれた部品と、起動の時点で読み込み済みのモデルも、`scripts/compare-config` が書き出す（`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後の 3 か所。`ActiveSupport.instance_variable_get(:@loaded)` で値のある名前）。誰が読み込んだかは、`ActiveSupport.on_load(:active_record) { puts caller }` を先に仕込むと分かる（Step 1）
 - 起動の途中の読み込みは、Step 1-b-1 から a-nti_manner_kick_course で検出する（上の「確認のコマンド」。CI でも流す）。見つけると `on_load(:active_record)` などの名前と疑わしい行を出して終了コード 1 で止まる。疑わしい行が gem の中を指すときは、`ANTI_MANNER_DEBUG=1` でスタックトレース全部を出し、アプリの行を探す（Step 1 の RP の serializer の設定は `activerecord-session_store-2.1.0/lib/active_record/session_store/session.rb` を指し、全部を出すと `config/application.rb` の行が出た）
-  - 検出できるのは、`config/application.rb`、`Bundler.require` で gem を require するとき、`config/environments/*.rb`、Rails 自身の initializer まで。gem の検査は Rails の各フレームワークの initializer の直後で終わるので、ほかの gem の initializer（web-console など）と `config/initializers/*.rb` は検出できない。監視の一覧に `action_dispatch_request` もない。これらで設定が効かなくなっていないかは、上の値の比較（有効にする前後で、test と development の値を書き出す）で確かめる。上の `@loaded` の確かめ方は `config/initializers` を読む直前の時点を見るので、`config/initializers` の中での読み込みは見えない。どこで読み込まれたかは `on_load { puts caller }` で探す
+  - 検出できるのは、`config/application.rb`、`Bundler.require` で gem を require するとき、`config/environments/*.rb`、Rails 自身の initializer まで。gem の検査は Rails の各フレームワークの initializer の直後で終わるので、ほかの gem の initializer（web-console など）と `config/initializers/*.rb` は検出できない。監視の一覧に `action_dispatch_request` もない。これらで設定が効かなくなっていないかは、上の値の比較（有効にする前後で、test と development の値を書き出す）で確かめる。上の `scripts/compare-config` の「`config/initializers` の直前」は、その時点を見るので、`config/initializers` の中での読み込みは見えない。どこで読み込まれたかは `on_load { puts caller }` で探す
   - `ANTI_MANNER` を付けたまま、ほかのコマンド（`bin/rails test` など）を流さない。gem が起動の途中で終了コード 0 で終えるので、何も検査せずに成功したように見える
 - 応答の前後比較は、Step 1-b-2 から各アプリの minitest の応答のスナップショット（下の「応答のスナップショット」）で行う。使い捨ての統合テストは要らない。test 環境では出ない development だけのヘッダー（`Server-Timing`、rack-mini-profiler・web-console のもの）と CSRF のトークンは、Rails を上げる Step で development のアプリの応答を `curl` で見る（Step 1 と同じ）
 
