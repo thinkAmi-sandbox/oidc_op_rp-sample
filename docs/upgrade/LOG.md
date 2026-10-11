@@ -2050,6 +2050,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 - rails-lock で、人間に確かめて 3 アプリの `tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーし、守るファイルを 12 にした（コピーの直後にハッシュを控え、元の 9 ファイルのハッシュが変わっていないことを確かめた）
 - rails-defaults の後（`3d85c46` の時点）に、12 ファイルのハッシュが作業の開始時（`local_secret.txt` はコピーの直後）と同じことを確かめた。ハッシュの控えはセッションの scratchpad にしかないので、次のセッションは、始めた時点のハッシュをこの時点の続きとして控え直す
 - rails-load-defaults の始め（`e539059` の時点）に 12 ファイルのハッシュを控え直し、`load_defaults 7.1` のコミット（各アプリの E2E を含む）の後も同じことを確かめた
+- verify の手動確認の直前にも 12 ファイルのハッシュと件数が同じことを確かめた。手動確認で 3 アプリの development DB が初めて Rails 7.1 で開かれ、3 つの DB のハッシュが変わった（RS は DEF-7.1-47 のテーブル、3 つとも DEF-7.1-48 の WAL）。OP・RP には `-wal`・`-shm` が残った。守るファイルに OP・RP の `-wal` を足して 14 にし、手動確認の後のハッシュを新しい基準にした（人間が判断。TIPS.md）
 
 ### gem ごとの対応
 
@@ -2111,11 +2112,37 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
   - 7.1.6 の雛形の initializer は 7.0.10 と同じで、消すものはなかった。雛形にない `backtrace_silencers.rb` は残し、先頭に残す理由のコメントを足した（人間が承認。7.0 のときはコミットメッセージにだけ書いていた）
   - 解説（DEF-7.1-42〜46 と `backtrace_silencers.rb`）に人間の返事を得てから、記録（`173a321`）、RS `47a0dfc`・RP `52bafaa`・OP `7bca31e` の順にコミットした。RuboCop の `TargetRailsVersion` は 7.1 にして、3 アプリで新しい指摘がないことを確かめた（`c0853c8`）
 
+### 手動確認
+
+verify で、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Rails 7.1.6・Puma 8.0.2 が出た。
+
+- 起動の直後に、RS の最初の要求で、手動確認用の RS の development DB に `schema_migrations` と `ar_internal_metadata` が作られた。止まって人間に確かめ、Rails 7.1 の未実行マイグレーションの検査の変化として受け入れた（DEF-7.1-47。下の「遭遇した問題」）
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP のログイン画面も同意画面も出ずに RP に戻った。前回の手動確認（Rails 7.0.10）で作った OP のセッション Cookie（Rails 7.0 の形式の暗号化 Cookie）を、Rails 7.1 の OP が読めた（DEF-7.1-41 の確かめ残し。secret_key_base は `tmp/local_secret.txt` にコピーしたもの）。OP のログは、認可エンドポイントが 302、トークン・userinfo・JWKS が 200。RP のセッションは、ログインで ID が入れ替わった
+- introspection 用 RP: 前回のトークンは revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke（OP は 200）の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回。Step 2-b と同じ
+- サーバーの出力: 3 アプリとも、エラー・warning・DEPRECATION の新しいものはない。RP の `/stylesheets/application.css` のルーティングのエラーは元からのもの
+- 手動確認用の環境: 直前の件数は基準と同じ（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）。手動確認で、OP の development DB は `oauth_access_grants` が 19 → 21 件、`oauth_access_tokens` が 47 → 52 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 12 件のまま（ID 24 の行が 25 に入れ替わった）。増えた行は `-wal` の中にある（サーバーを止めても本体に移らなかった）。署名鍵・`.env`・3 アプリの `tmp/development_secret.txt`・`tmp/local_secret.txt` は変わっていない。以降の基準は手動確認の後の 14 ファイルのハッシュ
+
 ### 遭遇した問題
 
 | 問題 | 対応 |
 |---|---|
 | Rails 7.1.6 にすると、E2E のサーバーの起動を待つところで 120 秒のタイムアウトになった。OP はすべての要求に `ActiveRecord::PendingMigrationError` を返した（E2E 用の DB にテーブルがない）。`e2e/scripts/start-server.sh` は `bin/rails db:drop db:setup` を 1 つのプロセスで流していた | アプリの `tmp/` に作った確かめ用の DB で再現した。1 つのプロセスで `db:drop db:setup` を流すと最後に DB のファイルがなく、`db:setup` だけや、`db:drop` と `db:setup` を別のプロセスで流すとテーブルが入る。Rails 7.1 は SQLite を WAL で開き（rails/rails#49349。`activerecord-7.1.6/lib/active_record/connection_adapters/sqlite3_adapter.rb:733`）、`db:drop` が `-wal`・`-shm` も消す（#49435 の修正）。同じプロセスに残った接続との組み合わせが原因の見込みで、内部の経路までは確かめていない。人間に確かめ、Rails 7.1.6 の lock の前に、3 アプリの `db:drop` と `db:setup`（RS は `db:create`）を別のプロセスで流すようにした。Rails 7.0.10 のまま E2E が通ることを確かめてからコミットした |
+| verify の手動確認で、RS を Rails 7.1 で起動すると、手動確認用の RS の development DB に `schema_migrations` と `ar_internal_metadata` が作られた。前の手動確認（Rails 7.0）では RS の DB は変わらなかった | 7.1 の `CheckPending` が `migration_context.open` を通り、`Migrator` の初期化で 2 つのテーブルを作るためと、`activerecord-7.1.6` と v7.0.10 のソースで確かめた。止まって人間に確かめ、追随として受け入れた（DEF-7.1-47）。元のファイルの写しがないので、手動確認の後のハッシュを新しい基準にした |
+| 手動確認の後、サーバーを止めても OP・RP の `-wal` が残り、本体のファイルのコピーで数えると件数が増えていなかった。WAL になった RS の DB は、`-shm` がないと `sqlite3 -readonly` で開けなかった | Rails 7.1 は SQLite を WAL で開く（DEF-7.1-48）。件数は `-wal` を含めて読み取り専用で数え直した。人間に確かめ、DEF-7.1-48 を記録し、TIPS.md の守るファイルに `-wal` を足して、数え方を書いた |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`5eedf23`）で 36 の検査がすべて通った。各コミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。スナップショットの差分なし。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で毎回作り直している
+- RuboCop（`TargetRailsVersion: 7.1`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）
+- lock: Step 3 の始め（`d4a4a4a`）からの動きは「gem ごとの対応」のとおり。default gem に合わせた一時固定（json 2.6.3・bigdecimal 3.1.3・logger 1.5.3・base64 0.1.1・cgi 0.3.7・ostruct 0.5.5・reline 0.6.0・io-console 0.6.0 ほか）は動いておらず、Step 3 で固定した tsort 0.2.0・irb 1.6.2・connection_pool 2.5.5 は計画どおり
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動し、複数行の入力と Tab の補完が動いた（irb 1.6.2 は lock の版、reline 0.6.0）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: 上の「手動確認」
 
 ### スキルについて気づいたこと
 
@@ -2160,3 +2187,8 @@ rails-load-defaults:
 19. 18 と同じことが rails-load-defaults にもある。手順 1 は「前の書き出しを取る」だけで、`load_defaults` に任せた設定の値が書き出されるかを確かめる手順がない（今回は取る前に気づき、道具に足してから取った）
 20. 手順 2 の `new_framework_defaults_*.rb` の削除を `git rm` で行うと、削除がステージされたまま残る。commit.md の注意のとおり外そうとしたが、消えたファイルは zsh のグロブ（`rails_*/...`）に当たらず、1 回目は外れていなかった。`scripts/commit-per-app` はアプリのディレクトリをステージするので、手順 2 はステージしない `rm` で足りる
 21. 手順 3 は「消す initializer を決める」だけで、残す initializer（雛形にないファイル）に templates.md の「残す独自設定のコメント」を当てるかが書いていない。前の版（7.0）ではコメントを足していなかった。今回は解説の項目に入れて人間に確かめた
+
+verify:
+
+22. 手動確認の入口の条件は「手動確認用の環境が控えた状態と同じ」だが、新しい版で初めて開くことで手動確認用の環境が変わる（DB の形式、フレームワークが作るテーブル）ことを、手動確認の前に見込む手順がない。今回は、WAL は rails-lock で見込んでいたが、RS のテーブルは見込めず、起動した後に止まって確かめた。起動の前に DB の写しを取っておけば、元に戻す選択肢も残せた
+23. 手動確認用の環境のハッシュで比べる方法は、SQLite が WAL になると、サーバーを止めた後も `-wal` が残り、`-shm` は読むだけで変わるので、そのままでは使えない。設定の「手動確認用の環境」は、DB の形式の変化を想定していない
