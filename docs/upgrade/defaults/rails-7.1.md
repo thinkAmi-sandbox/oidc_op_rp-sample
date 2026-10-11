@@ -46,6 +46,7 @@
 | DEF-7.1-36 | テストの HTML の読み方が HTML5 になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ（test） | 追随 |
 | DEF-7.1-37 | `filter_parameters` を先に正規表現にまとめる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-38 | 処理されなかった例外のログのレベルが ERROR になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-39 | 既定の応答ヘッダーから `X-Download-Options` がなくなる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -460,3 +461,17 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: rails/rails#48575、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.10.2「config.action_dispatch.debug_exception_log_level」
 - コミット: RS・RP・OP（`enable the logging defaults of Rails 7.1`）
+
+### グループ 5（なし）・グループ 6: 応答のヘッダー
+
+グループ 5（`action_view.sanitizer_vendor`）は `load_defaults 7.1` に任せたので、なくした。
+
+### DEF-7.1-39: 既定の応答ヘッダーから `X-Download-Options` がなくなる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 6）/ 対象: RS・RP・OP（Rails が返すすべての応答）
+- 何が変わるか: `config.action_dispatch.default_headers` の既定の値から `"X-Download-Options" => "noopen"` を除く。ほかの 5 つ（`X-Frame-Options`・`X-XSS-Protection`・`X-Content-Type-Options`・`X-Permitted-Cross-Domain-Policies`・`Referrer-Policy`）は同じ値のまま。すべての応答から `X-Download-Options: noopen` がなくなる。設定の値の比較: `ActionDispatch::Response.default_headers` から `X-Download-Options` が消えた（3 アプリ・test と development）。応答のスナップショットの差分は、この 1 行だけ（RS 3 件・RP 7 件・OP 40 件）
+- なぜ: このヘッダーは Internet Explorer だけが使い、IE は 2022 年にサポートが終わった。Rails 7 は IE を十分にはサポートしていないので、既定から外した（rails/rails#43968）
+- 3 アプリへの影響: IE 以外のブラウザ・faraday・Playwright はこのヘッダーを使わず、3 アプリのコードも読まない。ダウンロードさせるファイルを返す画面もない。画面・リダイレクト先・アプリ間のやり取りは変わらない。応答のスナップショットを作り直した
+- 扱い: 追随
+- 出典: rails/rails#43968、`railties-7.1.6/CHANGELOG.md`（「Remove default `X-Download-Options` header」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.10.3「config.action_dispatch.default_headers」
+- コミット: RS・RP・OP（`drop X-Download-Options from the default headers`）
