@@ -11,7 +11,7 @@ ruby '3.2.11'
 gem 'a-nti_manner_kick_course', groups: %i[development test]
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails', branch: 'main'
-gem 'rails', '~> 7.0.10'
+gem 'rails', '~> 7.1.6'
 # Use sqlite3 as the database for Active Record
 gem 'sqlite3', '~> 1.4'
 # Use Puma as the app server

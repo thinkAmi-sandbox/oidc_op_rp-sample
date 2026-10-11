@@ -13,4 +13,4 @@ x-request-id: <REQUEST_ID>
 x-runtime: <RUNTIME>
 x-xss-protection: 0
 
-<html><body>You are being <a href="http://localhost:3781/auth/my_op/callback?error=access_denied&amp;error_description=The+resource+owner+or+authorization+server+denied+the+request.">redirected</a>.</body></html>
+

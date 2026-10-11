@@ -13,4 +13,4 @@ x-request-id: <REQUEST_ID>
 x-runtime: <RUNTIME>
 x-xss-protection: 0
 
-<html><body>You are being <a href="http://www.example.com/">redirected</a>.</body></html>
+
