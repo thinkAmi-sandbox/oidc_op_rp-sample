@@ -13,7 +13,7 @@
 # 既定の入力は、reline・irb・io-console の版と入力の方式の表示、Tab の補完、複数行の入力（if true … end）、exit。
 # CONSOLE_STEPS には JSON の文字列の配列を渡す（例: '["next\r", "continue\r"]'）。
 # 出力の全体は環境変数 CHECK_CONSOLE_LOG_DIR（なければ一時ディレクトリ）に残し、要約を出す。
-# 既定の入力で、表示の行と `=> 42` が出て、終了の状態が 0 なら終了コード 0。
+# 既定の入力で、表示の行と `=> 42` が出て、終了の状態が 0 なら終了コード 0（CONSOLE_STEPS のときは、終了の状態だけを見る）。
 # development は手動確認用の DB に触れないよう、E2E 用の DB（db/e2e.sqlite3）を指す。
 
 set -u
@@ -74,6 +74,7 @@ echo "== $app $env_name: ${command[*]}（出力: $log）"
 echo "$result"
 if [ -n "${CONSOLE_STEPS:-}" ]; then
   echo "$plain" | tail -20
+  echo "$result" | grep -q '^child_status 0$' || { echo "終了の状態が 0 でない"; exit 1; }
   exit 0
 fi
 

@@ -9,6 +9,7 @@
 import json
 import os
 import pty
+import re
 import select
 import sys
 import time
@@ -58,8 +59,14 @@ with open(out_path, "wb") as out:
         return True
 
     # プロンプトを待つ（起動に時間がかかるので、最長 60 秒）
+    # 端末の制御文字を除いた出力の末尾が、プロンプト（`>` か `(byebug)`）で終わるまで待つ。
+    # 途中の出力に `=>` などがあっても、プロンプトとは見なさない
+    def at_prompt():
+        tail = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", buffer[-400:]).rstrip()
+        return tail.endswith(b">") or tail.endswith(b"(byebug)")
+
     deadline = time.time() + 60
-    while time.time() < deadline and b">" not in buffer[-200:] and b"(byebug)" not in buffer:
+    while time.time() < deadline and not at_prompt():
         if not pump(0.5):
             break
     pump(2)
