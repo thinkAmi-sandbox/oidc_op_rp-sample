@@ -59,6 +59,7 @@
 | DEF-7.1-48 | SQLite の DB が WAL で開かれる | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-7.1-49 | OP の initializer に、gem の雛形のコメントが 2 つ増える | 周辺 gem の雛形（doorkeeper-openid_connect 2.0.0） | OP | 追随 |
 | DEF-7.1-50 | OP のロケールに、`post_logout_redirect_uris` の属性名とエラー文言が増える | 周辺 gem の雛形（doorkeeper-openid_connect 2.0.0） | OP | 追随 |
+| DEF-7.1-51 | OP の schema.rb が、Rails 7.0 からの書き出しの形になる | Rails の既定値（schema.rb の書き出し） | OP | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -588,7 +589,7 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 
 ## 周辺 gem（Step 3-b）
 
-Step 3-b で、doorkeeper-openid_connect を 1.10.5 → 2.0.0 に上げたときに起きた、gem の雛形の変化。上げた理由と、業務的な挙動の変化（意図的な仕様変更）は [PLAN.md](../PLAN.md) の Step 3-b。
+Step 3-b で、doorkeeper-openid_connect を 1.10.5 → 2.0.0 に上げたときに起きた、gem の雛形の変化と、`post_logout_redirect_uris` のマイグレーションの前に初めて出た schema.rb の書き出しの変化（DEF-7.1-51）。上げた理由と、業務的な挙動の変化（意図的な仕様変更）は [PLAN.md](../PLAN.md) の Step 3-b。
 
 ### DEF-7.1-49: OP の initializer に、gem の雛形のコメントが 2 つ増える
 
@@ -611,3 +612,16 @@ Step 3-b で、doorkeeper-openid_connect を 1.10.5 → 2.0.0 に上げたとき
 - 扱い: 追随（2.0.0 の雛形で置き換える）
 - 出典: `doorkeeper-openid_connect-2.0.0/config/locales/en.yml`（v1.10.5 との差分は +18 行）、`doorkeeper-openid_connect-2.0.0/CHANGELOG.md` の 2.0.0.beta1 の #243、`doorkeeper-openid_connect-2.0.0/lib/doorkeeper/openid_connect/orm/active_record/mixins/application.rb`（検証）。Rails ガイドに該当の節はない
 - コミット: OP（`update doorkeeper-openid_connect to 2.0.0`）
+
+### DEF-7.1-51: OP の schema.rb が、Rails 7.0 からの書き出しの形になる
+
+- 種類: Rails の既定値（schema.rb の書き出し）/ 対象: OP（`db/schema.rb`）
+- 何が変わるか: schema.rb を書き出し直すと、3 つの書き方が変わる
+  - `ActiveRecord::Schema[6.1].define(...)` → `ActiveRecord::Schema[7.1].define(...)`
+  - datetime の列の `precision`: doorkeeper の 4 列（`oauth_access_grants`・`oauth_access_tokens` の `created_at`・`revoked_at`）に `precision: nil` が付き、users・oauth_applications の `created_at`・`updated_at` から `precision: 6` が消える
+  - `define ... do` の次の空行が消える
+- なぜ: Rails 7.0 で datetime の列の既定の精度が 6 になった（rails/rails#42297）。古い schema.rb を新しい既定で読むと本番と違う精度で DB ができるので、Rails 7.0.2 から、書き出した Rails の版を `Schema[x.y]` として入れ、その版の既定で読む（rails/rails#44286。空行が消えたのも同じ PR）。あわせて、新しい既定の 6 は省き、精度なしは `precision: nil` と書く（rails/rails#44358）。Step 1 の `app:update` は版を `Schema[6.1]` にしただけで（rails/rails の commit 7ad011c7d8）、OP は 2021 年からマイグレーションがなく書き出し直していなかったので、Step 3-b で `post_logout_redirect_uris` のマイグレーションの前に初めて出た
+- OP への影響: DB の列は変わらない。今の schema.rb と新しい形の schema.rb を、それぞれ空の DB に `db:schema:load` で読み込み、`sqlite_master` の SQL が同じことを確かめた（doorkeeper の列は `datetime`、users・oauth_applications の列は `datetime(6)` のまま）。E2E（`db:setup`）とテスト（`maintain_test_schema`）は schema.rb を読むので、同じ DB ができる。書き出しには E2E 用の DB（`DATABASE_URL=sqlite3:db/e2e.sqlite3`）を使い、手動確認用の DB には触れない
+- 扱い: 追随（マイグレーションとは理由が違うので、`bin/rails db:schema:dump` で書き出しの形だけを変えるコミットにする。マイグレーションのコミットの schema.rb の差分は、列の行と版の日付だけになる）
+- 出典: `activerecord-7.0.10/CHANGELOG.md`（「Dump the database schema containing the current Rails version」「Set precision 6 by default for `datetime` columns」）、rails/rails#42297・#44286・#44358、`activerecord-7.1.6/lib/active_record/schema_dumper.rb` の `header`、`activerecord-7.1.6/lib/active_record/connection_adapters/abstract/schema_dumper.rb` の `schema_precision`、Rails ガイド v7.0 の「Rails アップグレードガイド」の 2.15「Active RecordのスキーマダンプにRailsのバージョンが含まれるようになった」
+- コミット: OP（`dump schema.rb in the rails 7.1 format`）
