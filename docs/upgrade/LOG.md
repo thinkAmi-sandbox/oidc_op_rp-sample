@@ -1984,7 +1984,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 ## Step 3: Rails 7.1（2026-10-11）
 
-- ブランチ / PR: `upgrade/step3-rails71` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step3-rails71` / [#29](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/29)
 - バージョン: Ruby 3.2.11（変更なし）/ Rails 7.0.10 → 7.1.6
 - `/rails-upgrade` のスキルを実際の作業に使う最初の Step。スキルの手順・型・設定で、足りない・合わない・迷ったところは、作業を止めずに控えて、この節の最後の「スキルについて気づいたこと」に書く（スキルを直すかは人間が判断する）
 
