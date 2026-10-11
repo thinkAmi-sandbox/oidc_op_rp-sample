@@ -47,6 +47,8 @@
 | DEF-7.1-37 | `filter_parameters` を先に正規表現にまとめる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-38 | 処理されなかった例外のログのレベルが ERROR になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 | DEF-7.1-39 | 既定の応答ヘッダーから `X-Download-Options` がなくなる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-40 | `MessageVerifier`・`MessageEncryptor` の既定の serializer が `:json_allow_marshal` になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-41 | メッセージのデータとメタデータをまとめて直列化する | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ（効くのは OP） | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -475,3 +477,25 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 追随
 - 出典: rails/rails#43968、`railties-7.1.6/CHANGELOG.md`（「Remove default `X-Download-Options` header」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.10.3「config.action_dispatch.default_headers」
 - コミット: RS・RP・OP（`drop X-Download-Options from the default headers`）
+
+### グループ 7: Cookie・メッセージの形式
+
+### DEF-7.1-40: `MessageVerifier`・`MessageEncryptor` の既定の serializer が `:json_allow_marshal` になる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 7）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_support.message_serializer = :json_allow_marshal`。serializer を指定せずに作った `MessageVerifier`・`MessageEncryptor`（`Rails.application.message_verifier` など）が JSON で書き、読むときは古い Marshal の形式にも戻って読める。設定の値の比較: `ActiveSupport::Messages::Codec.default_serializer` が :marshal → :json_allow_marshal（3 アプリ・test と development）
+- なぜ: Marshal は、署名の鍵が漏れたときに、細工したメッセージで任意のオブジェクトを復元させる攻撃の入り口になる。安全な JSON を既定にし、7.1 の間は古いメッセージも読めるようにした（rails/rails#47963。雛形のコメントでは、7.2 で `:json` だけになる予定）
+- 3 アプリへの影響: 3 アプリのコードは `MessageVerifier`・`MessageEncryptor` を直接使わない。Cookie は別の設定の `cookies_serializer`（RP・OP は `:json`）で書くので、この設定の対象外
+- 扱い: 追随
+- 出典: rails/rails#47963、`activesupport-7.1.6/CHANGELOG.md`、`new_framework_defaults_7_1.rb` の雛形のコメント、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.14.9「config.active_support.message_serializer」
+- コミット: RS・RP・OP（`enable the message format defaults of Rails 7.1`）
+
+### DEF-7.1-41: 署名・暗号化したメッセージの中で、データとメタデータをまとめて直列化する
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 7）/ 対象: RS・RP・OP（効くのは OP のセッション Cookie）
+- 何が変わるか: `config.active_support.use_message_serializer_for_metadata = true`。`purpose` や有効期限のメタデータを、データと一緒に 1 回で直列化する（今までは、データを直列化した後でメタデータの封筒に入れて、もう一度直列化していた）。署名・暗号化した Cookie の中身の形式が変わる。設定の値の比較: `ActiveSupport::Messages::Metadata.use_message_serializer_for_metadata` が nil → true
+- なぜ: 二重の直列化をやめて速くした（rails/rails#46848）
+- 3 アプリへの影響: 対象は OP のセッション Cookie（Cookie store の暗号化 Cookie）だけ。RP のセッション Cookie は署名のない ID、RS は Cookie を使わず、3 アプリのコードに `cookies.signed`・`cookies.encrypted` はない。Rails 7.1.6 の OP の test で、同じ鍵・同じ用途の暗号化を設定の前後で作って読み合わせ、古い形式は新しい設定で読め、新しい形式も 7.1 では古い設定で読め、用途が違えばどちらも読めないことを確かめた。Rails 7.0 は新しい形式を読めない（雛形のコメント）ので、Rails 7.0 のブランチに戻すと、手動確認のブラウザの OP のログインが一度切れる。ローテーションのコードは入れない（DEF-7.0-36 と同じ考え方）。Rails 7.0 のときの OP の Cookie が 7.1 で読めることは、verify の手動確認で確かめる
+- 扱い: 追随
+- 出典: rails/rails#46848、`activesupport-7.1.6/lib/active_support/messages/metadata.rb`、`actionpack-7.1.6/lib/action_dispatch/middleware/cookies.rb`、`new_framework_defaults_7_1.rb` の雛形のコメント、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の 3.14.10「config.active_support.use_message_serializer_for_metadata」
+- コミット: RS・RP・OP（`enable the message format defaults of Rails 7.1`）
