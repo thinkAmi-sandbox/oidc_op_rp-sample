@@ -2047,6 +2047,9 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 作業の開始時（ブランチを切った後）に、9 ファイルのハッシュを控えた。件数は Step 2-b の手動確認の後と同じ（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）。スキル化の PR では手動確認をしていないので、基準は Step 2-b の手動確認の後のまま。
 
+- rails-lock で、人間に確かめて 3 アプリの `tmp/development_secret.txt` を `tmp/local_secret.txt` にコピーし、守るファイルを 12 にした（コピーの直後にハッシュを控え、元の 9 ファイルのハッシュが変わっていないことを確かめた）
+- rails-defaults の後（`3d85c46` の時点）に、12 ファイルのハッシュが作業の開始時（`local_secret.txt` はコピーの直後）と同じことを確かめた。ハッシュの控えはセッションの scratchpad にしかないので、次のセッションは、始めた時点のハッシュをこの時点の続きとして控え直す
+
 ### gem ごとの対応
 
 | gem | バージョン | 対応 |
