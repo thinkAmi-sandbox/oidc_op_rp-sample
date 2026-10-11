@@ -26,6 +26,20 @@
 | DEF-7.1-16 | コメントと書き方だけの変化 | `app:update` の雛形 | 3 アプリ | 追随 |
 | DEF-7.1-17 | `bin/setup` の `system!` が例外で止まる | `app:update` の雛形 | 3 アプリ | 追随 |
 | DEF-7.1-18 | `active_storage:update` のマイグレーション | `app:update` の雛形 | 3 アプリ | 採用しない |
+| DEF-7.1-19 | Active Record の暗号化の `hash_digest_class` が SHA256 になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-20 | SHA1 で暗号化したデータを読む予備の鍵を足さない | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-21 | `after_commit` などを、最後に保存したインスタンスで呼ぶ | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-22 | `before_committed!` を、トランザクションに入ったすべてのインスタンスで呼ぶ | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-23 | トランザクションのコールバックを、定義した順に呼ぶ | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-24 | 単数形の関連の名前を `where` に書くと、エラーにする | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-25 | `attr_readonly` の属性への代入を、エラーにする | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-26 | `serialize` が YAML を既定にしない | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-27 | モデルを Marshal するときの形式が 7.1 になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-28 | `has_secure_token` のトークンを `new` の時点で作る | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-29 | ジョブの引数の BigDecimal を、精度を保って直列化する | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-30 | キャッシュの有効期限の不正な値を、エラーにする | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-31 | query log tags の形式が SQLCommenter になる | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
+| DEF-7.1-32 | `ActionController::Parameters` を Hash と `==` で比べない | Rails の既定値（`new_framework_defaults_7_1.rb`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -222,3 +236,151 @@ Gemfile の rails を `~> 7.1.6` にしただけで（`load_defaults 7.0` のま
 - 扱い: 採用しない（Step 1 と同じ扱い。`scripts/restore-app-config` が消す）
 - 出典: `railties-7.1.6/lib/rails/tasks/framework.rake`（`app:update` が `active_storage:update` を流す）
 - コミット: なし
+
+## `load_defaults`（`new_framework_defaults_7_1.rb`）
+
+`new_framework_defaults_7_1.rb` の設定を、グループごとに有効にした。グループと順番は人間が決めた（[PLAN.md](../PLAN.md) の Step 3、[LOG.md](../LOG.md) の Step 3）。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた。`action_view.sanitizer_vendor`・`action_text.sanitizer_vendor`・`add_autoload_paths_to_load_path`・`cache_format_version` は、`new_framework_defaults_7_1.rb` では有効にせず、`load_defaults 7.1` に任せる（`load_defaults 7.1` にするときに値を確かめる）。`sanitizer_vendor` の行は、sprockets-rails を入れていないアプリでは initializer の時点で `Rails::HTML` がなく、`NameError` で起動しない（rails/rails#51246。Rails 7.1.6 の `load_defaults` の側は #51267 で直っている）
+
+### グループ 1: 3 アプリが使っていない機能
+
+有効にしても、3 アプリの検査と E2E がすべて通り、応答のスナップショットは同じだった。
+
+### DEF-7.1-19: Active Record の暗号化の `hash_digest_class` が SHA256 になる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.encryption.hash_digest_class = OpenSSL::Digest::SHA256`（SHA1 → SHA256）。設定の値の比較: ActiveRecord::Encryption.config.hash_digest_class が SHA1 → SHA256（3 アプリ・test と development）
+- なぜ: Active Record の暗号化の鍵を作るダイジェストを、7.0 で SHA256 にした key generator とそろえる
+- 3 アプリへの影響: `encrypts` を使っておらず、暗号化したデータもない
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Support decrypting data encrypted non-deterministically with a SHA1 hash digest.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.67「config.active_record.encryption.hash_digest_class」
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-20: SHA1 で暗号化したデータを読む予備の鍵を足さない
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.encryption.support_sha1_for_non_deterministic_encryption = false`。設定の値の比較: config の値だけ（読み出す口がない）（3 アプリ・test と development）
+- なぜ: SHA1 で暗号化したデータがなければ、予備の鍵は要らない
+- 3 アプリへの影響: 主鍵がないので、もともと予備の鍵は足されない（previous の数は前後とも 0）
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（同上）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.68「config.active_record.encryption.support_sha1_for_non_deterministic_encryption」
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-21: `after_commit` などを、最後に保存したインスタンスで呼ぶ
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.run_commit_callbacks_on_first_saved_instances_in_transaction = false`。設定の値の比較: ActiveRecord::Base の値が true → false（3 アプリ・test と development）
+- なぜ: トランザクションの中で同じ行を複数のインスタンスで保存したとき、最新の状態で呼ぶ
+- 3 アプリへの影響: `after_commit` などのコールバックは、アプリにも devise（confirmable を使っていない）・doorkeeper にもない
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Run transactional callbacks on the freshest instance to save a given record within a transaction.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.44
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-22: `before_committed!` を、トランザクションに入ったすべてのインスタンスで呼ぶ
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.before_committed_on_all_records = true`。設定の値の比較: ActiveRecord の値が false → true（3 アプリ・test と development）
+- なぜ: 上と同じ考え方
+- 3 アプリへの影響: 同上
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Hide changes to before_committed! callback behaviour behind flag.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.24
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-23: トランザクションのコールバックを、定義した順に呼ぶ
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.run_after_transaction_callbacks_in_order_defined = true`。設定の値の比較: ActiveRecord の値が false → true（3 アプリ・test と development）
+- なぜ: 今までは定義の逆順だった。直感に合う順にした
+- 3 アプリへの影響: 同上
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「`after_commit` callbacks defined on models now execute in the correct order.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.46
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-24: 単数形の関連の名前を `where` に書くと、エラーにする
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.allow_deprecated_singular_associations_name = false`。設定の値の比較: ActiveRecord の値が true → false（3 アプリ・test と development）
+- なぜ: 非推奨だった書き方をやめる
+- 3 アプリへの影響: アプリの関連を `where` で引く書き方はない。テストは通った
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Add configurable deprecation warning for singular associations」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.56
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-25: `attr_readonly` の属性への代入を、エラーにする
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.raise_on_assign_to_attr_readonly = true`。設定の値の比較: ActiveRecord の値が false → true（3 アプリ・test と development）
+- なぜ: 黙って捨てていた代入を、すぐ分かるようにする
+- 3 アプリへの影響: `attr_readonly` を使っていない
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Raise on assignment to readonly attributes」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.43
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-26: `serialize` が YAML を既定にしない
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.default_column_serializer = nil`。設定の値の比較: ActiveRecord::Base の値が YAML → nil（3 アプリ・test と development）
+- なぜ: YAML の暗黙の直列化をやめる
+- 3 アプリへの影響: `serialize` を使っていない。RP のセッションは activerecord-session_store の JSON の serializer
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「`ActiveRecord::Base.serialize` no longer uses YAML by default.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.45
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-27: モデルを Marshal するときの形式が 7.1 になる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.marshalling_format_version = 7.1`。設定の値の比較: ActiveRecord の値が 6.1 → 7.1（3 アプリ・test と development）
+- なぜ: 小さく速い形式にした
+- 3 アプリへの影響: モデルを Marshal しない（キャッシュは null・memory だけ。RP のセッションは JSON）
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Introduce a more stable and optimized Marshal serializer for Active Record models.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.27
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-28: `has_secure_token` のトークンを `new` の時点で作る
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.generate_secure_token_on = :initialize`。設定の値の比較: ActiveRecord の値が :create → :initialize（3 アプリ・test と development）
+- なぜ: 保存の前でもトークンを使えるようにした
+- 3 アプリへの影響: `has_secure_token` を使っていない（doorkeeper のトークンは doorkeeper が作る）
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Change `has_secure_token` default to `on: :initialize`」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.60
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-29: ジョブの引数の BigDecimal を、精度を保って直列化する
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_job.use_big_decimal_serializer = true`。設定の値の比較: ActiveJob の値が false → true（3 アプリ・test と development）
+- なぜ: JSON を使うキューで値が変わる不具合を直した
+- 3 アプリへの影響: ジョブを使っていない
+- 扱い: 追随
+- 出典: activejob の CHANGELOG（「Fix BigDecimal (de)serialization for adapters using JSON.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.15.11
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-30: キャッシュの有効期限の不正な値を、エラーにする
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_support.raise_on_invalid_cache_expiration_time = true`。設定の値の比較: ActiveSupport::Cache::Store の値が false → true（3 アプリ・test と development）
+- なぜ: 不正な `expires_in` などを、すぐ分かるようにする
+- 3 アプリへの影響: キャッシュに書かない（null・memory だけ）
+- 扱い: 追随
+- 出典: activesupport の CHANGELOG（「Add `raise_on_invalid_cache_expiration_time` config to `ActiveSupport::Cache::Store`」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.14.22
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-31: query log tags の形式が SQLCommenter になる
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.query_log_tags_format = :sqlcommenter`。設定の値の比較: config の値だけ（formatter は前後とも未設定）（3 アプリ・test と development）
+- なぜ: OpenTelemetry の SQLCommenter の形式にそろえた
+- 3 アプリへの影響: query log tags を有効にしていないので、formatter は前後とも設定されない
+- 扱い: 追随
+- 出典: activerecord の CHANGELOG（「Update query log tags to use the SQLCommenter format by default.」）、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.8.49
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
+
+### DEF-7.1-32: `ActionController::Parameters` を Hash と `==` で比べない
+
+- 種類: Rails の既定値（`new_framework_defaults_7_1.rb` のグループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.action_controller.allow_deprecated_parameters_hash_equality = false`。設定の値の比較: ActionController::Parameters の値が true → false（3 アプリ・test と development）
+- なぜ: 7.0 で非推奨にした比べ方をやめる。Hash との比べ方は常に false になる
+- 3 アプリへの影響: `params ==` の比べ方はアプリ・gem にない。テストは通った
+- 扱い: 追随
+- 出典: `actionpack-7.1.6/lib/action_controller/metal/strong_parameters.rb`、Rails ガイド v7.1 の「Rails アプリケーションを設定する」の3.9.21
+- コミット: RS・RP・OP（`enable the unused-feature defaults of Rails 7.1`）
