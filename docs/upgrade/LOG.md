@@ -1955,3 +1955,5 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 - `scripts/check-apps`（3 アプリと E2E）: スキルを作った後に流し、36 の検査がすべて通った。minitest は RS 11 runs・RP 33 runs・OP 69 runs、0 failures（`CI=1` でも同じ）、E2E は 10 passed（Step 2-b と同じ）
 - 手動確認用の環境: 作業の開始時に 9 ファイルのハッシュを控え、件数が Step 2-b の手動確認の後と同じこと（OP `oauth_access_grants` 19・`oauth_access_tokens` 47、RP `sessions` 12・`op_users` 1）を確かめた。スクリプトを確かめた後に、ハッシュが作業の開始時と同じだった
+- verify（スキルを試して直した後）: アプリのディレクトリ・`e2e/`・`.github/` は epic と差分がない（アプリのコードと lock は変えていない）。`scripts/check-apps` の 36 の検査がすべて通り、件数は上と同じ。`bin/rails c` は `scripts/check-console` で 3 アプリとも起動し（上の「スクリプトの確かめ方と結果」）、`bin/rails s` は E2E で起動した。手動確認用の環境の 9 ファイルのハッシュは作業の開始時と同じ。追跡中の全ファイルと、この PR の 15 コミットのメッセージが、公開物の安全チェックを通った。ブラウザでの手動確認は、アプリを変えていないので行っていない
+- 再現に使った scratchpad の worktree（タグ `rails-6.1-prepared` の後と、Step 2-b の前後）は消した。各アプリの `vendor/bundle` は本体へのリンクだったので、本体の gem は残っている
