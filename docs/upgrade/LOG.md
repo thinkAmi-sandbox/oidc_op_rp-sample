@@ -1896,7 +1896,7 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 
 ## スキル化: `/rails-upgrade` のスキルと、Rails のマイナーを上げるときのスクリプト（2026-10-11）
 
-- ブランチ / PR: `upgrade/skill-rails-upgrade` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/skill-rails-upgrade` / [#28](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/28)
 - バージョン: Ruby 3.2.11・Rails 7.0.10（変更なし）。gem は上げていない。アプリのコードと lock も変えていない
 - この節は、スキル化の PR で決めた記録の書き方（research の出口で節を作り、作業ごとに足していく。PLAN.md の 13 章の 3）にならい、作業の途中から書いている
 
