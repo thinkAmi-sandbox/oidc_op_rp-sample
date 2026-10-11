@@ -1709,7 +1709,7 @@ gem を上げる前に、OP に 11 本を足した（57 → 68 runs）。後で�
 
 ## Step 2: Ruby 3.2（2026-10-10）
 
-- ブランチ / PR: `upgrade/step2-ruby32` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step2-ruby32` / [#26](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/26)
 - バージョン: Ruby 3.1.7 → 3.2.11 / Rails 7.0.10（変更なし）。Bundler 2.3.27 → 2.4.19（`BUNDLED WITH`）。lock の default gem を 3.2.11 の版に合わせ直した。nokogiri 1.18.10 → 1.19.4
 - Ruby だけを上げる最初の Step。分かった手順は TIPS.md の「Ruby を上げる」にまとめた（スキル化の材料。PLAN.md の 13 章）
 - 既定値への追随（A）と業務的な挙動の変化（B）は、どちらも起きなかった（下の「前後の比較」）。defaults/ への記録はない
@@ -1801,3 +1801,95 @@ Ruby を上げる前（3.1.7）に、`scripts/check-apps` の結果と、起動�
 | PLAN.md の Step 2 の「決めたこと」に、erb の扱いを「人間と決める」と書いたまま、決めた内容が別の行にある | 決めた内容の行を指すように直した |
 | brakeman.ignore の EOLRuby のメッセージが Ruby 3.1.7 のまま | 直さない。fingerprint にメッセージは含まれず、無視リストに当たり続ける。Step 1 で EOLRails のメッセージを残したのと同じ扱いで、上の「前後の比較」と TIPS.md に書いてある |
 | コピーしたキャッシュの `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない | 3 アプリの `vendor/bundle/ruby/3.2.0/cache` の `.gem` 360 個（重複を除いて 177）の SHA-256 が、すべて rubygems.org の値と同じことを確かめた。TIPS.md に確かめ方を足した |
+
+## Step 2-b: Ruby 3.2 以上を必要とする周辺 gem（2026-10-10〜2026-10-11）
+
+- ブランチ / PR: `upgrade/step2b-ruby32-gems` / （PR 作成後に記入）
+- バージョン: Ruby 3.2.11・Rails 7.0.10（変更なし）。OP の doorkeeper-openid_connect 1.10.1 → 1.10.5。3 アプリの zeitwerk 2.6.18 → 2.7.5 → 2.8.3、byebug 12.0.0 → 13.0.0、simplecov 0.22.0 → 1.2.0、brakeman 7.1.1 → 8.0.6。byebug の依存の reline 0.6.0・io-console 0.6.0（一時固定）が lock に入り、simplecov の依存だった docile・simplecov-html・simplecov_json_formatter が lock から消えた
+- 追随した gem の既定値・雛形は、[defaults/rails-7.0.md](defaults/rails-7.0.md) の「周辺 gem（Step 2-b）」に記録した（DEF-7.0-48〜50）。業務的な挙動の変化（B）は起きなかった
+- gem を上げる手順で分かったことは、TIPS.md の「gem の更新」と「rails c を確かめる」にまとめた（スキル化の材料。PLAN.md の 13 章）
+
+### 作業計画で決めたこと
+
+着手時に PLAN.md 8 章の手順で確かめ直し（サブエージェント 3 つ: doorkeeper-openid_connect、byebug・reline・rack-mini-profiler、simplecov・zeitwerk・brakeman。lock の解決は `bundle lock --update <gem> --conservative --print` で lock を書かずに試した）、作業計画を出して承認を得た。確かめたことと決めたことの一覧は PLAN.md の Step 2-b の節に移した。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 順番 | doorkeeper-openid_connect → 雛形への追随 → zeitwerk 2.7.5 → 2.8.3 → byebug → simplecov → brakeman。1 gem ずつ、アプリごとに RS → RP → OP | doorkeeper-openid_connect は advisory の修正版なので最初（CLAUDE.md）。アプリの実行に関わる zeitwerk の後に、開発・テストの道具 |
+| doorkeeper-openid_connect | `--patch --conservative` で 1.10.5。2.0.0 は対象外 | `--conservative` だけでは 2.0.0（メジャー。マイグレーションが要る）になる |
+| zeitwerk | 2.7.5（一時固定）→ 2.8.3 | マイナーを飛ばさない。Rails v7.0.10 自身の lock が 2.7.3 |
+| reline・io-console | reline 0.6.0・io-console 0.6.0 に一時固定 | byebug 13 は `reline >= 0.6.0` で、Ruby 3.2.11 の default gem の reline 0.3.2 では満たせない。reline は要件を満たす最小の版（Step 1 の benchmark・securerandom と同じ扱い）、io-console は default gem と同じ版（固定しないと C 拡張の 0.9.4 が入る） |
+| brakeman | 8.0.6 | 8.1.0 は 2026-10-01 公開で、2 週間たっていない |
+| rack-mini-profiler | 上げずに Step 3 に移す（人間が判断。CLAUDE.md の ①対応版を待つ） | 5.0.0 の railtie が Rails 7.1 の `Rails.env.local?` を使い、Rails 7.0 の development ではプロファイラーが無効になる |
+| ほかの gem | `bundle outdated` に出る jwt 3.x と間接依存は動かさない | 2-b は Ruby 3.2 以上を必要とする gem だけ。jwt 3.x の時期は未定（PLAN.md 7 章） |
+| 手動確認 | すべての gem を上げた後に 1 回（introspection の流れまで） | doorkeeper-openid_connect と、development の zeitwerk の読み込みを含めるため |
+
+### 作業計画からの変更点
+
+- simplecov は、計画で「DEF-7.0-50 の候補（記録するかも含めて確かめる）」としていた。出力の変化を解説し、DEF-7.0-50 として記録して追随すると人間が決めた。最新の 1.3.2 は Ruby 3.3 以上が必要で今は入らないので、1.3 系の変化（対象のファイルがないグループを省く、`rails` プロファイルのグループの並び）を確かめて DEF-7.0-50 に書き、1.3 は Step 4（Ruby 3.3）の後に上げることにした（人間の質問への回答。コードレビューで、Step 4 は Ruby だけを上げるので、その後のサブステップと書き直した）
+- brakeman 8.0.6 で `RenderRCE` のチェックが増えた。警告の結果は変わらないので、DEF にせず、この節とコミットメッセージに記録した（人間が判断）
+- 記録の後に、IMP-011 に、1.10.2 で増えた `auth_time_from_access_token`（grant ごとの `auth_time`。`max_age` の判定には使われない）も選べることを書き足した（人間が承認）
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| doorkeeper-openid_connect | 1.10.1 → 1.10.5 | OP。`bundle update doorkeeper-openid_connect --patch --conservative`。GHSA-8r7r-wh7x-27ff（1.10.4 で修正。DCR は無効なので影響しなかった）を解消した。ruby-advisory-db にない advisory なので、無視リストの変更はない |
+| （雛形） | — | OP の initializer（DEF-7.0-48）とロケール（DEF-7.0-49）を 1.10.5 の雛形に合わせた。initializer は雛形の 1.10.1 → 1.10.5 の差分を `patch` で当て、独自の設定の印に当たって外れた 1 か所（`auth_time_from_access_token` の例）を手で足した。印の中の独自の設定と雛形との差分は前後で同じ |
+| zeitwerk | 2.6.18 → 2.7.5 → 2.8.3 | 3 アプリ。2.7.5 は一時固定（Gemfile に版を足して `bundle install` → 外して `bundle lock --local`）、2.8.3 は `bundle update zeitwerk --conservative` |
+| byebug | 12.0.0 → 13.0.0 | 3 アプリ。Gemfile に `io-console 0.6.0`・`reline 0.6.0` を足して `bundle update byebug --conservative` → 外して `bundle lock --local`。io-console は落とさず default gem を使い、ビルドもしなかった |
+| simplecov | 0.22.0 → 1.2.0 | 3 アプリ。`bundle update simplecov --conservative`（1.3 は Ruby 3.3 以上なので 1.2.0 で止まる）。DEF-7.0-50 |
+| brakeman | 7.1.1 → 8.0.6 | 3 アプリ。Gemfile の既にある行に一時的に `'8.0.6'` を書いて `bundle update brakeman --conservative` → 戻して `bundle lock --local`。racc は 1.5.2 のまま |
+
+- ダウンロードした `.gem`（doorkeeper-openid_connect 1.10.5、zeitwerk 2.7.5・2.8.3、byebug 13.0.0、reline 0.6.0、simplecov 1.2.0、brakeman 8.0.6。OP 以外は 3 アプリで 1 回ずつ）の SHA-256 は、すべて rubygems.org の値と同じ
+- epic と比べて lock で動いたのは、上の gem の行と、増えた reline・io-console、消えた docile・simplecov-html・simplecov_json_formatter だけ。lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords）、一時固定の gem（benchmark・securerandom・faraday-net_http・jwt 2.10.3）は動いていない。Gemfile は 3 アプリとも epic と同じ
+
+### 前後の比較
+
+- 起動の途中の読み込み: gem ごとに、上げる前後で、`config/application.rb` の後・`config/initializers` の直前・`initialize!` の後に読み込み済みの部品と、`filter_parameters`・`ActiveRecord::Base.filter_attributes` を test と development で書き出して比べた（TIPS.md の「設定の値と応答の比較」の方法）。変わったのは、doorkeeper-openid_connect 1.10.5 で `Doorkeeper::AccessGrant` が起動の時点で読み込まれなくなったことだけ。1.10.3（#308）で、`openid_request` の関連を `on_load(:active_record)` の `run_hooks` ではなく、モデルが読み込まれたとき（`AccessGrantExtension#included`）に足すようになったため。読み込んだ後の関連（`Doorkeeper::OpenidConnect::Request`）は同じ。1-b-3-2 で doorkeeper 5.9.9 が `Doorkeeper::AccessToken` を遅延して読み込むようになったのと同じ形
+- 応答のスナップショット（minitest）と E2E のスナップショット: どの gem でも差分なし
+- `-W:deprecated` を付けた development の eager load（`bin/rails runner 'Rails.application.eager_load!'`）: zeitwerk 以降の各段で、3 アプリとも `warning:` の行は 0
+- テストの出力の警告: 前後とも OP の `auth_time_from_resource_owner` の DEPRECATION（IMP-011）だけ。1.10.5 でも文言は同じ
+- byebug 13 を require しただけでは reline を読まない: コードレビューの後に、RS の development と test で `bin/rails runner` から `defined?(Reline)` が nil で、読み込み済みの readline 系のファイルは thor の `line_editor/readline.rb` だけなことを確かめた（byebug 13 は `byebug` を呼んだときに reline を読む）
+- `bin/rails c`（byebug 13）: 擬似端末で起動して確かめた（TIPS.md の「rails c を確かめる」）。上げる前は reline 0.3.2・irb 1.6.2、上げた後は lock の reline 0.6.0・io-console 0.6.0 と default gem の irb 1.6.2 を読み、どちらも `IRB::RelineInputMethod` で、複数行の入力（`if true` … `end`）は `=> 42` を返した。`already activated` などの警告はない。違ったのは、`Rails.versi` に Tab を 1 回送ったとき、0.6.0 では `Rails.version` に補完され、0.3.2 では補完されなかったことだけ（擬似端末での模擬の結果で、原因は確かめていない）
+- byebug: `bin/rails runner` の中で `byebug` を呼ぶと、12.0.0 でも 13.0.0 でも同じ位置（`rails runner` が文字列を評価した後の railties の行）で止まり、`next` の行き先も同じで、`continue` で抜けた。入力を読むのが Readline から Reline 0.6.0 になった
+- simplecov: カバレッジの値（RS 33/33・RP 112/112・OP 14/14 で、どれも 100%）、集計の対象のファイル（RS 7・RP 15・OP 8）、`.last_run.json` は同じ。結果の行と `coverage/` の中身が変わった（DEF-7.0-50）
+- brakeman: 3 アプリとも終了コード 0、`Security Warnings: 0`、`Ignored Warnings: 2`。JSON の出力で、警告と無視した警告の fingerprint・チェック名・メッセージが前後で同じことを確かめた。違うのは `Checks Run` に `RenderRCE`（8.0.0 で `CheckRender` から分かれた。対象は Rails 4.2.5 以下）が増えたことだけ
+
+### 手動確認
+
+すべての gem を上げた後に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Rails 7.0.10 が出た。RP の画面には rack-mini-profiler 4.0.1 のバッジが出た。
+
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP のセッションが前回の手動確認から残っていたので、ログイン画面を経ず、同意画面も省いて（my_op のアプリにこのユーザーの有効なトークンがあるため）RP に戻った。OP のログは、認可エンドポイントが 302、トークン・userinfo・JWKS が 200。RP の ID トークンの検証（JWKS の取得と nonce の比較）も通った
+- introspection 用 RP: 前回のトークンは revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke は 200、revoke の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回
+- サーバーの出力: 3 アプリとも、エラー・warning・DEPRECATION の新しいものはない。RP の `/stylesheets/application.css` のルーティングのエラーは元からのもの
+- 手動確認用の環境: 作業の開始時に 9 ファイルのハッシュを控え、件数が Step 2 の手動確認の後と同じこと（OP `oauth_access_grants` 17・`oauth_access_tokens` 42、RP `sessions` 12・`op_users` 1）を確かめた。手動確認の直前（サーバーを起動し直す前）にもハッシュが同じことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 17 → 19 件、`oauth_access_tokens` が 42 → 47 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 12 件のまま（既にある行を更新）で、どちらもハッシュが変わった。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt` は変わっていない。以降の基準は手動確認の後のハッシュ
+
+### 遭遇した問題
+
+1. `bin/rails c` を `script` コマンドの擬似端末で起動すると、Claude Code の Bash の環境に `TERM` がないため、reline 0.3.2 が terminfo を引けずに `rails/commands/console/console_command` の読み込みに失敗した。`TERM=xterm-256color` を付けると起動したが、reline がカーソル位置の問い合わせ（`ESC[6n`）を送って端末の返事を待つので、入力をパイプで流すだけでは止まったままになった（自分で起動したプロセスを止めた）。問い合わせに `ESC[1;1R` を返す Python の擬似端末のドライバー（scratchpad）で確かめた。TIPS.md に書いた
+2. カバレッジの集計の対象を読み出すスクリプトの `ruby` が、mise を通さずに macOS 標準の Ruby 2.6 で動き、`_1` が使えずに落ちた。`mise exec -- ruby` にした（TIPS.md の「コマンドの実行」にある注意）
+3. 手動確認を頼んだ後、人間がブラウザペインを開き直したときには、3 アプリのサーバーがアプリによって止められていた（約 11 時間前）。ハッシュと件数が変わっていないことを確かめてから、起動し直した
+4. 手動確認の依頼で、RP の `/introspection` の画面が「Login」ボタンで流れを始めることを書いていなかったので、人間が画面を開いただけで止まった。ボタンを押すよう頼み直した
+
+### 確認結果
+
+- `scripts/check-apps`（3 アプリと E2E）: 36 の検査がすべて通った。各コミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・RP 33 runs・OP 69 runs、0 failures（Step 2 と同じ）。`CI=1`（eager load あり）でも同じ件数で通る
+- E2E: 10 passed。スナップショットの差分なし
+- RuboCop: 3 アプリとも `no offenses detected`。`zeitwerk:check` は `All is good!`。`ANTI_MANNER=1 bin/rails runner 1` は test（`CI=1` 付きも）・development で `✅Congratulations!`。bundler-audit: `No vulnerabilities found`。無視リストを空にした bundler-audit で、無視リストの ID はすべて今も報告される。brakeman: `Security Warnings: 0`、`Ignored Warnings: 2`
+- `bin/rails c` は擬似端末で、`bin/rails s` は手動確認で、3 アプリとも起動した
+- 手動確認用の環境: 上の「手動確認」
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| PLAN.md 7 章と DEF-7.0-50 が simplecov 1.3 を「Step 4」で上げるとしているが、Step 4 は Ruby だけを上げる Step で、CLAUDE.md の「一度に上げるのは 1 つだけ」と食い違う | 「Step 4（Ruby 3.3）の後の周辺 gem のサブステップ」に直した（PLAN.md の Step 2-b と 7 章、DEF-7.0-50、この節の「作業計画からの変更点」） |
+| PLAN.md の Step 2-b の rack-mini-profiler の行が、5.0.0 でバッジ・ヘッダーが出なくなることを事実として書いているが、確かめたのは `Rails.env.local?` が false になることだけ | ソースを読んでの推論（5.0.0 は入れていない）と書いた。Step 3 で上げるときに確かめる |
+| byebug 13 を require しただけでは reline を読まない、という記述（PLAN.md・コミットメッセージ）を確かめた記録がない | 確かめて、上の「前後の比較」に書いた |
+| brakeman 8.1.0 の時期の「次の Step の最初」が、gem を上げないスキル化の PR を指すのか Step 3 を指すのか曖昧 | 「Step 3 の最初」に直した（PLAN.md の Step 2-b と 7 章） |
+| PLAN.md の Step 2-b の zeitwerk の行が、サブエージェントの API の突き合わせと、自分で確かめたことを区別していない | 区別して書いた |
+| TIPS.md の「rails c を確かめる」の擬似端末のドライバーが scratchpad にしかなく、後の Step で再現できない | 直さない。13 章の振り分け（3 アプリに固有の道具は `scripts/`）に照らして、スキルを作る PR で `scripts/` に置くかを決める |
+
+コードレビューの後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、手動確認用の環境の 9 ファイルのハッシュが手動確認の後と同じことを確かめた。

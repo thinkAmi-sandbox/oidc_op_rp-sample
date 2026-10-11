@@ -600,3 +600,43 @@ Rails 7.0 以上を必要とする周辺 gem を上げたときに起きた、ge
 - 扱い: 追随
 - 出典: `doorkeeper-openid_connect-1.10.1/config/locales/en.yml`、doorkeeper-openid_connect の CHANGELOG（1.10.0 の #267、1.10.1 の #299）。Rails ガイドに該当の節はない
 - コミット: OP（`follow the doorkeeper 5.9.9 locale and view templates`）
+
+## 周辺 gem（Step 2-b）
+
+Ruby 3.2 以上を必要とする周辺 gem を上げたときに起きた、gem の既定値・雛形の変化。上げた版と順番は [PLAN.md](../PLAN.md) の Step 2-b。
+
+### DEF-7.0-48: doorkeeper-openid_connect の initializer を 1.10.5 の雛形に合わせる
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.5 の `lib/generators/doorkeeper/openid_connect/templates/initializer.rb`）/ 対象: OP
+- 何が変わるか: `config/initializers/doorkeeper_openid_connect.rb` に、雛形の 1.10.1 → 1.10.5 の差分を当てる。「変更開始」〜「変更終了」の印で囲んだ独自の設定と雛形との差分は、前後で同じ
+  - コメントアウトされた設定の例が増える: `auth_time_from_access_token`（grant ごとの `auth_time`）、`authorize_dynamic_client_registration`、`apply_prompt_to_non_oidc_requests`、`end_session_endpoint`、`discovery_url_options`、印の中に残している claims の例の `response:` を付けた `_baz_`
+  - `select_account_for_resource_owner` のブロックの第 1 引数の名前が `resource_owner` から `resource_owner_or_nil` になり、例のコメントが `if resource_owner_or_nil` で囲まれる。ブロックの中身は空のまま
+- なぜ: 1.10.2 で、ログインしていなくても account selection を実行し、ブロックに `nil` を渡しうるようになった（#303）。同じ 1.10.2 で grant ごとの `auth_time` が選べるようになり（#304）、1.10.5 で文書になかった設定の例が雛形に足された（#327。CHANGELOG に「No behavior change」）。gem の generator の雛形にも追随すると人間が決めた（[PLAN.md](../PLAN.md) の 3 章の 2 の境目の 1）
+- 3 アプリへの影響: 設定の値は変わらない。ブロックは空なので、引数の名前を変えても動きは同じ。ログインしていない状態では、OP の `resource_owner_authenticator`（warden）が devise のログイン画面へ送るので、ブロックまで来ない（ソースを読んでの判断）。OP の minitest（`CI=1` も）・E2E が通り、応答のスナップショット（`authorize_prompt_select_account` を含む）は前後で同じ
+- 扱い: 追随
+- 出典: `doorkeeper-openid_connect-1.10.5/lib/generators/doorkeeper/openid_connect/templates/initializer.rb`、doorkeeper-openid_connect の CHANGELOG（1.10.2 の #303・#304、1.10.5 の #327）。Rails の外の gem なので、Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper-openid_connect 1.10.5 initializer template`）
+
+### DEF-7.0-49: doorkeeper-openid_connect のロケールを 1.10.5 の雛形に合わせる
+
+- 種類: 周辺 gem の雛形（doorkeeper-openid_connect 1.10.5 の `config/locales/en.yml`）/ 対象: OP
+- 何が変わるか: `config/locales/doorkeeper_openid_connect.en.yml` を 1.10.5 の gem の `en.yml` と同じにする。増えるのは `missing_required_claim`（``Required ID Token claim `%{claim}` is missing or blank``）とコメントの 1 行だけ
+- なぜ: 1.10.2 で、ID トークンの必須の claim（`iss`・`sub`・`aud`・`exp`・`iat`）が空のとき、黙って省かずに `MissingRequiredClaim` を出すようになった（#312）。その文言
+- 3 アプリへの影響: 今の設定（`issuer` は固定値、`sub` は `resource_owner.id`、`aud` はアプリの uid）では出ない。gem の engine のロケールにも同じキーと文言があるので、足す前後で `I18n.t` の結果は同じ。応答のスナップショットの差分はない
+- 扱い: 追随
+- 出典: `doorkeeper-openid_connect-1.10.5/config/locales/en.yml`、doorkeeper-openid_connect の CHANGELOG（1.10.2 の #312）。Rails ガイドに該当の節はない
+- コミット: OP（`follow the doorkeeper-openid_connect 1.10.5 locale template`）
+
+### DEF-7.0-50: simplecov 1.x で、カバレッジの結果の出し方が変わる
+
+- 種類: 周辺 gem（simplecov 0.22.0 → 1.2.0。テストの道具）/ 対象: RS・RP・OP
+- 何が変わるか: `bin/rails test` の最後に出るカバレッジの結果と、`coverage/` の中身が変わる。カバレッジの値（RS 33/33・RP 112/112・OP 14/14 で、どれも 100%）、集計の対象のファイル（RS 7・RP 15・OP 8。一覧も同じ）、`.last_run.json` の値は前後で同じ
+  - 結果の行が stdout から stderr に移り、文言が変わる（`Coverage report generated for Minitest to <アプリの絶対パス>/coverage.` と `Line Coverage: 100.0% (33 / 33)` → `Coverage report generated for Minitest to coverage/index.html` と `Line coverage: 33 / 33 (100.00%)`）
+  - `coverage/` が、`index.html` と `assets/0.13.2/` の JS・CSS・画像から、1 ファイルで完結する `index.html` と `coverage.json`・`.history.json`・`.report_stamp` になる（`.last_run.json`・`.resultset.json` は前後ともある）
+  - lock から docile・simplecov-html・simplecov_json_formatter が消える
+- なぜ: 1.0.0 で結果の行を stderr に出すようにし、JSON の formatter を本体に取り込んで既定の HTML の formatter が `coverage.json` も書くようにし、docile への依存をやめ、simplecov-html を本体に取り込んだ。1.1.0 で HTML のレポートを 1 ファイルで完結する `index.html` にした。1.2.0 で、成功した実行ごとに `coverage/.history.json` に履歴を残すようにした（既定で 100 件まで。`history_limit 0` で止められる）。`rails` プロファイルは、フィルタの書き方が `add_filter` から `skip` になり（対象は同じ）、`merge_subprocesses true` が入った
+- 3 アプリへの影響: アプリの挙動は変わらない。`coverage/` は gitignore の対象。CI（`.github/workflows/ci.yml`）と `scripts/check-apps` は結果の行を読まない（minitest の件数は Minitest の stdout から取る）。最低カバレッジを設定していないので、`bin/rails test` の終了コードは変わらない。テストの中で fork しないので、`merge_subprocesses` は効かない。起動の途中の読み込みは前後で同じ
+- 扱い: 追随（設定は足さない。`.history.json` も止めない）
+- 後の版で変わること: 1.3 は Ruby 3.3 以上が必要なので、Step 4（Ruby 3.3）の後の周辺 gem のサブステップで上げる。1.3.0 で、対象のファイルがないグループをレポートから省き、`rails` プロファイルのグループをアルファベット順にする（HTML のレポートのタブだけが変わる見込み）
+- 出典: simplecov の CHANGELOG（1.0.0 の Breaking Changes・Enhancements、1.1.0 の Breaking Changes、1.2.0 の Upgrade notes、1.3.0 の Upgrade notes）、`simplecov-1.2.0/lib/simplecov/profiles/rails.rb`。Rails ガイドに該当の節はない（v7.0 の「Rails テスティングガイド」にも simplecov の説明はない）
+- コミット: RS・RP・OP（`update simplecov to 1.2.0`）
