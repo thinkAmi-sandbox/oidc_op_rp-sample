@@ -2,6 +2,8 @@
 # 3 アプリ（RS・RP・OP）の検査と E2E を手元で流し、最後に結果の一覧を出す。
 # CI（.github/workflows/ci.yml）の rails ジョブ・e2e ジョブと同じ検査に、CI=1 の minitest と、
 # 無視リストを空にした bundler-audit（解消した advisory が無視リストに残っていないか）を足したもの。
+# CI からはこのスクリプトを呼ばず、同じ検査のコマンドを ci.yml にも持つ（理由は docs/upgrade/PLAN.md の 13 章の 5）。
+# 検査を足すときは、ci.yml にも足す。
 # 手順の中での使い方は docs/upgrade/TIPS.md の「確認のコマンド」。
 #
 # 使い方:
@@ -25,7 +27,7 @@ run_rails=1
 run_e2e=1
 
 usage() {
-  sed -n '6,11p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '8,13p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [ $# -gt 0 ]; do
