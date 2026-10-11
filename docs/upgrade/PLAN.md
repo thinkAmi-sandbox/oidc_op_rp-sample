@@ -762,7 +762,7 @@ Step 3 が epic に入ってから、`/rails-upgrade research` で調べた。�
 - [x] gems: schema.rb を Rails 7.1 の形で書き出す（OP。DEF-7.1-51）
 - [x] gems: `post_logout_redirect_uris` のマイグレーション（OP。その前に、annotate が `test/fixtures/users.yml` に足した注釈を別のコミットにした）
 - [x] verify（手動確認の直前に、手動確認用の OP の DB の写しを取ってから migrate した。CI は push の後）
-- [ ] pr
+- [x] pr
 
 意図的な仕様変更（3 章の 2 の B。人間が 1 つずつ判断した）:
 

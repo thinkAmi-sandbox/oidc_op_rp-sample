@@ -2306,6 +2306,11 @@ verify で、マイグレーションを流した後に `.claude/launch.json` �
 
 ### 遭遇した問題
 
+| 問題 | 対応 |
+|---|---|
+| E2E 用の DB で `db:migrate` を流すと、annotate が `test/fixtures/users.yml` に注釈を足した（research で見込めなかった） | 止まって人間に確かめ、注釈を残して別のコミットにした（上の「作業計画からの変更点」） |
+| 手動確認用の OP の development DB に `db:migrate` を流すと、`-wal` が 0 バイトになった | `db:migrate` のプロセスが閉じるときにチェックポイントが起き、`-wal` の中身が本体に移ったと見ている（内部の経路までは確かめていない）。本体と `-wal` のコピーで件数が同じ（`oauth_access_grants` 21・`oauth_access_tokens` 52）で `integrity_check` が ok なことを確かめた。手動確認でサーバーを動かした後は、`-wal` がまた残った |
+
 ### 確認結果
 
 verify で、PLAN.md の 10 章の完了条件を確かめた。
