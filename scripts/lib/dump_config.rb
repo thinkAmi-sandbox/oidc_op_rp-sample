@@ -175,6 +175,25 @@ extras = {
   'ログのファイルの上限（バイト）' => lambda {
     loggers = Rails.logger.respond_to?(:broadcasts) ? Rails.logger.broadcasts : [Rails.logger]
     loggers.map { |l| l.instance_variable_get(:@logdev)&.instance_variable_get(:@shift_size) }
+  },
+  # load_defaults 7.1 に任せた設定で、上の config.<名前> の節にクラスの値が出ないもの（Step 3）
+  'config.add_autoload_paths_to_load_path' => -> { Rails.application.config.add_autoload_paths_to_load_path },
+  # gem の置き場所（vendor/bundle）もアプリのディレクトリの中にあるので除く
+  '$LOAD_PATH のアプリのディレクトリ' => lambda {
+    $LOAD_PATH.select { |path| path.to_s.start_with?("#{app_dir}/") && !path.to_s.start_with?(bundle_dir) }
+  },
+  'config.log_file_size' => -> { Rails.application.config.log_file_size },
+  'Rails.cache のクラスと coder の serializer' => lambda {
+    coder = Rails.cache.instance_variable_get(:@coder)
+    [Rails.cache.class, coder.class, coder.instance_variable_get(:@serializer),
+     coder.instance_variable_get(:@legacy_serializer)]
+  },
+  'ActionText::ContentHelper.sanitizer' => lambda {
+    ActionText::ContentHelper.sanitizer.class if defined?(ActionText::ContentHelper)
+  },
+  'ActionView の sanitizer' => lambda {
+    [ActionView::Base.full_sanitizer.class, ActionView::Base.link_sanitizer.class,
+     ActionView::Base.safe_list_sanitizer.class]
   }
 }
 extras.each { |label, block| lines << "#{label} = #{read.call(&block)}" }
