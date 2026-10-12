@@ -2645,3 +2645,21 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 
 - 論点の確かめは、この見直しで決めた形（前の論点のまとめを次の論点と同じメッセージに載せ、最後の論点で承認も取る）で行った
 - 直した後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通った。手動確認用の環境の 14 ファイルのハッシュは、Step 4-b の作業の開始時の基準と同じ
+
+## Step 5: Rails 7.2（2026-10-12）
+
+- ブランチ / PR: `upgrade/step5-rails72` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 7.1.6 → 7.2.4
+- スキルの見直し（[#33](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/33)）の後、`/rails-upgrade` を引数なしで始めた最初の Step。resume から research へ止まらずに入り、research は Plan モードを使わずに行った
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 2 つ: Rails 7.2 の事実、周辺 gem の事実。lock の解決、advisory、mutex_m の警告、sqlite3 と Rails 7.1 の組み合わせは自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 sqlite3・annotaterb の順番 | Rails 7.2.4 の前に、sqlite3 2.9.6 → annotaterb の順で上げる | PLAN.md の「Rails 7.1 までは sqlite3 1.x のみ」は誤りで、Rails は 7.1.4 から 2.x を使える（`activerecord-7.1.6/CHANGELOG.md` の 7.1.4 の節）。今の 7.1.6 の lock で 2.9.6 にしても、動くのは sqlite3 の行だけ。annotaterb も Rails に依存しない。7 章の振り分けの 1（今の Rails のまま上げられる gem は前に）に当たり、sqlite3 は advisory 2 件の修正版で、DB のドライバーの変化と Rails の変化を別のコミットで検査できる（人間が判断） |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 5 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4-b と見直しの PR へのリンク）の後も、14 ファイルのハッシュは同じ
