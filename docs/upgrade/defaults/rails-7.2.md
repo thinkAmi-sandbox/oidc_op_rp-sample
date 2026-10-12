@@ -18,6 +18,17 @@
 | DEF-7.2-08 | `ActionController::API` に Caching と RateLimiting が入る | Rails の既定値 | RS | 追随 |
 | DEF-7.2-09 | test 環境の Active Job のアダプターが、設定の値でも `:test` になる | Rails の既定値 | 3 アプリ（test） | 追随 |
 | DEF-7.2-10 | Active Storage の 2 つの既定の変化（inline で返す画像の種類、Attachment の inverse_of） | Rails の既定値 | 3 アプリ | 追随 |
+| DEF-7.2-11 | `config/application.rb` の `%w(assets tasks)` → `%w[assets tasks]` | Rails の雛形 | RS・OP | 追随 |
+| DEF-7.2-12 | development で、ビューにファイル名の注釈を付ける | Rails の雛形 | 3 アプリ（development） | 追随 |
+| DEF-7.2-13 | メーラーの `default_url_options` を development・test に書く | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-7.2-14 | test.rb から `config.public_file_server.enabled = true` を消す | Rails の雛形 | 3 アプリ（test） | 追随 |
+| DEF-7.2-15 | 環境のファイルのコメントと書き方 | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-7.2-16 | `filter_parameter_logging.rb` に `:email` が増える | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-7.2-17 | production.rb の雛形 | Rails の雛形 | 3 アプリ（production） | 追随 |
+| DEF-7.2-18 | `config/puma.rb` の雛形（port は残す） | Rails の雛形 | 3 アプリ | 追随（port は残す） |
+| DEF-7.2-19 | `bin/setup` の `APP_NAME` と puma-dev のコメント | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-7.2-20 | `bin/rubocop`・`bin/brakeman` | Rails の雛形 | 3 アプリ | 採用しない |
+| DEF-7.2-21 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
 
 ## 周辺 gem（Step 5）
 
@@ -129,3 +140,114 @@ Rails を 7.1.6 → 7.2.4 にしたとき（`load_defaults` は 7.1 のまま）
 - 扱い: 追随
 - 出典: rails/rails#50265・#50800、`activestorage-7.2.4/lib/active_storage/engine.rb`・`activestorage-7.2.4/app/models/active_storage/attachment.rb`。Rails ガイドに該当の節はない
 - コミット: RS・RP・OP（`update Rails to 7.2.4`）
+
+## `app:update` の雛形（rails-app-update）
+
+3 アプリで `yes a | bin/rails app:update`（Rails 7.2.4）を流し、`scripts/restore-app-config` で独自設定を戻した後の差分。RP の `config/application.rb` の `autoload_lib_once` と inflector（DEF-7.1-10）と、3 アプリの `config/puma.rb` の `port` は、道具の一覧になく雛形に上書きされたので、人間に確かめて戻し、道具の一覧に足した（LOG.md の Step 5）。`new_framework_defaults_7_2.rb` は、すべてコメントのまま足し、rails-defaults で扱う。`active_storage:update` のマイグレーション 3 本（RS）は、DEF-7.0-14 のとおり消した。差分を当てた状態で、3 アプリの検査と E2E が通り、応答と E2E のスナップショット、警告、development だけのヘッダーは変わらなかった。設定の値で変わったのは DEF-7.2-12・13・16 の値だけ。
+
+### DEF-7.2-11: `config/application.rb` の `%w(assets tasks)` → `%w[assets tasks]`
+
+- 種類: Rails の雛形 / 対象: RS・OP（RP は `autoload_lib_once` の行を残すので HEAD のまま）
+- 何が変わるか: `config.autoload_lib(ignore: %w(assets tasks))` の配列の書き方が `%w[assets tasks]` になる
+- なぜ: 新しいアプリに rubocop-rails-omakase を入れたのに合わせて、雛形を `%w[]` の書き方にした（rails/rails#50486）
+- 3 アプリへの影響: 書き方だけ
+- 扱い: 追随
+- 出典: rails/rails#50486、`railties-7.2.4/lib/rails/generators/rails/app/templates/config/application.rb.tt`。Rails ガイドに該当の節はない
+- コミット: RS・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-12: development で、ビューにファイル名の注釈を付ける
+
+- 種類: Rails の雛形 / 対象: 3 アプリの development（ビューを描くのは RP・OP）
+- 何が変わるか: `config.action_view.annotate_rendered_view_with_filenames = true` が有効になり、development の HTML に `<!-- BEGIN app/views/... -->`・`<!-- END ... -->` のコメントが入る（OP のログイン画面で 6 個、RP のトップで 4 個）。最初のコメントは `<!DOCTYPE html>` の前に入る
+- なぜ: 開発中に、どのテンプレートが描いたかを分かりやすくするため、新しいアプリの development で既定にした（rails/rails#50436）
+- 3 アプリへの影響: 画面に描かれる文字は同じで、HTML のコメントが増えるだけ。E2E（development で動く）は通った。DOCTYPE の前のコメントは、HTML の仕様では標準モードの判定を変えない（WHATWG HTML の「The "initial" insertion mode」）。test・本番では無効
+- 扱い: 追随
+- 出典: rails/rails#50436、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の `config.action_view.annotate_rendered_view_with_filenames` の項
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-13: メーラーの `default_url_options` を development・test に書く
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: development に `config.action_mailer.default_url_options = { host: "localhost", port: 3000 }`、test に `{ host: "www.example.com" }` が入る
+- なぜ: メールの中で URL を作ると host がなくて落ちていたので、雛形に書くようにした（rails/rails#51191）
+- 3 アプリへの影響: 3 アプリともメールを送らない（OP の devise は `database_authenticatable`・`registerable`・`validatable` だけ）。port 3000 はアプリのポートと違うが、使われない
+- 扱い: 追随（雛形のまま）
+- 出典: rails/rails#51191。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-14: test.rb から `config.public_file_server.enabled = true` を消す
+
+- 種類: Rails の雛形 / 対象: 3 アプリの test
+- 何が変わるか: test.rb の `config.public_file_server.enabled = true` の行がなくなる
+- なぜ: `public_file_server.enabled` の既定が true になったので、雛形に書かなくなった（rails/rails#49851・#49852）
+- 3 アプリへの影響: 設定の値は true のまま（`scripts/compare-config` で確かめた）
+- 扱い: 追随
+- 出典: rails/rails#49851・#49852。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-15: 環境のファイルのコメントと書き方
+
+- 種類: Rails の雛形 / 対象: 3 アプリの development・test
+- 何が変わるか: コメントの文末に句点を付けた（rails/rails#51677）。`action_mailer.perform_caching` に説明のコメントを足した（#52215）。`public_file_server.headers` を 1 行にした。development に `apply_rubocop_autocorrect_after_generate!` のコメントの行を足した（#50506）。空行を 1 つ消した
+- 3 アプリへの影響: 書き方とコメントだけ
+- 扱い: 追随
+- 出典: rails/rails#51677・#52215・#50506。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-16: `filter_parameter_logging.rb` に `:email` が増える
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: 伏せる対象に `:email` が加わる（`:passw` の次）。アプリが足した `:code` とコメントは、道具で戻した
+- なぜ: メールアドレスも個人情報として、既定で伏せるため（rails/rails#49600）
+- 3 アプリへの影響: ログのパラメーターと `ActiveRecord::Base.filter_attributes`（`inspect` の表示）で、`email` を含む名前の値が `[FILTERED]` になる（OP のログインの `user[email]`、RP の `OpUser#email` など）。応答と DB は変わらない（PLAN.md の 3 章の 2 の境目 7）
+- 扱い: 追随
+- 出典: rails/rails#49600。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-17: production.rb の雛形
+
+- 種類: Rails の雛形 / 対象: 3 アプリの production（動作保証の外。雛形に追従するだけ）
+- 何が変わるか: `/up` を `force_ssl` のリダイレクトから外す例のコメント（rails/rails#51680）、`action_mailer.perform_caching` のコメント、`config.active_record.attributes_for_inspect = [ :id ]`（#52801）が入る
+- 扱い: 追随
+- 出典: rails/rails#51680・#52801。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-18: `config/puma.rb` の雛形（port は残す）
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: コメントを書き直し、threads の既定を 5 → 3（`RAILS_MAX_THREADS` で変えられる）にした。development の `worker_timeout 3600`、`environment`、`pidfile` の既定（`tmp/pids/server.pid`）の行を消し、pidfile は `PIDFILE` があるときだけ書く。`port` は、アプリの値（3782・3781・3780）を雛形の書き方（`ENV.fetch("PORT", 3780)`）にし、理由のコメントを付けて残した
+- なぜ: Puma の既定の設定を、平均的な Rails アプリに合わせて見直した（rails/rails#50669。threads の 3 も含む）。production では pidfile を作らない（#50644）。development の pid は Rails が渡すので、雛形から消した（commit 57a69167f0）
+- 3 アプリへの影響: development のサーバーのスレッドが 5 → 3 になる。応答の中身は変わらない。`worker_timeout` は workers を使うときだけ効く（使っていない）。環境は `rails s` が渡す。pid は `rails s` が development で `tmp/pids/server.pid` を渡し（`railties-7.2.4/lib/rails/commands/server/server_command.rb` の `pid`）、E2E は `-P tmp/pids/e2e_server.pid` を付ける。port は、`-p` を付けない `rails s`（README）で使われる（同ファイルの `user_supplied_options` と `puma-8.0.2/lib/rack/handler/puma.rb`）ので、雛形の 3000 にすると URL が変わる（業務的な挙動）。残した
+- 扱い: 追随（port は残す）
+- 出典: rails/rails#50669・#50644、上の 2 つのソース。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-19: `bin/setup` の `APP_NAME` と puma-dev のコメント
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: `APP_NAME` の定数と、puma-dev の設定のコメントアウトされた例が入る。`# path to your application root.` のコメントがなくなる
+- なぜ: puma-dev の設定を提案するため（rails/rails#51088・#51273）
+- 3 アプリへの影響: コメントアウトされた例と定数だけで、`bin/setup` の処理は同じ
+- 扱い: 追随
+- 出典: rails/rails#51088・#51273。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
+
+### DEF-7.2-20: `bin/rubocop`・`bin/brakeman`
+
+- 種類: Rails の雛形（新しいファイル）/ 対象: RS・RP・OP
+- 何が変わるか: Gemfile に rubocop・brakeman があるので、`app:update` が 2 つの binstub を作る（`railties-7.2.4/lib/rails/commands/app/update_command.rb`）
+- なぜ: 新しいアプリに rubocop-rails-omakase と brakeman を入れた（rails/rails#50486・#50507）
+- 3 アプリへの影響: 採用しないので、ない
+- 扱い: 採用しない（作られたファイルを消した）。`scripts/check-apps` と CI は `bundle exec rubocop`・`bundle exec brakeman` で流していて、使う場所がない。`bin/brakeman` は `--ensure-latest` を付け、最新でない brakeman では失敗するので、公開から 2 週間待つ決まりと食い違う。使わない入口を足さない（PLAN.md の 3 章の 2 の境目 5）。次の `app:update` でもまた作られる
+- 出典: rails/rails#50486・#50507
+- コミット: なし
+
+### DEF-7.2-21: `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`
+
+- 種類: Rails の雛形（新しいファイル）/ 対象: RP・OP（RS は API なので作られない）
+- 何が変わるか: `app:update` が 3 つのファイルを作る
+- なぜ: 406 のページは、`allow_browser` で古いブラウザを止めたときに返す（rails/rails#51545）。アイコンは、新しいアプリのレイアウトと PWA が使う（#50526）
+- 3 アプリへの影響: RP・OP は `allow_browser` を使わず、レイアウトもアイコンを参照しない
+- 扱い: 採用しない（使っていない機能のファイル。境目 5。作られたファイルを消した）
+- 出典: rails/rails#51545・#50526
+- コミット: なし
