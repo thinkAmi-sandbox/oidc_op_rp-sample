@@ -26,6 +26,10 @@
 # only consider `If-None-Match` as specified by RFC 7232 Section 6.
 # If set to `false` both conditions need to be satisfied.
 #++
+#
+# ここで有効にしても効かない。ActionDispatch の railtie の initializer（action_dispatch.configure）が、config/initializers より前に
+# ActionDispatch::Http::Cache::Request.strict_freshness に値を入れるため。load_defaults 8.0 で入る
+# （docs/upgrade/PLAN.md の Step 6、LOG.md の Step 6 の「作業計画からの変更点」）
 # Rails.application.config.action_dispatch.strict_freshness = true
 
 ###
