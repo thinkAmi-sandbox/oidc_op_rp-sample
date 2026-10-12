@@ -2352,7 +2352,8 @@ gems:
 ## Step 4: Ruby 3.3（2026-10-12）
 
 - ブランチ / PR: `upgrade/step4-ruby33` / （PR 作成後に記入）
-- バージョン: Ruby 3.2.11 → 3.3.12 / Rails 7.1.6（変更なし）。Bundler 2.4.19 → 2.5.22（`BUNDLED WITH`）。lock の default gem を 3.3.12 の版に合わせ直す
+- バージョン: Ruby 3.2.11 → 3.3.12 / Rails 7.1.6（変更なし）。Bundler 2.4.19 → 2.5.22（`BUNDLED WITH`）。lock の default gem を 3.3.12 の版に合わせ直した。erb の CVE-2026-41316 は default gem の erb 4.0.3.1 で解消した
+- Ruby だけを上げる Step。既定値への追随（A）と業務的な挙動の変化（B）は、どちらも起きなかった（下の「前後の比較」）
 
 ### 作業計画で決めたこと
 
@@ -2369,18 +2370,18 @@ gems:
 - 上げないもの: rubocop・webmock（2 週間たった最新版が今の版）、simplecov 1.3（サブステップ 4-b）、faraday-net_http（Step 8）、connection_pool（Step 5）、reline（0.6.0 のまま。3.3.12 の default gem の 0.5.10 は byebug 13 の要件を満たさない）、mise（2026.5.10 のまま）
 - ダウンロード: `ruby-3.3.12.tar.gz`（21,489,887 B、2026-07-16 公開）。作業計画で示し、入れる直前に改めて人間に確かめる
 
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| RS で、前の版のキャッシュからコピーした `.gem` のうち、3.3.12 の default gem と同じ名前・版の 3 つ（benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5）を、`vendor/bundle/ruby/3.3.0` から消して入れ直した。RP・OP では、コピーするときに外した（OP は ruby2_keywords の `.gem` がなかったので 2 つ） | RS を入れた後、この 3 つが default gem ではなく `vendor/bundle` から読まれていた。Bundler は、キャッシュに `.gem` があると、同じ版の default gem があっても入れてそちらを読む。benchmark・tsort は 3.2.11 では本物の gem として入れていて、ruby2_keywords は Step 2 で意図せず落とした `.gem` が残っていた。版は同じで Ruby だけの gem なので挙動は変わらない見込みだが、CI（setup-ruby が新しく入れる）は同じ版の default gem を使い、手元と読む場所がずれるので、止まって人間に確かめた（人間が判断）。消したのは gitignore の対象の手元のファイルだけで、`3.2.0/cache` に元の `.gem` が残る。TIPS.md の「Ruby を上げる」に書いた |
+
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 3-b の手動確認の後と同じだった（OP `oauth_access_grants` 23・`oauth_access_tokens` 57、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。
 
 - Step 3-b の verify で取った手動確認用の OP の development DB の写し（`rails_open_id_provider/tmp/manual_check_backup/`。migrate の前の本体と `-wal`）は、Step 3-b の PR が epic に入ったので、人間に確かめて消した。消した後も 14 ファイルのハッシュは控えと同じ。TIPS.md の項目は、写しの取り方と消す時期の一般の手順に書き直した
 - ruby の作業の間（RS・RP・OP のコミットの前後）も、手動確認の直前まで、14 ファイルのハッシュは作業の開始時と同じ。書き出しと検査は、development でも E2E 用の DB（`DATABASE_URL=sqlite3:db/e2e.sqlite3`）を指した
-
-### 作業計画からの変更点
-
-| 変更 | 理由 |
-|---|---|
-| RS で、前の版のキャッシュからコピーした `.gem` のうち、3.3.12 の default gem と同じ名前・版の 3 つ（benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5）を、`vendor/bundle/ruby/3.3.0` から消して入れ直した。RP・OP では、コピーするときに外した（OP は ruby2_keywords の `.gem` がなかったので 2 つ） | RS を入れた後、この 3 つが default gem ではなく `vendor/bundle` から読まれていた。Bundler は、キャッシュに `.gem` があると、同じ版の default gem があっても入れてそちらを読む。benchmark・tsort は 3.2.11 では本物の gem として入れていて、ruby2_keywords は Step 2 で意図せず落とした `.gem` が残っていた。版は同じで Ruby だけの gem なので挙動は変わらない見込みだが、CI（setup-ruby が新しく入れる）は同じ版の default gem を使い、手元と読む場所がずれるので、止まって人間に確かめた（人間が判断）。消したのは gitignore の対象の手元のファイルだけで、`3.2.0/cache` に元の `.gem` が残る。TIPS.md の「Ruby を上げる」に書いた |
 
 ### gem ごとの対応
 
@@ -2399,6 +2400,10 @@ gems:
 - brakeman の無視リスト: 3 アプリとも、EOLRuby の項目を消した（JSON を読んで項目を除き、書き戻した。差分は項目の削除だけ）。brakeman の結果は、警告 0、無視した警告は EOLRails の 1 件、使われない無視の項目は 0 件
 - `TargetRubyVersion` を 3.3 にした（`bc1a335`）。3 アプリとも新しい指摘はない。RuboCop が読む値が 3.3 になることを `RuboCop::ConfigStore` で確かめた
 - epic と比べて lock で動いたのは、上の行と `RUBY VERSION`・`BUNDLED WITH` だけ。一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）、Gemfile の `ruby` 以外の行は動いていない
+
+### 意図的な仕様変更
+
+なし。既定値・雛形への追随（3 章の 2 の A）も、業務的な挙動の変化（B）も起きなかった（下の「前後の比較」）。defaults/ への記録はない
 
 ### 前後の比較
 
@@ -2439,3 +2444,22 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 - 公開物の安全チェック: 各コミットの hooks で通った
 - CI: push の後に確かめる（push は人間が行う）
 - 手動確認用の環境: HEAD で、14 ファイルのハッシュが手動確認の後の基準と同じ（上の「手動確認」）
+
+### スキルについて気づいたこと
+
+Step 3・3-b と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+research:
+
+1. ruby.md の手順 3（新しい Ruby の default gem の版を調べ、合わせ直す方針を決める）は、Ruby を入れた後の作業になっているが、版は GitHub のタグのソースから、増える依存（irb 1.13.1 の rdoc・psych・stringio）は rubygems.org の API から、research の時点で決められた。方針は判断の関門なので、research に前倒しできる。lock の試行だけは Ruby を入れた後になる（Plan モードではファイルを書けず、Ruby もない）
+2. research の手順 2 の advisory の確かめ方（設定の「作業ごとの参照」の research の行）は、lock の gem を前提にしている。default gem（erb・resolv）の advisory は lock になく bundler-audit で検出できないので、ruby-lang.org の告知で見つけた（resolv の CVE-2026-80212・80213 は、research のサブエージェントが告知の一覧から見つけた）。Ruby を上げる Step で、Ruby の告知の脆弱性を確かめる項目がない
+3. brakeman の EOLRuby の無視の項目が、Ruby を上げると使われない無視になることを、research でソースを読んで見つけた。ruby.md と設定の「前後の比較」に、無視リストの項目が当たり続けるかを見る手順がない（Step 2 では当たり続けた）
+
+ruby:
+
+4. ruby.md の手順 4 は、gem の入れ直しで「意図しないダウンロードが起きない」ことを見るが、前の版のキャッシュに新しい Ruby の default gem と同じ版の `.gem` があると、ダウンロードなしで入って default gem の代わりに読まれる。default gem から読まれるかは TIPS.md にしかなく、RS のコミットの前の確かめで気づいた（TIPS.md の「Ruby を上げる」に足した）
+5. `scripts/compare-config` の書き出しは、その版にない設定を読んだときの例外のメッセージも含むので、Ruby を上げると、アプリの設定が同じでも例外の文言（`NoMethodError`）の差分が出る。前後の比較の手順に、道具の出力の差分とアプリの差分を分ける目安がない
+
+manual-check:
+
+6. 手動確認でサーバーの出力を読むとき、元からあるエラー（RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`）の一覧が設定にも TIPS.md にもなく、新しいものかを判断するのに過去の記録とビューを探した（OP の分は、これまで記録していなかった）
