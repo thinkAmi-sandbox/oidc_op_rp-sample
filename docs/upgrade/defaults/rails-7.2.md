@@ -29,6 +29,9 @@
 | DEF-7.2-19 | `bin/setup` の `APP_NAME` と puma-dev のコメント | Rails の雛形 | 3 アプリ | 追随 |
 | DEF-7.2-20 | `bin/rubocop`・`bin/brakeman` | Rails の雛形 | 3 アプリ | 採用しない |
 | DEF-7.2-21 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
+| DEF-7.2-22 | Active Job の enqueue を、コミットの後に遅らせるかをアダプターに任せる | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
+| DEF-7.2-23 | Active Storage が WebP を画像として扱う | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
+| DEF-7.2-24 | PostgreSQL のアダプターが、手で書いたクエリの日付を Date にする | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 5）
 
@@ -251,3 +254,37 @@ Rails を 7.1.6 → 7.2.4 にしたとき（`load_defaults` は 7.1 のまま）
 - 扱い: 採用しない（使っていない機能のファイル。境目 5。作られたファイルを消した）
 - 出典: rails/rails#51545・#50526
 - コミット: なし
+
+## `load_defaults 7.2`（`new_framework_defaults_7_2.rb`）
+
+`new_framework_defaults_7_2.rb` の 5 項目を、グループごとに有効にした（グループと順番は人間が決めた: 1 使っていない機能 → 2 マイグレーション → 3 YJIT）。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べた。設定しないと書き出しに出ない値は、前の書き出しの前に `scripts/lib/dump_config.rb` に足した（`70d77d1`）。
+
+### DEF-7.2-22: Active Job の enqueue を、コミットの後に遅らせるかをアダプターに任せる
+
+- 種類: Rails の既定値（`load_defaults 7.2`。グループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_job.enqueue_after_transaction_commit = :default`。`perform_later` を Active Record のトランザクションの中で呼んだとき、コミットの後まで遅らせるかを、キューのアダプターが決める。設定の値の比較: `ActiveJob::Base.enqueue_after_transaction_commit` が `:never` → `:default`（3 アプリ・test と development）
+- なぜ: コミットの前にジョブが動き、まだ保存されていないレコードを読めずに失敗するのを防ぐため（rails/rails#51426）
+- 3 アプリへの影響: ジョブを使わない（`perform_later`・`deliver_later` はない）。検査と E2E は通り、スナップショットの差分はない
+- 扱い: 追随
+- 出典: rails/rails#51426、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.15.5「config.active_job.enqueue_after_transaction_commit」と 3.1.1「ターゲットバージョン7.2のデフォルト値」
+- コミット: RS・RP・OP（`enable the unused Rails 7.2 framework defaults`）
+
+### DEF-7.2-23: Active Storage が WebP を画像として扱う
+
+- 種類: Rails の既定値（`load_defaults 7.2`。グループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_storage.web_image_content_types` に `image/webp` が加わり、WebP の変換の結果を PNG にせず WebP のまま返す。設定の値の比較: `ActiveStorage.web_image_content_types` に `image/webp` が増えた（3 アプリ・test と development）
+- なぜ: ブラウザが広く WebP に対応したため（`activestorage-7.2.4/CHANGELOG.md` の「Add `image/webp` to `config.active_storage.web_image_content_types` when `load_defaults "7.2"` is set.」。rails/rails の commit f3e3f82e7d）
+- 3 アプリへの影響: Active Storage を使わない（DEF-7.1-18）
+- 扱い: 追随
+- 出典: 上の CHANGELOG、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.17.6「config.active_storage.web_image_content_types」
+- コミット: RS・RP・OP（`enable the unused Rails 7.2 framework defaults`）
+
+### DEF-7.2-24: PostgreSQL のアダプターが、手で書いたクエリの日付を Date にする
+
+- 種類: Rails の既定値（`load_defaults 7.2`。グループ 1）/ 対象: RS・RP・OP
+- 何が変わるか: `config.active_record.postgresql_adapter_decode_dates = true`。PostgreSQL の `select_value("select '2024-01-01'::date")` が String ではなく Date を返す。設定の値の比較: config の値だけ（pg がなく、アダプターを読めない）
+- なぜ: 手で書いたクエリでも日付を Ruby の型にするため（rails/rails#51763）
+- 3 アプリへの影響: SQLite で、PostgreSQL のアダプターを読み込まない
+- 扱い: 追随
+- 出典: rails/rails#51763、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.8.55「config.active_record.postgresql_adapter_decode_dates」
+- コミット: RS・RP・OP（`enable the unused Rails 7.2 framework defaults`）
