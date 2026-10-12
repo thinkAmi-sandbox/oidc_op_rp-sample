@@ -11,7 +11,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 
 ## 作業を始めるとき
 
-1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する。コマンドの実行や確認の手順は `docs/upgrade/TIPS.md`（作業のコツ）を参照する。Step の作業は、人間が `/rails-upgrade [作業名]` で始める（スキルは `.claude/skills/rails-upgrade/`、このリポジトリ固有の設定は `.claude/rails-upgrade-project.md`。方向と構成は PLAN.md の 13 章）
+1. `docs/upgrade/PLAN.md`（計画・進捗）と `docs/upgrade/LOG.md`（判断の記録）を読み、次に行う Step を確認する。コマンドの実行や確認の手順は `docs/upgrade/TIPS.md`（作業のコツ）を参照する。Step の作業は、人間が `/rails-upgrade` で始める。スキルは、チェックリストから次の作業を決め、関門（人間の判断・理解が要るところ）まで作業をまたいで止まらずに進む。作業名を付けるのは、やり直しや飛ばしのときだけ（スキルは `.claude/skills/rails-upgrade/`、このリポジトリ固有の設定は `.claude/rails-upgrade-project.md`。方向と構成は PLAN.md の 13 章）
 2. 現在のブランチを確認する。作業ブランチは `epic/rails-8.1-upgrade` から切る
 3. クローン直後は `git config core.hooksPath .githooks` を実行して git hooks を有効にする。あわせて `git config blame.ignoreRevsFile .git-blame-ignore-revs` で、見た目だけのコミットを git blame から外す
 4. Ruby は mise で管理する。各アプリの `mise.toml`（`.ruby-version` を読ませる設定）は、初回に各アプリのディレクトリで `mise trust` を実行しないと読まれない
@@ -42,7 +42,7 @@ OpenID Connect の OpenID Provider（OP）、Relying Party（RP）、Resource Se
 ## 人間との分担
 
 - 判断が必要なことは、1 回に 1 つの論点だけ、根拠（ファイルと行、調べた事実）と見立てを添えて、テキストで質問する
-- 各 Step は、調査して作業計画を出し、人間の承認を待ってからファイルを変更する
+- 各 Step は、調査して作業計画を出し、人間の承認を待ってからファイルを変更する（例外は、research で人間と決めた論点を、そのたびに LOG.md の Step の節に足すこと）
 - ダウンロードが発生するもの（gem、npm パッケージ、Playwright のブラウザ、Ruby / Node など）は、入れる前に名前・バージョン・サイズを示して確認する
 - 手動確認用のローカル環境（各アプリの development DB、`.env`、OP の署名鍵）を消す・作り直す操作（`db:drop`、`db:reset`、seeds の投入など）は、実行する前に確認する
 - ブラウザでのパスワードの入力と、OP の同意画面の「Authorize」は人間が行う。依頼するときは、ブラウザペインが画面に出ているかを確かめてから声をかける
