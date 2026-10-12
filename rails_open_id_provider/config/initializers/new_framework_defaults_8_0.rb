@@ -15,6 +15,10 @@
 # If set to `:offset`, `to_time` methods will use the UTC offset.
 # If `false`, `to_time` methods will convert to the local system UTC offset instead.
 #++
+#
+# このアプリでは config/application.rb で設定している。ここで設定すると、config/initializers より前の
+# initializer（active_support.set_configs）が古い値を渡して非推奨の警告を出し、test の deprecation = :raise で
+# 起動できない（rails/rails#54015・#54449、docs/upgrade/defaults/rails-8.0.md の DEF-8.0-01）
 # Rails.application.config.active_support.to_time_preserves_timezone = :zone
 
 ###
