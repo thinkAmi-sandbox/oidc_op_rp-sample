@@ -2910,6 +2910,7 @@ Step 全体（見直しの流れ）:
 |---|---|
 | Rails 8.0.5.1 自身の起動の途中の読み込み（initializer `action_controller.live_streaming_excluded_keys` が `ActionController::Live`・`ActionDispatch::Response` を読み込む）を、検査で 1 件だけ Step 7 まで許すことにした。`scripts/check-load-hooks` を足し、check-apps と CI から呼ぶ（`9a53b51`） | rails-lock で、3 アプリの「起動の途中の読み込み」が test・`CI=1`・development で失敗した（research では見つけていなかった）。Rails の不具合（rails/rails#58145）で、8-0-stable の修正（#58276）は 8.0.5.1 に入っていない。自前のパッチは保守ができなくなるのでとらず（人間が判断）、未リリースの 8-0-stable・修正の入らない 8.0.4.1 もとらず、許す範囲を検出の hook と版・行で 1 件に絞った。隠れる分は、各作業の前後の compare-config の「読み込み済みの部品」で補う（DEF-8.0-02。人間が判断） |
 | `to_time_preserves_timezone` は、rails-defaults で `new_framework_defaults_8_0.rb` に移さず、`config/application.rb` に置いたまま `load_defaults 8.0` で消すことにした（論点 2 では移すとしていた）。rails-defaults のグループ 1 は、application.rb と defaults のファイルのコメントを直すだけにした | 移すと 3 アプリの test が起動時に止まった。initializer `active_support.set_configs` は config/initializers より前に走り、その時点の `:offset` で非推奨の警告を出す（`activesupport-8.0.5.1/lib/active_support/railtie.rb:125-130`）。defaults のファイルの値が効かない不具合（rails/rails#54015）は #54017 で直ったが、警告は残っている。「application.rb で設定する」とガイドに書く #54449 はマージされずに閉じた。test の `:raise` を緩める案、2 か所に書く案はとらない（人間が判断。DEF-8.0-01） |
+| rails-defaults のグループ 2（`action_dispatch.strict_freshness`）は、defaults のファイルで有効にせず、理由のコメントを付けてコメントのまま残した。値の変化は rails-load-defaults で確かめる | defaults のファイルで有効にしても、`ActionDispatch::Http::Cache::Request.strict_freshness` は false のままだった。ActionDispatch の railtie の initializer `action_dispatch.configure`（`actionpack-8.0.5.1/lib/action_dispatch/railtie.rb:79`）が、config/initializers より前に値を入れる（8-0-stable・8.1.4・main も同じ。Rails の Issue・PR に報告は見当たらない）。`load_defaults 8.0` なら入る。OP の `config/application.rb` に一時的に置いて効かせても、discovery への条件付きの要求 4 通り（`If-None-Match`・`If-Modified-Since` の組み合わせ）の応答は 200・304・304・200 で前と同じだった（ETag と 304 は `Rack::ETag`・`Rack::ConditionalGet` が出し、この設定は Rails の `request.fresh?` だけに効く）。一時的な設定を `application.rb` に足す案、効かないまま有効にする案はとらない（人間が判断） |
 
 ### gem ごとの対応
 
@@ -3017,3 +3018,7 @@ rails-app-update:
 
 13. `app:update` の雛形が、rails-lock で足した一時的な設定（`config/application.rb` の `to_time_preserves_timezone`）を上書きした。`scripts/restore-app-config` は決まった独自設定だけを戻すので、作業の途中で足した一時的な設定は、差分を読んで手で戻した。rails-lock で設定を足すときに、rails-app-update で上書きされることを見込んでおく必要がある
 14. `scripts/compare-config` は、設定のキー（`config.action_controller.perform_caching` など）が消えると、そのキーに結び付けたクラスの値も出さないので、test の `perform_caching` が false → true になったことが書き出しの差分に出なかった。雛形の差分（行の削除）から気づき、runner で確かめた
+
+rails-defaults:
+
+15. `new_framework_defaults_8_0.rb` の 3 項目のうち 2 つ（`to_time_preserves_timezone`・`strict_freshness`）が、defaults のファイルからは扱えなかった（前者は警告で test が止まり、後者は値が入らない）。どちらも、railtie の initializer が config/initializers より前に値を読むため。rails-defaults の手順 3.3 は「値が変わらないときは起動の途中の読み込みを疑う」としているが、今回は読み込みではなく initializer の順番が原因だった。research で、defaults の各項目が「どの initializer で、いつ読まれるか」を確かめる手順があれば、計画の段階で分かった
