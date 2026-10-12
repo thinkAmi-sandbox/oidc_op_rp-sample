@@ -2482,7 +2482,7 @@ manual-check:
 
 ## Step 4-b: simplecov 1.3.2（2026-10-12）
 
-- ブランチ / PR: `upgrade/step4b-simplecov13` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step4b-simplecov13` / [#32](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/32)
 - バージョン: Ruby 3.3.12・Rails 7.1.6（変更なし）。3 アプリの simplecov 1.2.0 → 1.3.2
 - 追随した gem の既定値は、[defaults/rails-7.1.md](defaults/rails-7.1.md) の「周辺 gem（Step 4-b）」に記録した（DEF-7.1-52）。業務的な挙動の変化（B）は起きなかった
 - lock にある default gem と同じ版の gem（16 個。OP は ostruct を足して 17 個）を、3 アプリとも `vendor/bundle` に入れた。Step 4 の後、手元は default gem から、CI は `vendor/bundle` から読んでいて、ずれていた（下の「遭遇した問題」）
@@ -2592,7 +2592,7 @@ gems:
 
 ## スキルの見直し: 作業の切り替えと確認のまとめ方（2026-10-12）
 
-- ブランチ / PR: `upgrade/skill-workflow` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/skill-workflow` / [#33](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/33)
 - バージョン: Ruby 3.3.12・Rails 7.1.6（変更なし）。gem は上げていない。アプリのコードと lock も変えていない
 
 ### 作業計画で決めたこと
@@ -2645,3 +2645,237 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 
 - 論点の確かめは、この見直しで決めた形（前の論点のまとめを次の論点と同じメッセージに載せ、最後の論点で承認も取る）で行った
 - 直した後も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通った。手動確認用の環境の 14 ファイルのハッシュは、Step 4-b の作業の開始時の基準と同じ
+
+## Step 5: Rails 7.2（2026-10-12）
+
+- ブランチ / PR: `upgrade/step5-rails72` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 7.1.6 → 7.2.4。その前に sqlite3 1.7.3 → 2.9.6、OP の annotate 3.2.0 → annotaterb 4.25.0（RP は annotate を外した）
+- 追随した Rails と gem の既定値・雛形は、[defaults/rails-7.2.md](defaults/rails-7.2.md) に記録した（DEF-7.2-01〜29）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空になった（Rails の 10 件、sqlite3 の 2 件が解消）
+- スキルの見直し（[#33](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/33)）の後、`/rails-upgrade` を引数なしで始めた最初の Step。resume から research へ止まらずに入り、research は Plan モードを使わずに行った
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 2 つ: Rails 7.2 の事実、周辺 gem の事実。lock の解決、advisory、mutex_m の警告、sqlite3 と Rails 7.1 の組み合わせは自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 sqlite3・annotaterb の順番 | Rails 7.2.4 の前に、sqlite3 2.9.6 → annotaterb の順で上げる | PLAN.md の「Rails 7.1 までは sqlite3 1.x のみ」は誤りで、Rails は 7.1.4 から 2.x を使える（`activerecord-7.1.6/CHANGELOG.md` の 7.1.4 の節）。今の 7.1.6 の lock で 2.9.6 にしても、動くのは sqlite3 の行だけ。annotaterb も Rails に依存しない。7 章の振り分けの 1（今の Rails のまま上げられる gem は前に）に当たり、sqlite3 は advisory 2 件の修正版で、DB のドライバーの変化と Rails の変化を別のコミットで検査できる（人間が判断） |
+| 2 mutex_m | 3 アプリの Gemfile の test グループに `gem 'mutex_m'` を明示する（理由のコメント付き、版は書かない）。Rails 7.2.4 のコミットに入れる | activesupport 7.2 が依存から外し、lock から mutex_m 0.2.0 が消える。minitest 5.14.4 が `require "mutex_m"` するので、Ruby 3.3 の bundled_gems の警告がテストのたびに出る（再現した）。PLAN.md の 7 章の「警告が出たら明示」に当たる。明示すると lock は 0.2.0 のままで、`vendor/bundle` にもある。minitest を上げる案は、間接の gem で方針の外なので採らない（人間が判断） |
+| 3 annotaterb の範囲 | OP は Gemfile を `annotaterb` にし、`bin/rails g annotate_rb:install` の雛形（`lib/tasks/annotate_rb.rake`・`.annotaterb.yml`）に追随して、旧 rake の値と違う 2 つ（`hide_limit_column_types`・`hide_default_column_types`）を `.annotaterb.yml` に移し、旧 rake を消す。注釈を付け直して差分が出ないことを E2E 用の DB で確かめる。RP は Gemfile を `annotaterb` にするだけで、generator は流さない | 今の使われ方と同じにする。OP は migrate の後に注釈を付けている。RP は gem があるだけで rake も注釈もなく、hook を入れると使っていない機能を動かし始める（3 章の 2 の境目 5）。旧 rake の `rubocop:disable` は、雛形の rake に `task` のブロックがないので要らなくなる見込み（人間が判断） |
+| 4 rubocop・webmock | Step 5 では上げない。次の Step（6）の research の最初に、その時点の最新版と公開から 2 週間たっているかを確かめる。webmock を上げるときは、版ごとに RS の `body:` で照合するテストが通ることを見る | rubocop 1.92.0（10-10）・webmock 3.27.0〜3.29.0（10-10・10-11）は 2 週間たっていない（10-24・10-25）。人間の求めで webmock を掘り下げた。3 つの版は、メンテナーが 10-10〜10-11 に溜まった Issue・PR（2015 年からの 19 件）を片付けた区切りごとのリリースで、前の版の不具合を直す連続リリースではない（10-10 以降の新しい Issue・PR は 0 件）。3.28.0 の破壊的な変更（`to_rack` に `rack.session` を入れない。#985・#1093）は、Rails 7 のアプリを `to_rack` に渡すと落ちる不具合の修正で、3 アプリのテストは `to_rack` を使わない。Unreleased に次の版の変更（#1128）があり、待つ間に版が増えるおそれがある。開発・テスト用の道具で advisory もない（人間が判断） |
+| 5 手動確認の時期 | verify で 1 回（`load_defaults 7.2` と `TargetRailsVersion` の後）。RP の my_op のログインと introspection 用 RP の流れ、OP の「Redirected to」行の `code=` を見る。直前に、3 アプリの development DB の本体と `-wal` を各アプリの `tmp/manual_check_backup/` に写す | sqlite3 2.x のドライバーと Rails 7.2 で、手動確認用の DB を初めて開く。Step 3 では 7.1 で初めて開いたときに DB が変わった（DEF-7.1-47・48）ので、元に戻す選択肢を残す（Step 3 の気づきの 22）。secret_key_base は 7.2.4 も `tmp/local_secret.txt` を読み（`master.key`・`SECRET_KEY_BASE` はない）、`load_defaults 7.2` に Cookie の形式を変える項目はない。全部が揃った状態で 1 回にすると、手動確認用の DB を開く回数が少ない（人間が判断）。この論点への返事で、作業計画（ダウンロードの確認を含む）の承認も得た |
+
+- 上げないもの: rubocop・webmock（論点 4）、web-console 4.3.0（railties `>= 8.0`。Step 6）、rack 3.x（間接の gem）、minitest（論点 2）
+- ダウンロード: sqlite3 2.9.6-arm64-darwin・annotaterb 4.25.0・Rails の構成 gem 7.2.4 の 13 個・tzinfo 2.0.6・useragent 0.16.11（計 5,244,416 B）。各 `.gem` は 1 回だけ落とし、照合してほかのアプリのキャッシュにコピーする。作業計画で示し、論点 5 への返事で承認を得た
+- 調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 5: Rails 7.2」に書いた。PLAN.md の 7 章の sqlite3 の行と、Step 3 の「調べたこと」の誤り（Rails 7.1 は sqlite3 1.x だけ）も直した
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| RP は annotate を annotaterb に置き換えず、Gemfile から外した（論点 3 では「RP は gem だけ置き換える」としていた） | 追随の解説（DEF-7.2-01・02 の関門）で、人間が「そもそも RP では annotate が不要と考えてよいか」と確かめた。RP の annotate は、OP と同じ最初のコミット（`b422079`、2021-08-14）で Gemfile に入ったが、注釈の rake が足されたのも注釈が付いたのも OP だけで、RP には一度も注釈が付いていない（`git log -S'== Schema Information'`）。アップグレード中に動かしたのは、Step 1 で注釈の形を比べるためだけだった。使っていない gem を新しい gem に置き換える理由がないので外した。Step 1 で使われなくなった listen を外したのと同じ扱い（人間が判断）。annotaterb の `.gem` は RP で落として照合し、OP はそのコピーを使った |
+| `app:update` の後、RP の `autoload_lib_once` と 3 アプリの puma の port を戻し、`scripts/lib/restore_app_config.rb` の一覧に足した（`b048482`） | どちらも道具の一覧になく、雛形に上書きされた。RP の `autoload_lib_once` は Step 3 の決定（DEF-7.1-10）、port は README の `rails s` の URL（業務的な挙動）なので、人間に確かめて残した（DEF-7.2-18） |
+| rails-defaults の前に、`scripts/lib/dump_config.rb` に 4 つの値を足した（`70d77d1`） | `new_framework_defaults_7_2.rb` の 5 項目のうち 4 つが、設定しないと書き出しに出ず、前後を比べられなかった（Step 3 の気づきの 18 のとおり、最初に確かめた） |
+| 手動確認用の環境の守るファイルを 14 から 12 にした（OP・RP の `-wal` を外した） | 手動確認の後、sqlite3 2.x の閉じ方の変化で `-wal` が本体に移って消えた（DEF-7.2-29）。中身は件数と `integrity_check` で確かめ、写しから戻さずに、手動確認の後の 12 ファイルを新しい基準にした（人間が判断）。TIPS.md と設定を直した |
+| RS・OP の Rails の歓迎ページの `/icon.png` のエラーを、元からあるエラーの一覧に足した（`public/icon.png` は採用しないまま） | 手動確認で、7.2 の歓迎ページがアイコンを読むと分かった。development でルートを開いたときだけで、業務の流れには出ない（人間が判断。DEF-7.2-21 の補足。TIPS.md の「手動確認用の環境」） |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 5 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4-b と見直しの PR へのリンク）の後も、14 ファイルのハッシュは同じ
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| sqlite3 | 1.7.3 → 2.9.6 | 3 アプリ。Gemfile を `~> 1.4` → `~> 2.9`。RS は `bundle update sqlite3 --conservative`（`Fetching` は sqlite3 2.9.6 の arm64-darwin 版だけ）。RP・OP は `bundle lock --update sqlite3 --conservative` で lock を書き、RS で照合した `.gem` をキャッシュにコピーして `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。lock で動いたのは sqlite3 の 3 行だけ（Linux は `x86_64-linux-gnu` 版。`PLATFORMS` は変わらない）。`scripts/verify-gem-checksums` で 3 アプリとも rubygems.org の SHA-256 と一致した。無視リストから CVE-2026-54619・GHSA-mwm8-39rw-8826 を消した（`47ee48d`・`c400e4a`・`9bc8265`） |
+| annotate → annotaterb | 3.2.0 → 4.25.0（OP） | Gemfile の `annotate` を `annotaterb` にして `bundle lock`、RP で照合した `.gem` をキャッシュにコピーして `--local` で入れた。`bin/rails g annotate_rb:install`（E2E 用の DB を指した）で `lib/tasks/annotate_rb.rake`・`.annotaterb.yml` を作り、旧 rake を消した。`.annotaterb.yml` の 2 つの値を旧 rake の値にし、rake は RuboCop に合わせて書き方を直した（DEF-7.2-01・02）。lock で動いたのは annotate・annotaterb の行だけ（`c05d34f`） |
+| Rails | 7.1.6 → 7.2.4 | 3 アプリ（rails-lock）。7.1.6 は 7.1 系の最新なので、先に上げるパッチはなかった。`scripts/resolve-lock --gem 'rails=~> 7.2.4' --rails --unpin tzinfo` で解決した lock を持ち込み、Gemfile の rails を `~> 7.2.4` にし、test グループに mutex_m を理由のコメント付きで足して `bundle lock`。動いたのは Rails の構成 gem と tzinfo 2.0.4 → 2.0.6。増えたのは useragent 0.16.11 と `DEPENDENCIES` の mutex_m（lock の 0.2.0 のまま）。RS の `bundle install` で落としたのは 15 個（Rails の構成 gem 13・tzinfo・useragent）だけで、すべて rubygems.org の SHA-256 と一致した。RP・OP は照合した `.gem` をキャッシュにコピーして `--local` で入れた（`Installing` の 15 行だけ）。3 アプリとも lock の gem はすべて `vendor/bundle` にある。無視リストから Rails の 10 件を消し、3 アプリとも `ignore: []` になった。7.2.4 で初めて起動したときに、`Rails.application.secret_key_base` が `tmp/local_secret.txt` と同じことを確かめた（E2E 用の DB）。DEF-7.2-03〜10（`04e8c71`・`4f6e7e6`・`f4e67fc`） |
+| tzinfo / useragent | 2.0.4 / （なし） → 2.0.6 / 0.16.11 | activesupport 7.2 の `tzinfo >= 2.0.5`、actionpack 7.2 の `useragent ~> 0.16`（Rails 7.2.4 と同じコミット） |
+| mutex_m | 0.2.0（変更なし） | activesupport 7.2 の依存から外れ、3 アプリの Gemfile の test グループに明示した（論点 2。Rails 7.2.4 と同じコミット）。警告の比較で、bundled_gems の警告は出ていない |
+| connection_pool | 2.5.5（変更なし） | activesupport 7.2.4 が `>= 2.2.5, < 3` なので、一時固定の理由がなくなった。lock は動いていない |
+| annotate | 3.2.0 → （なし）（RP） | Gemfile から外した（上の「作業計画からの変更点」）。lock で消えたのは annotate の行だけ（rake は railties の依存で残る）。annotaterb 4.25.0 の `.gem` は、RP で `bundle install` したときに落とし（`Fetching` は annotaterb だけ）、`scripts/verify-gem-checksums` で rubygems.org の SHA-256 と一致した（`7a7aeaa`） |
+
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update`（DB は E2E 用）を流し、`scripts/restore-app-config` で独自設定を戻してから、差分を人間が確かめた。項目ごとの解説は [defaults/rails-7.2.md](defaults/rails-7.2.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| `config/application.rb` の `%w[assets tasks]` | RS・OP は採用 | 書き方だけ（DEF-7.2-11） |
+| RP の `config/application.rb` の `autoload_lib_once` と inflector | 戻した | Step 3 で決めた独自設定（DEF-7.1-10）。雛形の `config.autoload_lib` に上書きされ、道具の一覧になく戻らなかったので、人間に確かめて戻し、一覧に足した（`b048482`） |
+| development の `annotate_rendered_view_with_filenames` | 採用 | development の HTML にコメントが入るだけ（DEF-7.2-12） |
+| development・test のメーラーの `default_url_options` | 採用 | メールを送らない（DEF-7.2-13） |
+| test の `public_file_server.enabled` の削除 | 採用 | 既定が true（DEF-7.2-14） |
+| 環境のファイルのコメントと書き方 | 採用 | DEF-7.2-15 |
+| `filter_parameter_logging.rb` の `:email` | 採用 | ログと `inspect` だけ（DEF-7.2-16） |
+| production.rb | 採用 | 雛形に追従するだけ（DEF-7.2-17） |
+| `config/puma.rb` | 採用（port は戻した） | 3 アプリの port（3782・3781・3780）が雛形の 3000 になり、道具の一覧になかった。README の `rails s` はこの値で起動するので、人間に確かめて残し、雛形の書き方と理由のコメントにして、一覧に足した（DEF-7.2-18、`b048482`） |
+| `bin/setup` | 採用 | DEF-7.2-19 |
+| `bin/rubocop`・`bin/brakeman` | 採用しない | 使う場所がなく、`bin/brakeman` の `--ensure-latest` が 2 週間の決まりと食い違う（DEF-7.2-20） |
+| `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`（RP・OP） | 採用しない | `allow_browser` と PWA を使わない（DEF-7.2-21） |
+| test の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code` とコメント | 戻した | アプリの独自設定（`scripts/restore-app-config`） |
+| `active_storage:update` のマイグレーション 3 本（RS） | 採用しない | Active Storage を使わない（DEF-7.0-14。道具で消した） |
+| `new_framework_defaults_7_2.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- コミット: RS `55348ca`・RP `bb57416`・OP `e1c65b4`
+
+### `new_framework_defaults_7_2.rb` を有効にした順番
+
+グループと順番は人間が決めた。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた（起動の途中の読み込みで効かない設定はなかった）。設定しないと書き出しに出ない 4 つの値（`config.yjit`・`RubyVM::YJIT.enabled?`・`ActiveJob::Base.enqueue_after_transaction_commit`・`ActiveRecord.validate_migration_timestamps`）は、前の書き出しを取る前に `scripts/lib/dump_config.rb` に足した（`70d77d1`。Step 3 の気づきの 18 のとおり、最初に確かめた）。解説への返事の後に、アプリごとにコミットした。項目ごとの解説は [defaults/rails-7.2.md](defaults/rails-7.2.md) の「`load_defaults 7.2`」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 使っていない機能 | `active_job.enqueue_after_transaction_commit`、`active_storage.web_image_content_types`、`active_record.postgresql_adapter_decode_dates` | 値だけが変わる（DEF-7.2-22〜24。`b14e242`・`edbf4c1`・`977dee7`） |
+| 2 | マイグレーション | `active_record.validate_migration_timestamps` | 先の日付のマイグレーションはない。E2E 用の DB で `db:migrate:status`・`db:migrate` が通った（DEF-7.2-25。`65e903b`・`6943a9e`・`646888f`） |
+| 3 | YJIT | `yjit` | development・test で YJIT が有効になる。結果は同じ（DEF-7.2-26。`fd35cb6`・`c274ef7`・`65f7ead`） |
+
+- グループ 2 で確かめるために E2E 用の DB に `db:migrate` を流すと、RP・OP の `db/schema.rb` が書き出された（OP は見出しの `Schema[7.1]` → `Schema[7.2]`、RP は Rails 6.1 の形 → 7.2 の形）。この設定の変化ではないので戻した。次に RP・OP でマイグレーションを流すと同じ差分が出る（DEF-7.2-25 の補足）
+- 3 グループとも、検査と E2E の件数は前と同じで、応答と E2E のスナップショットの差分はない。警告と development だけのヘッダーは、グループ 3 の前後で同じ。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+
+### `load_defaults 7.2`
+
+- 3 アプリを `config.load_defaults 7.2` にし、`new_framework_defaults_7_2.rb` を消した（ステージしない `rm`。Step 3 の気づきの 20）。rails-defaults で一時的に足した設定はほかにない。前（YJIT の後の書き出し）と比べて、3 アプリの test・development の設定の値と起動の途中に読み込み済みの部品は同じ（DEF-7.2-27）
+- 雛形にない initializer は `backtrace_silencers.rb` だけ（ほかは 7.2 の雛形にあるものか、アプリの独自のもの）。7.2 の railties が `BACKTRACE` を扱うので消した。RS の test で、ファイルの有無と `BACKTRACE` の有無の 4 通りで、絞り込んだ結果が同じことを確かめた（DEF-7.2-28）
+- 解説（DEF-7.2-27・28）に人間の返事を得てから、記録（`3bea7b2`）、RS `8fb6c4a`・RP `305e0e6`・OP `ef7d27c` の順にコミットした。検査と E2E は通り、スナップショットの差分はない
+- RuboCop の `TargetRailsVersion` を 7.2 にした（`8b857f5`）。3 アプリとも新しい指摘はない。`RuboCop::ConfigStore` で読む値が 7.2 になることを確かめた。rubocop-rails 2.38.0 に 7.2 を条件にする cop はない（8.0 を条件にする `Rails/StrongParametersExpect` はある）
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| （出ていない）Rails 7.2 で activesupport が mutex_m に依存しなくなり、lock から消えると、minitest 5.14.4 の `require "mutex_m"` で Ruby 3.3 の bundled_gems の警告が出る（research で再現した） | 3 アプリの Gemfile の test グループに mutex_m を明示した（作業計画の論点 2）。この Step を通して、`RUBYOPT=-W:deprecated` を付けたテストと eager load の `warning:` は 0 件、DEPRECATION は前からある OP の `auth_time_from_resource_owner`（IMP-011）だけ |
+
+### 意図的な仕様変更
+
+なし。応答のスナップショット・E2E・verify の手動確認で、業務的な挙動の変化は見つからなかった。`app:update` が puma の port を雛形の 3000 にしたのは、URL が変わる（業務的な挙動）ので戻した（DEF-7.2-18）。応答とファイルの変化はすべて既定値・雛形への追随として解説し、人間の返事を得た（[defaults/rails-7.2.md](defaults/rails-7.2.md) の DEF-7.2-01〜29）
+
+### 前後の比較
+
+sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。
+
+- sqlite3 2.9.6
+  - `scripts/check-apps`: 前後とも 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 前を 2 回取って同じことを確かめた。前後で同じ
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後とも `warning:` は 0 件。DEPRECATION は前後とも OP の IMP-011 だけ
+  - SQLite（development、E2E 用の DB）: ライブラリは 3.45.2 → 3.53.2。`journal_mode`（wal）・`synchronous`（1）・`foreign_keys`（1）は同じ
+  - E2E 用の DB から書き出した schema.rb（RP・OP）: 前後で同じ。RP の commit 済みの schema.rb は Rails 6.1 の形のままで、書き出すと Rails 7.1 の形になる（前からの状態。OP は Step 3-b で書き出し直した）
+  - 雛形と既定値の追随はない。業務的な挙動の変化もない
+  - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+- annotaterb（OP）・annotate を外す（RP）。前は sqlite3 の後の書き出し（その後アプリは変わっていない）
+  - 旧 rake を消す前に annotaterb を流すと、旧 rake の `require 'annotate'` で `LoadError` になった。旧 rake を消してから流した
+  - OP の注釈（E2E 用の DB）: 雛形の既定値のままでも「Model files unchanged」。2 つの値を引き継いで `annotaterb models --force` で書き直させても、`app/models/user.rb`・`test/fixtures/users.yml` の差分はない。`db:migrate --trace` の後に hook が `Annotating models` を流し、差分はない（schema.rb も同じ）
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 前後で同じ（RP・OP の development でも、起動の途中に読み込み済みの部品は同じ）
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）
+  - `scripts/check-apps`（各アプリのコミットの前の `commit-per-app`）: RP 33・OP 69 runs、0 failures（`CI=1` も同じ）、E2E 10 passed。スナップショットの差分はない。RuboCop は、雛形の rake を直す前は 3 つの指摘（`Style/FrozenStringLiteralComment`・`Style/StringLiterals`）、直した後は指摘なし
+  - 業務的な挙動の変化はない。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+- Rails 7.2.4（rails-lock）。前は annotaterb の後の書き出しと、lock を変える前に取った development だけのヘッダー（2 回取って同じ）・brakeman の JSON・OP のテストのログの行数
+  - `scripts/check-apps`: 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 26 種類の違いがあり、すべて 6 つ（またはテストの 3 つ）の書き出しに共通。DEF-7.2-05〜10 に振り分けた
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）。mutex_m の bundled_gems の警告は出ない
+  - development だけのヘッダー（E2E 用の DB で Puma に通した。RS の `/apples/show`、RP のトップ、OP の discovery・ログイン画面。日付・ID・数値と `x-miniprofiler-ids` は伏せた）: RP のトップの Server-Timing に `start_transaction.active_record` が増えただけ（DEF-7.2-04）
+  - brakeman: 警告 0、エラー 0、使われない無視の項目 0、チェックの数は同じ（79）。無視した EOLRails は同じ fingerprint で当たり、メッセージが「Rails 7.2.4 ended on 2026-08-09」になった
+  - OP のテストのログ: 「Redirected to」行の `code=` が、72 行すべて `[FILTERED]` になった（DEF-7.2-03）。RP のテストのログの「Redirected to」行は変わらない
+  - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+- `app:update`（rails-app-update）。前は rails-lock の後の書き出し
+  - `scripts/check-apps`: 36 の検査がすべて通った（件数は前と同じ）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`: 変わったのは、development・test のメーラーの `default_url_options`（DEF-7.2-13）、development の `annotate_rendered_view_with_filenames`（DEF-7.2-12）、`filter_parameters`・`ActiveRecord::Base.filter_attributes` の `email`（DEF-7.2-16）だけ。test の `public_file_server.enabled` は true のまま（DEF-7.2-14）
+  - `RUBYOPT=-W:deprecated` の警告と development だけのヘッダー（本文の長さは伏せている）: 前後で同じ。development の HTML のビューの注釈は、`Rack::MockRequest` で OP のログイン画面（6 個）と RP のトップ（4 個）を数えた
+  - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+
+### 手動確認
+
+verify で、`load_defaults 7.2` と `TargetRailsVersion` の後（`1ee85ff`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Rails 7.2.4・Puma 8.0.2・`ruby 3.3.12 … +YJIT`、threads 3 が出た。
+
+- 直前に、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体と `-wal`（OP・RP）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 5）
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`（DEF-7.2-03 を development でも確かめた）
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回。Step 4 と同じ
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css` と OP の同意画面の `/stylesheets/doorkeeper/application.css` と、プレビューが起動時に開いた RS・OP のトップ（Rails の歓迎ページ）の `/icon.png`。`/icon.png` は 7.2 の歓迎ページがアイコンを読むためで、`public/icon.png` は採用しないままにした（人間が判断。DEF-7.2-21 の補足）。元からあるエラーの一覧を TIPS.md の「手動確認用の環境」に書いた（Step 4 の気づきの 7）
+- 手動確認用の環境: 手動確認で、OP の development DB は `oauth_access_grants` が 25 → 27 件、`oauth_access_tokens` が 62 → 67 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP は `sessions` 12 件・`op_users` 1 件のまま。どちらも `integrity_check` は ok で、WAL のまま。サーバーを止めた後、OP・RP の `-wal`・`-shm` がなくなり、中身は本体に移っていた（sqlite3 2.x の閉じ方の変化。DEF-7.2-29）。人間に確かめ、守るファイルから OP・RP の `-wal` を外して 12 にし、手動確認の後の 12 ファイルのハッシュを新しい基準にした（変わったのは OP・RP の DB の本体だけ。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt`・`tmp/local_secret.txt` は変わっていない）。TIPS.md と設定（`.claude/rails-upgrade-project.md`）を直した。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| `app:update` で、RP の `autoload_lib_once` と 3 アプリの puma の port が雛形に上書きされ、`scripts/restore-app-config` で戻らなかった | 差分を読んで見つけ、止まって人間に確かめて戻した。道具の一覧に足した（`b048482`。上の「`app:update` で採用したもの・戻したもの」） |
+| グループ 2 を確かめるために E2E 用の DB で `db:migrate` を流すと、RP・OP の `db/schema.rb` が書き出された | この設定の変化ではないので戻した（DEF-7.2-25 の補足） |
+| 手動確認の後、OP・RP の `-wal` がなくなり、`-shm` のない WAL の DB の写しを `sqlite3 -readonly` で開けなかった | sqlite3 1.7.3 と 2.9.6 で、準備済みの文を残して終えるスクリプトを比べ、sqlite3 2.x の閉じ方の変化が原因と確かめた（DEF-7.2-29）。写しは `immutable=1` で開いて数えた。守るファイルを 12 にした（人間が判断） |
+| `ruby -e` に日本語を書くと `invalid multibyte char`、zsh の `read` で特別な変数 `path` に値を入れると PATH が壊れる | スクリプトをファイルにした。変数の名前を変えた（使い捨てのコマンドだけ） |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`1ee85ff`）で 36 の検査がすべて通った。各コミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この Step を通して出なかった。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で作り直している
+- RuboCop（`TargetRailsVersion: 7.2`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。解消済みの ID の検査も通る）・brakeman: すべて通った（`check-apps` の項目）。brakeman は 3 アプリとも `Security Warnings: 0`・`Ignored Warnings: 1`（EOLRails。Rails 7.2.4 でも同じ fingerprint）
+- lock: epic（`38603d2`）からの動きは、Rails の構成 gem（7.2.4）、sqlite3 2.9.6、tzinfo 2.0.6、増えた useragent 0.16.11、RP の annotate を外したこと、OP の annotate → annotaterb 4.25.0、`DEPENDENCIES` の rails・sqlite3・mutex_m（と annotate の行）だけ。default gem に合わせた版と、一時固定の reline 0.6.0・connection_pool 2.5.5（7.2.4 で固定の理由がなくなった）・faraday-net_http 3.0.2（RS・RP）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（YJIT の有効の後。irb 1.13.1・reline 0.6.0。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。YJIT が CI の Ruby で使えるかも、そのときに CI のログで見る（DEF-7.2-26）
+- 手動確認用の環境: 上の「手動確認」。HEAD で、12 ファイルのハッシュが手動確認の後の基準と同じ
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| development のメーラーの `default_url_options` の port が 3000 で、アプリの port と違う | 直さない。雛形どおりに追随すると決めた（DEF-7.2-13）。3 アプリはメールを送らず使われない。メールを使うときに直すことは DEF-7.2-13 に書いてある（人間が判断） |
+| この節の「作業計画からの変更点」に、RP の annotate の件しかない | 直した。道具の追加、puma の port、守るファイル 14 → 12、`/icon.png` の扱いを表に足した（人間が判断） |
+| mutex_m の明示は、古い minitest 5.14.4 の回避で、根本は minitest を上げること | 直さない。論点 2 で minitest は間接の gem として上げないと決めた。PLAN.md の 7 章の base64・mutex_m の行に、間接の gem をまとめて上げるときに外せることを足した（人間が判断） |
+| `.annotaterb.yml` が gem の既定値を全部書き写していて、後の版の既定値の変化が隠れる | 直さない。generator の雛形に追随すると決めた（DEF-7.2-02）。後の版の既定値の変化は、gem を上げるときに雛形と比べる（人間が判断） |
+| puma の port を戻すとき、上のコメントも HEAD のものに戻るので、雛形のコメントの変化が隠れる | 直さない。`restore_setting` は理由のコメントを一緒に戻す作り。下の「スキルについて気づいたこと」の 19 に控えた（人間が判断） |
+| `autoload_lib_once` を戻す処理が、`restore_setting` と同じ探し方を書き直している | 直さない。道具の整理は Step 5 の範囲を超える。下の 20 に控えた（人間が判断） |
+| DEF-7.2-12 のガイドの出典に、節の番号がない | 直した（3.11.16）（人間が判断） |
+
+- 直した後（文書だけの変更）も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、件数は同じ。手動確認用の環境の 12 ファイルのハッシュは、手動確認の後の基準と同じ
+
+### スキルについて気づいたこと
+
+Step 3〜4-b と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。この Step は、スキルの見直し（#33）の流れを初めて試す Step でもある。
+
+見直しの流れを試した結果（research まで）:
+
+1. `/rails-upgrade` を引数なしで呼ぶと、resume（ブランチ、手動確認用の環境の控え、PR へのリンクのコミット）から research へ、止まらずに入れた。research は Plan モードを使わず、lock の試行・advisory・警告の再現を scratchpad で行えた
+2. 確認のまとめ方: 論点は 5 つで、人間の返事は 6 回（論点 4 の掘り下げの依頼を含む）。前の論点のまとめを次の論点のメッセージに載せたので、まとめへの同意だけの往復はなかった。掘り下げの依頼は同じ論点のまま調べて答え、その後の返事で決めた。最後の論点（5）への返事で、作業計画とダウンロードの承認を取れた。決めた論点は、そのたびに記録に足してコミットした（4 回。論点 5 は計画を移すコミットに入れた）
+
+resume:
+
+3. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#33 の取り込みが入っていなかった。resume の手順 2 は「ブランチを切る」だけで、切る前に epic を origin に合わせる手順がない。今回は fetch して早送りしてから切った
+
+research:
+
+4. Step 3 の気づきの 2（zsh で `--unpin` の値を配列にせずに繰り返すと「不明な引数」になる）に、また当たった
+5. Step 3 の気づきの 12（resolve-lock の「消えた gem」に出ない）が、mutex_m でまた起きた。解決した lock を、Gemfile を書き換えたコピーに持ち込んで `bundle lock` するところまで試して見つけ、消えた gem を読むもの（minitest 5.14.4）を探して警告を再現した。resolve-lock の最後に `bundle lock` を流して差分を出せば、research の時点で見える
+6. 計画の前提（PLAN.md の 7 章の「Rails 7.1 までは sqlite3 1.x のみ」）が誤っていて、順番が変わった。research の手順 3（周辺 gem の振り分け）は 7 章の時期を前提にしていて、時期の根拠を確かめ直す手順がない。今回はサブエージェントの報告から気づき、gem のソースで確かめた
+7. ダウンロードの数え方（Step 4-b の気づきの 2）は、TIPS.md の手順のとおり、解決した lock の gem のうち `vendor/bundle` にないものを数え、手元と CI の置き場所も確かめた。数える道具がないので、scratchpad のスクリプトで行った
+
+gems:
+
+8. gems の手順は「gem を上げる」を想定していて、別の gem に置き換えること（annotate → annotaterb）は書いていない。置き換えでは、古い gem を読むファイル（旧 rake の `require 'annotate'`）を先に消さないと新しい gem の道具が動かず、gem を外したかどうかの比べ方（lock から消える gem、Bundler.require で読まれなくなるもの）も、その場で決めた
+9. 計画で決めた範囲（論点 3 の「RP は gem だけ置き換える」）を、理解の関門の質問で人間が見直した（RP では annotate がそもそも不要）。research で gem の使われ方を確かめたが、「置き換える」を前提に範囲を決め、外す案を出さなかった。research の手順 3（周辺 gem の振り分け）に、使っていない gem を外す選択肢がない
+
+rails-lock:
+
+10. Step 3 の気づきの 15 のとおり、development だけのヘッダーの前を rails-lock の始め（lock を変える前）に取り、コミットの前に比べられた。ただし書き出しの道具がなく、Puma に通して毎回変わる値を伏せるスクリプトを scratchpad で作った。`x-miniprofiler-ids` は前の要求の ID が積み上がるので、1 回目の書き出しで 2 回分が食い違い、伏せる対象に足した（Step 3 の記録にある Content-Length の件と同じ原因）
+11. `scripts/compare-config diff` の差分は 570 行あり、3 アプリ × 2 環境で同じ違いが繰り返されていた。同じ行をまとめると 26 種類だった。Rails のマイナーを上げると、`load_defaults` を変えなくても設定の値が変わる（非推奨の設定が外れる、クラスに設定が増える）ので、まとめて数える手順か道具があるとよい
+12. 解説の項目の出典で、日本語版のガイドの本文を探すのに `ruby -e` へ日本語を書き、Step 4 の「遭遇した問題」と同じく `invalid multibyte char` になった。スクリプトをファイルにして読んだ
+
+rails-app-update:
+
+13. `scripts/restore-app-config` の一覧になかった独自設定が 2 つ（RP の `autoload_lib_once`、3 アプリの puma の port）、雛形に上書きされた。どちらも 7.1 では雛形が変わらなかったので、一覧に足す機会がなかった。手順 3 の「雛形にない独自設定が消えた」に当たり、差分を読んで見つけた。道具の一覧に足すのは手順 2 にあるが、HEAD との差分で独自設定（日本語のコメントや、雛形と違う値）が消えた箇所を機械的に拾う手順はない
+14. 解説の材料として、development の HTML を `Rack::MockRequest` で読むときに、zsh の特別な変数 `path`（PATH と結びついている）に `read` で値を入れてしまい、後のコマンドが見つからなくなった（scratchpad の使い捨てのコマンド。TIPS.md の zsh の注意に足す候補）
+
+verify:
+
+15. Step 3 の気づきの 22・23 が、形を変えてまた起きた。手動確認用の DB の形は、Rails だけでなく DB のドライバーの gem（sqlite3 2.x の閉じ方）でも変わる。今回は作業計画で写しを取ると決めていたので、元に戻す選択肢は残っていたが、`-wal` が消えることは見込めず、手動確認の後に止まって確かめた。守るファイルの一覧が gem の振る舞いに依存している
+16. 手動確認の操作を頼む前にブラウザペインが見えているかを確かめる手順（manual-check の手順 3）は、ペインが隠れていて、人間に開いてもらう往復が 1 回増えた。人間は開いた後、確かめの返事を待たずに 2 つの流れを済ませた
+
+Step 全体（見直しの流れ）:
+
+17. research の後も、作業の境目（gems → rails-lock → rails-app-update → rails-defaults → rails-load-defaults → verify → pr）では止まらず、「◯◯ が終わった。次は △△ に入る」と示して続けられた。人間の返事は、関門だけだった（research の論点 5 つと掘り下げ 1 回、annotaterb の解説と RP の annotate の掘り下げ、rails-lock・rails-app-update の解説、rails-defaults のグループの順と 3 グループの解説、rails-load-defaults の解説、手動確認の依頼（ペインを開く・操作）、`-wal` と `/icon.png` の論点）。関門の後の質問にも、前の論点のまとめを載せた
+18. 理解の関門の解説は、項目ごとの型（種類・何が変わるか・なぜ・影響・提案・出典）で示し、返事の後に defaults/ に記録してから設定のコミットをする流れは、DEF の番号を先に決めてコメントやコミットメッセージから指すのに合っていた。一方で、解説の前に番号を決めてファイルのコメントに書いた（puma の port の DEF-7.2-18）ので、項目を足し引きすると番号がずれる心配があった
+
+コードレビュー:
+
+19. `scripts/restore-app-config` は、戻す設定の上に続くコメントも HEAD のものに戻すので、雛形がそのコメントを変えたときに、戻した後の差分には出ない。rails-app-update の手順 3（差分の振り分け）で、戻す前の差分（`app:update` の直後）も見る手順があるとよい（コードレビューの指摘。直さずに控えた）
+20. `scripts/lib/restore_app_config.rb` の `autoload_lib_once` の戻し方は、`restore_setting` と同じ探し方を、雛形側の名前と続く行だけ変えて書き直した。設定ごとに「HEAD の探し方・雛形の探し方・続く行」を渡せる形にまとめられる（コードレビューの指摘。直さずに控えた）

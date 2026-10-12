@@ -89,7 +89,7 @@
 
 ## 手動確認用の環境
 
-- 守るファイルと確かめ方: TIPS.md の「手動確認用の環境」（9 ファイルのハッシュ。Step 3 の rails-lock の後は 12 ファイル、Step 3 の verify の後は `-wal` を足した 14 ファイル。件数は `sqlite3 -readonly`）
+- 守るファイルと確かめ方: TIPS.md の「手動確認用の環境」（9 ファイルのハッシュ。Step 3 の rails-lock の後は 12 ファイル、Step 3 の verify の後は `-wal` を足した 14 ファイル、Step 5 の verify の後は `-wal` が消えて 12 ファイル。件数は `sqlite3 -readonly`、`-wal` のない WAL の DB は写しを `immutable=1` で開く）
 - 基準の件数: LOG.md の最後の手動確認の節
 
 ## 手動確認

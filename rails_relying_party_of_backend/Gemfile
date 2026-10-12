@@ -11,9 +11,9 @@ ruby '3.3.12'
 gem 'a-nti_manner_kick_course', groups: %i[development test]
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails', branch: 'main'
-gem 'rails', '~> 7.1.6'
+gem 'rails', '~> 7.2.4'
 # Use sqlite3 as the database for Active Record
-gem 'sqlite3', '~> 1.4'
+gem 'sqlite3', '~> 2.9'
 # Use Puma as the app server
 gem 'puma', '~> 8.0'
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
@@ -42,7 +42,6 @@ group :development, :test do
 end
 
 group :development do
-  gem 'annotate'
   # Access an interactive console on exception pages or by calling 'console' anywhere in the code.
   gem 'web-console', '>= 4.1.0'
   # Display performance information such as SQL time and flame graphs for each request in your browser.
@@ -51,6 +50,9 @@ group :development do
 end
 
 group :test do
+  # minitest 5.14.4 が require "mutex_m" する。Rails 7.2 で activesupport の依存から外れ、lock にないと
+  # Ruby 3.3 の bundled_gems の警告が出るので明示する（docs/upgrade/PLAN.md の Step 5）
+  gem 'mutex_m'
   # カバレッジの計測と、外部への HTTP 通信の遮断・差し替え
   gem 'simplecov', require: false
   gem 'webmock', require: false

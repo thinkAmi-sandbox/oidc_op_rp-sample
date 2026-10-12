@@ -71,7 +71,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - 出力先の lock をアプリに持ち込み、アプリの Gemfile の rails を変えて `bundle lock` すれば、過去の一時固定と同じ結果になる（タグ `rails-6.1-prepared` の worktree で、Step 1 の 3 アプリの lock と同じになることを確かめた）
 - gem の依存と Ruby の要件は、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json` で確かめられる。`.gem` のサイズは `https://rubygems.org/downloads/<gem>-<版>.gem` への HEAD リクエストの `content-length`
 - Gemfile に gem を足す・動かすときは Bundler/OrderedGems に気をつける。RuboCop はコメントを区切りとして扱い（`TreatCommentsAsGroupSeparators`）、自動修正はコメントと gem の対応を崩すことがある（LOG.md の Step 0-e「Gemfile」）
-- 理由付きの `rubocop:disable` が残っている（RS `apples_controller.rb`、RP `introspections_controller.rb`・`my_op.rb`、OP の annotate の rake）。そのコードを書き換えたら、disable が要らなくなっていないか確かめる（`Lint/RedundantCopDisableDirective`）
+- 理由付きの `rubocop:disable` が残っている（RS `apples_controller.rb`、RP `introspections_controller.rb`・`my_op.rb`。OP の annotate の rake の disable は、Step 5 で annotaterb の雛形にしてなくなった）。そのコードを書き換えたら、disable が要らなくなっていないか確かめる（`Lint/RedundantCopDisableDirective`）
 
 ## Ruby を上げる（Step 2）
 
@@ -121,7 +121,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 
 - 手動確認用のローカル環境（各アプリの development DB、`.env`、OP の署名鍵）は gitignore 対象。作業の前後で、次のファイルのハッシュが一致することを `shasum` で確かめる
   - `rails_open_id_provider/db/development.sqlite3`、`rails_relying_party_of_backend/db/development.sqlite3`、`rails_resource_server/db/development.sqlite3`
-  - `rails_open_id_provider/db/development.sqlite3-wal`、`rails_relying_party_of_backend/db/development.sqlite3-wal`（Step 3 の verify から。Rails 7.1 は SQLite を WAL で開き、サーバーを止めても `-wal` が残って、書き込んだ行がその中にある。DEF-7.1-48。`-shm` は読み取り専用で開いても更新日時が変わるので、ハッシュは比べない）
+  - `-wal` があるときは、`rails_open_id_provider/db/development.sqlite3-wal`、`rails_relying_party_of_backend/db/development.sqlite3-wal` も（Step 3 の verify から Step 5 の verify まで。Rails 7.1 は SQLite を WAL で開き（DEF-7.1-48）、sqlite3 1.x ではサーバーを止めても `-wal` が残って、書き込んだ行がその中にあった。sqlite3 2.x では、サーバーを正しく止めると `-wal` が本体に移って消えるので、Step 5 の verify から守るファイルは 12 になった（DEF-7.2-29）。`-shm` は読み取り専用で開いても更新日時が変わるので、ハッシュは比べない）
   - `rails_open_id_provider/jwtRS256.key`
   - `rails_relying_party_of_backend/.env`、`rails_resource_server/.env`
   - 3 アプリの `tmp/development_secret.txt`（Rails 7.0 までの development・test の secret_key_base）
@@ -132,8 +132,10 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - ユーザーの資格情報は `rails_open_id_provider/tmp/manual_check_user.txt` にある。値をチャットやドキュメントに出さない。ブラウザでのログインと同意は人間が行う
 - ブラウザペインが画面に出ていないと、AI からは表示できない（`tabs_context` が「hidden」と返す）。手動確認を頼む前に、人間にペインを開いてもらう
 - プレビューのサーバーの標準出力は `preview_logs` で読む。`search` は部分一致で、正規表現は使えない
+- 手動確認のサーバーの出力に出る、元からあるエラー（新しいものかを判断するときに比べる。Step 5 で一覧にした）: RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`（どちらも `ActionController::RoutingError`。アセットパイプラインのないアプリで `stylesheet_link_tag` が出す要求）、RS・OP のトップ（Rails の歓迎ページ。プレビューが起動時に開く）の `/icon.png`（Rails 7.2 から。`public/icon.png` を採用していない。DEF-7.2-21）。`preview_logs` の `level: error` はこれらを拾わないので、`search: Error` で探す
 - 手動確認でログインすると、RP と OP の development DB に行が増えてハッシュが変わる。手動確認の直前にハッシュが作業前と一致することを確かめ、前後の件数を読み取り専用の `sqlite3 -readonly` で数えて記録する（Step 0-f-2）。以降の基準は手動確認の後のハッシュ
-- Step 3 の verify から、development DB は WAL になっている（DEF-7.1-48）。件数は `-wal` の中も含めて数えるため、本体のファイルだけをコピーして数えない。`sqlite3 -readonly` は `-shm` があれば開ける。`-shm` がない WAL の DB は `unable to open database file` になるので、本体と `-wal` を一緒に scratchpad にコピーして数える
+- Step 3 の verify から、development DB は WAL になっている（DEF-7.1-48）。`-wal` があるときは、件数を `-wal` の中も含めて数えるため、本体のファイルだけをコピーして数えない。`sqlite3 -readonly` は `-shm` があれば開ける。`-shm` がない WAL の DB は `unable to open database file` になる。本体（と、あれば `-wal`）を scratchpad にコピーし、`-wal` があれば `sqlite3 -readonly <写し>`、`-wal` がなければ `sqlite3 "file:<写し>?immutable=1"` で数える（Step 5。`-wal` のない WAL の DB は、`-readonly` でも `-shm` を作れずに開けなかった）
+- Step 5 の sqlite3 2.x から、サーバーやコマンドを正しく終えると、最後の接続が閉じるときに `-wal` が本体に移って消える（sqlite3 1.x は、Rails が残す準備済みの文のために接続を閉じられず、`-wal` が残っていた。DEF-7.2-29）。手動確認の後に `-wal` がなくても、データは本体にある
 - `db:migrate` のように、DB を開いて書き込み、正常に閉じる操作の後は、`-wal` が空（0 バイト）になることがある（Step 3-b で、手動確認用の OP の DB に migrate を流したとき）。中身は本体に移っていて、データは失われていない。件数はこれまでどおり、本体と `-wal` のコピーで数える
 - 手動確認用の DB を変える操作（migrate など）の前は、DB の本体と `-wal` を `<アプリ>/tmp/manual_check_backup/`（gitignore）に写し、写しのハッシュが元と同じことを確かめる。`-shm` は開くときに作り直されるので写さない。scratchpad はセッションをまたいで残らないので使わない。写しがある間は `bin/rails tmp:clear` などの `tmp/` を消す操作をしない。写しは、その Step の PR が epic に入った後に、人間に確かめてから消す（Step 3-b で OP の DB の写しを取り、Step 4 の開始時に消した）
 
