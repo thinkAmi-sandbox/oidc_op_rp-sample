@@ -2482,6 +2482,8 @@ manual-check:
 
 - ブランチ / PR: `upgrade/step4b-simplecov13` / （PR 作成後に記入）
 - バージョン: Ruby 3.3.12・Rails 7.1.6（変更なし）。3 アプリの simplecov 1.2.0 → 1.3.2
+- 追随した gem の既定値は、[defaults/rails-7.1.md](defaults/rails-7.1.md) の「周辺 gem（Step 4-b）」に記録した（DEF-7.1-52）。業務的な挙動の変化（B）は起きなかった
+- lock にある default gem と同じ版の gem（16 個。OP は ostruct を足して 17 個）を、3 アプリとも `vendor/bundle` に入れた。Step 4 の後、手元は default gem から、CI は `vendor/bundle` から読んでいて、ずれていた（下の「遭遇した問題」）
 
 ### 作業計画で決めたこと
 
@@ -2499,3 +2501,43 @@ manual-check:
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4-b の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4 の PR へのリンク）の後も、14 ファイルのハッシュは同じ
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| lock にある default gem と同じ版の gem（json・bigdecimal・logger・base64・cgi・drb・mutex_m・io-console・irb・rdoc・psych・stringio・benchmark・securerandom・tsort・ruby2_keywords の 16 個。OP は ostruct 0.6.0 も）を、3 アプリとも `vendor/bundle` に入れた | RS の `bundle update` で、計画にないダウンロードとして起きた（下の「遭遇した問題」）。止まって原因を調べ、CI も同じものを入れて読んでいると分かった。手元を CI に揃える案と、Step 4 の状態（default gem から読む）に戻す案を示し、人間が CI に揃える案を選んだ |
+| RP・OP は、`bundle update` の代わりに、`bundle lock --update simplecov --conservative` で lock だけを書き、RS で照合済みの `.gem` 17 個をキャッシュにコピーして、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。OP の ostruct 0.6.0 だけは `gem fetch` で落とした（11,776 B） | 同じものを 3 回落とさないため（人間が判断）。計画のダウンロードは simplecov の 3 回だったが、実際は RS の 17 個と OP の ostruct の 1 個 |
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| simplecov | 1.2.0 → 1.3.2 | 3 アプリ。RS は `bundle update simplecov --conservative`、RP・OP は上の入れ方。lock で動いたのは、3 アプリとも simplecov の 1 行だけ。DEF-7.1-52 |
+| json ほか 16 個（OP は ostruct を足して 17 個） | 変更なし（lock の版のまま） | 読む場所が、default gem から `vendor/bundle` に変わった（3 アプリ。手元だけ。CI は Step 4 から `vendor/bundle`）。版は同じ |
+
+- 照合: `scripts/verify-gem-checksums` で、3 アプリのキャッシュの `.gem` がすべて rubygems.org の SHA-256 と一致した（RS 142・RP 156・OP 199 個。落とした simplecov 1.3.2・16 個・ostruct 0.6.0 を含む）
+- 読む場所: `bundle exec ruby -e` で、3 アプリとも lock の gem がすべて `vendor/bundle` から読まれ、default gem から読まれる gem は 0 個（RS 107・RP 117・OP 109 個）
+- epic と比べて lock で動いたのは simplecov の行だけ。lock に入れた default gem の版、一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）、Gemfile は動いていない
+- advisory: simplecov の advisory はない（research）。bundler-audit の無視リストは変わらない
+
+### 意図的な仕様変更
+
+なし。gem の既定値への追随は DEF-7.1-52（カバレッジのレポートのグループの出し方。人間が追随と判断した）
+
+### 前後の比較
+
+simplecov を上げる前（`769ad12`。3 アプリとも default gem から読む状態）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。
+
+- `scripts/check-apps`: 前後とも 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+- `scripts/compare-config dump`（3 アプリ、test・development）: 前を 2 回取って同じことを確かめた。前後で同じ
+- `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後とも、`warning:` の行は 0 件。DEPRECATION は前後とも OP のテストの `auth_time_from_resource_owner`（IMP-011）だけ
+- カバレッジの出力（`coverage/`）: `coverage.json` の合計・ファイルごとの値（RS 7・RP 15・OP 8 ファイル）・エラーの欄、`.last_run.json`、テストの最後に出る結果の行（`Line coverage: 33 / 33 (100.00%)` など）、`coverage/` のファイルの一覧は前後で同じ。違ったのは、`coverage.json` と `.history.json` のグループ（空のグループが外れ、アルファベット順になった。DEF-7.1-52）と、`meta` の `simplecov_version`・`timestamp` だけ
+- prism: テストの実行の終わりに `$LOADED_FEATURES` を見ると、前は 3 アプリとも prism 1.9.0 が読まれ、後は読まれない（1.3.1 から、Prism を branch・method のカバレッジで要るときだけ読む）
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RS の `bundle update simplecov --conservative` で、simplecov のほかに、lock にある default gem と同じ版の gem 16 個を rubygems.org から落とし、`vendor/bundle` に入れた（6 個は C 拡張をビルドした）。lock は simplecov の 1 行しか動かず、research の `--print` では見えなかった | 止まって人間に報告し、原因を調べた。Bundler 2.5.12 の rubygems/rubygems#7673 で、Bundler は lock にある default gem を普通の gem として扱い、入れるようになった（`bundler-2.5.22` の `lib/bundler/source/rubygems.rb` の `specs` は、default gem の spec を、rubygems.org などにないときだけ足す。`lib/bundler/rubygems_integration.rb` の `installed_specs` は default gem を除く）。Bundler 2.4.19 は、default gem の spec で rubygems.org の spec を上書きしていた（`:override_dupes`）。落とした 17 個の `.gem` は、すべて rubygems.org の SHA-256 と一致した |
+| Step 4 の後、手元と CI で、default gem と同じ版の gem を読む場所がずれていた | CI のログで確かめた。Step 4 の PR の CI（`BUNDLED WITH` 2.5.22）は、各ジョブで 16 個（OP は ostruct を足して 17 個）を入れていた。Step 2 の CI（Bundler 2.4.19。キャッシュなしで 484 個を入れた）は、これらを入れていない。Step 4 は「CI は同じ版の default gem を使う」と考えて RS の 3 つを外し、`--local` で入れたので、手元だけ default gem から読んでいた（Bundler 2.4 までは正しかった前提）。人間の判断で、3 アプリとも `vendor/bundle` に入れて CI に揃えた。TIPS.md の「Ruby を上げる」と「gem の更新」を直した |

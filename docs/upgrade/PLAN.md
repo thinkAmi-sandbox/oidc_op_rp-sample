@@ -867,9 +867,10 @@ Step 3-b が epic に入ってから、`/rails-upgrade research` で調べた。
 
 Step 4 が epic に入ってから、`/rails-upgrade research` で調べた。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-12）。Ruby 3.3.12・Rails 7.1.6 のまま、Ruby 3.3 以上を必要とする simplecov 1.3 系に上げる（Step 2-b では 1.2.0 で止めた。7 章）。経緯と作業の記録は LOG.md の Step 4-b。
 
-- [ ] gems: simplecov 1.2.0 → 1.3.2（RS）
-- [ ] gems: simplecov 1.2.0 → 1.3.2（RP）
-- [ ] gems: simplecov 1.2.0 → 1.3.2（OP）
+- [x] gems: simplecov 1.2.0 → 1.3.2（RS）
+- [x] gems: simplecov 1.2.0 → 1.3.2（RP）
+- [x] gems: simplecov 1.2.0 → 1.3.2（OP）
+- [x] gems: lock にある default gem と同じ版の gem を、3 アプリとも `vendor/bundle` に入れる（CI に揃える。LOG.md の Step 4-b の「作業計画からの変更点」。人間が判断）
 - [ ] verify（手動確認は行わない。手動確認用の環境の 14 ファイルのハッシュを、作業の開始時の基準と比べる）
 - [ ] pr
 
