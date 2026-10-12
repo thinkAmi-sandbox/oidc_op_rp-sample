@@ -23,6 +23,11 @@ module RailsRelyingPartyOfBackend
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 7.2
 
+    # Rails 8.0 は、この値が :zone でないと起動時に非推奨の警告を出し、test の deprecation = :raise で起動できない。
+    # 8.0 の既定値を先に取り込む。rails-defaults で new_framework_defaults_8_0.rb に移し、load_defaults 8.0 で消す
+    # （docs/upgrade/PLAN.md の Step 6 の決めたことの 2）
+    config.active_support.to_time_preserves_timezone = :zone
+
     # 雛形の config.autoload_lib ではなく、lib を once のローダーで読む。lib/omniauth/strategies/my_op.rb は
     # 起動時に一度だけ作られる OmniAuth のミドルウェアが使うので、リロードしない。lib/omniauth は既定の推測では
     # Omniauth になるので、gem の OmniAuth に合わせる（docs/upgrade/defaults/rails-7.1.md の DEF-7.1-10、PLAN.md の Step 3）
