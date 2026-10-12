@@ -2348,3 +2348,29 @@ gems:
 
 2. gems の手順は「gem を上げる」だけを想定していて、gem が求めるマイグレーション（generator を流す、DB を migrate する、schema.rb を書き出す）の手順と、どの DB で流すか（手動確認用の DB に触れない）が書いていない。今回は作業計画で決めた
 3. `scripts/commit-per-app` は、アプリの外のファイル（E2E の baseline）を、アプリの変更と同じコミットに入れられない。応答の変化が E2E の baseline にも出る gem では、手で同じ手順を行うことになる。注釈だけのコミットのように、アプリの中の変更の一部だけをコミットするときも、退避を手で行った
+
+## Step 4: Ruby 3.3（2026-10-12）
+
+- ブランチ / PR: `upgrade/step4-ruby33` / （PR 作成後に記入）
+- バージョン: Ruby 3.2.11 → 3.3.12 / Rails 7.1.6（変更なし）。Bundler 2.4.19 → 2.5.22（`BUNDLED WITH`）。lock の default gem を 3.3.12 の版に合わせ直す
+
+### 作業計画で決めたこと
+
+`/rails-upgrade research` で、Plan モードで調べた（サブエージェント 3 つ: Ruby 3.3 の事実、gem の対応、リポジトリの中の版の箇所。mise の入れ方、irb の依存、resolv を読む gem は自分で確かめた）。作業計画を出し、論点を 1 つずつ人間と確かめてから承認を得た。調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 4」に書いた。lock の合わせ直しの試行は、Plan モードではファイルを書けないので、Ruby 3.3.12 を入れてから scratchpad のコピーで行う（Step 2 と同じ）。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版 | 3.3.12 | 3.3 系の最新で最後のリリース（v3_3_13 のタグはない）。公開から 2 週間以上たち、erb の CVE-2026-41316 の修正版（erb 4.0.3.1）を含む |
+| irb の合わせ直し | irb 1.13.1 にし、依存で増える rdoc・psych・stringio も 3.3.12 の default gem の版（6.6.3.1・5.1.2・3.1.1）に固定する | 8 章の 4 の方針どおり。落とさず、ビルドもしない。固定しないと最新の rdoc 8.1.0・psych 5.5.0・stringio 3.2.0 が入る。`rails c` の irb が 1.6.2 → 1.13.1 になるので、`scripts/check-console` で起動と入力を確かめる（人間が判断） |
+| brakeman の無視リストの EOLRuby の項目 | 3 アプリとも、各アプリの Ruby を上げるコミットで消す | 3.3 は EOL でなくなり、無視の理由がなくなる。fingerprint は Ruby の版を含まないので、残すと 3.3 の EOL も黙って無視する（人間が判断） |
+| resolv の CVE-2026-80212・80213 | Gemfile に足さず、記録だけにする（PLAN.md の 7 章の resolv の行） | research で新しく見つかった。3.2 の 0.2 系も 3.3 の 0.3.1 も対象で、Ruby を上げて増えるリスクではない。lock の gem で `Resolv` を使うのは bundler-audit と rubocop だけで、アプリの実行時には読まれない。Step 2 の erb と同じ扱い（人間が判断） |
+| 手動確認 | 3 アプリの Ruby を上げた後（`TargetRubyVersion` の前）に 1 回。introspection の流れまで | Step 2 と同じ（人間が判断） |
+
+- 上げないもの: rubocop・webmock（2 週間たった最新版が今の版）、simplecov 1.3（サブステップ 4-b）、faraday-net_http（Step 8）、connection_pool（Step 5）、reline（0.6.0 のまま。3.3.12 の default gem の 0.5.10 は byebug 13 の要件を満たさない）、mise（2026.5.10 のまま）
+- ダウンロード: `ruby-3.3.12.tar.gz`（21,489,887 B、2026-07-16 公開）。作業計画で示し、入れる直前に改めて人間に確かめる
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 3-b の手動確認の後と同じだった（OP `oauth_access_grants` 23・`oauth_access_tokens` 57、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。
+
+- Step 3-b の verify で取った手動確認用の OP の development DB の写し（`rails_open_id_provider/tmp/manual_check_backup/`。migrate の前の本体と `-wal`）は、Step 3-b の PR が epic に入ったので、人間に確かめて消した。消した後も 14 ファイルのハッシュは控えと同じ。TIPS.md の項目は、写しの取り方と消す時期の一般の手順に書き直した

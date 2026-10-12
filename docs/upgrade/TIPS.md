@@ -50,7 +50,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 ## gem の更新
 
 - `bundle update <gem> --conservative` で上げ、`git diff -U0 Gemfile.lock | grep -E '^[-+]    [a-z]'` で、変わった gem を毎回見る
-- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb）と、一時固定した gem（benchmark・securerandom・faraday-net_http・reline・tsort・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
+- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb・rdoc・psych・stringio）と、一時固定した gem（benchmark・securerandom・faraday-net_http・reline・tsort・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
   - Gemfile に既にある gem を固定するときは、行を足さずに既にある行に版を書き、後で元に戻す（Step 2-b の brakeman）。作業の前に Gemfile を scratchpad にコピーしておき、コピーで戻すと確実
   - 依存で入る gem が default gem と同じ名前のとき（Step 2-b の byebug 13 の reline・io-console）は、default gem の版で要件を満たせるならその版に（ダウンロードもビルドもしない）、満たせないなら要件を満たす最小の版に固定する。固定しないと最新の版（io-console は C 拡張）が入る
@@ -131,7 +131,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - 手動確認でログインすると、RP と OP の development DB に行が増えてハッシュが変わる。手動確認の直前にハッシュが作業前と一致することを確かめ、前後の件数を読み取り専用の `sqlite3 -readonly` で数えて記録する（Step 0-f-2）。以降の基準は手動確認の後のハッシュ
 - Step 3 の verify から、development DB は WAL になっている（DEF-7.1-48）。件数は `-wal` の中も含めて数えるため、本体のファイルだけをコピーして数えない。`sqlite3 -readonly` は `-shm` があれば開ける。`-shm` がない WAL の DB は `unable to open database file` になるので、本体と `-wal` を一緒に scratchpad にコピーして数える
 - `db:migrate` のように、DB を開いて書き込み、正常に閉じる操作の後は、`-wal` が空（0 バイト）になることがある（Step 3-b で、手動確認用の OP の DB に migrate を流したとき）。中身は本体に移っていて、データは失われていない。件数はこれまでどおり、本体と `-wal` のコピーで数える
-- 手動確認用の OP の development DB の写し（本体と `-wal`）が `rails_open_id_provider/tmp/manual_check_backup/` にある（Step 3-b の verify で、migrate の前に取った）。Step 3-b の PR が epic に入った後に、人間に確かめてから消す。それまで `bin/rails tmp:clear` などの `tmp/` を消す操作をしない
+- 手動確認用の DB を変える操作（migrate など）の前は、DB の本体と `-wal` を `<アプリ>/tmp/manual_check_backup/`（gitignore）に写し、写しのハッシュが元と同じことを確かめる。`-shm` は開くときに作り直されるので写さない。scratchpad はセッションをまたいで残らないので使わない。写しがある間は `bin/rails tmp:clear` などの `tmp/` を消す操作をしない。写しは、その Step の PR が epic に入った後に、人間に確かめてから消す（Step 3-b で OP の DB の写しを取り、Step 4 の開始時に消した）
 
 ## LOG.md の書き方
 
