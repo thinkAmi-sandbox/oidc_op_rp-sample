@@ -2477,3 +2477,25 @@ ruby:
 manual-check:
 
 7. 手動確認でサーバーの出力を読むとき、元からあるエラー（RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`）の一覧が設定にも TIPS.md にもなく、新しいものかを判断するのに過去の記録とビューを探した（OP の分は、これまで記録していなかった）
+
+## Step 4-b: simplecov 1.3.2（2026-10-12）
+
+- ブランチ / PR: `upgrade/step4b-simplecov13` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12・Rails 7.1.6（変更なし）。3 アプリの simplecov 1.2.0 → 1.3.2
+
+### 作業計画で決めたこと
+
+`/rails-upgrade research` で、Plan モードで調べた（サブエージェントは使わなかった。CHANGELOG とソースの差分は GitHub のタグ、版・依存・サイズは rubygems.org の API、lock の解決は `bundle lock --update simplecov --conservative --print`）。作業計画を出し、論点を 1 つずつ人間と確かめてから承認を得た。調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 4-b」に書いた。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版 | 1.3.2。公開から 2 週間の決まりの例外とする | 着手の日（10-12）は公開から 12 日目。脆弱性があれば既に報告されている時期と考えられ、advisory も出ていない。AI は、2 週間たった 1.3.1 にし、1.3.2 は Step 5 の最初に上げる案を出した（1.3.1 からの違いは、`parallelize` を使わない 3 アプリには効かない修正だけ）が、人間が 1.3.2 を選んだ。brakeman 8.1.0（Step 3。10 日目）に続く 2 例目 |
+| 追随の記録 | DEF-7.1-52 の 1 項目（ファイルのないグループを外す、`rails` プロファイルのグループの並び順）。defaults/rails-7.1.md に「周辺 gem（Step 4-b）」の節を足す | どちらもグループの出し方の変化で、前例の DEF-7.0-50 も 1 項目にまとめた。Prism を読み込まなくなること（1.3.1）は既定値の変化ではないので、DEF-7.1-52 の影響とこの節に書く（人間が判断） |
+| 手動確認 | 行わない。手動確認用の環境の 14 ファイルのハッシュを、作業の開始時と verify で比べる | simplecov は test グループで `require: false` で、development のサーバーでは読まれない。lock で動くのは simplecov だけ（人間が判断） |
+| rubocop 1.92.0・webmock 3.27.0〜3.29.0 | この Step では扱わない。Step 5 の research の最初に確かめる | 公開から 1〜2 日で、2 週間たっていない（人間が判断） |
+
+- ダウンロード: simplecov 1.3.2 の `.gem`（218,624 B）を、3 アプリで 1 回ずつ。作業計画で示し、承認を得た
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4-b の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4 の PR へのリンク）の後も、14 ファイルのハッシュは同じ
