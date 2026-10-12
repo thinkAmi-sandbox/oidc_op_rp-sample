@@ -926,7 +926,7 @@ Step 4-b が epic に入った後、Step 5 の前に、Step 4-b で `/rails-upgr
 
 Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` の research で調べた（Plan モードは使っていない）。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-12）。Ruby 3.3.12 のまま Rails を 7.1.6 から 7.2.4 に上げる。その前に、今の Rails で上げられる sqlite3 2.9.6 と annotaterb を上げる。経緯と作業の記録は LOG.md の Step 5。
 
-- [ ] gems: sqlite3 2.9.6（3 アプリ。Gemfile `~> 1.4` → `~> 2.9`。bundler-audit の無視リストから sqlite3 の 2 件を消す）
+- [x] gems: sqlite3 2.9.6（3 アプリ。Gemfile `~> 1.4` → `~> 2.9`。bundler-audit の無視リストから sqlite3 の 2 件を消す）
 - [ ] gems: annotate → annotaterb 4.25.0（RP は Gemfile の gem だけ。OP は `annotate_rb:install` の雛形、`.annotaterb.yml` に旧 rake の 2 つの値、旧 rake の削除）
 - [ ] rails-lock: Rails 7.2.4（3 アプリ。tzinfo 2.0.6・useragent 0.16.11 が増え、mutex_m を Gemfile に明示する。無視リストから Rails の 10 件を消す。connection_pool の一時固定の理由がなくなる）
 - [ ] rails-app-update

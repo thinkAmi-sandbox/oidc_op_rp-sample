@@ -2672,6 +2672,25 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 5 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4-b と見直しの PR へのリンク）の後も、14 ファイルのハッシュは同じ
 
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| sqlite3 | 1.7.3 → 2.9.6 | 3 アプリ。Gemfile を `~> 1.4` → `~> 2.9`。RS は `bundle update sqlite3 --conservative`（`Fetching` は sqlite3 2.9.6 の arm64-darwin 版だけ）。RP・OP は `bundle lock --update sqlite3 --conservative` で lock を書き、RS で照合した `.gem` をキャッシュにコピーして `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。lock で動いたのは sqlite3 の 3 行だけ（Linux は `x86_64-linux-gnu` 版。`PLATFORMS` は変わらない）。`scripts/verify-gem-checksums` で 3 アプリとも rubygems.org の SHA-256 と一致した。無視リストから CVE-2026-54619・GHSA-mwm8-39rw-8826 を消した（`47ee48d`・`c400e4a`・`9bc8265`） |
+
+### 前後の比較
+
+sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。
+
+- sqlite3 2.9.6
+  - `scripts/check-apps`: 前後とも 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 前を 2 回取って同じことを確かめた。前後で同じ
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後とも `warning:` は 0 件。DEPRECATION は前後とも OP の IMP-011 だけ
+  - SQLite（development、E2E 用の DB）: ライブラリは 3.45.2 → 3.53.2。`journal_mode`（wal）・`synchronous`（1）・`foreign_keys`（1）は同じ
+  - E2E 用の DB から書き出した schema.rb（RP・OP）: 前後で同じ。RP の commit 済みの schema.rb は Rails 6.1 の形のままで、書き出すと Rails 7.1 の形になる（前からの状態。OP は Step 3-b で書き出し直した）
+  - 雛形と既定値の追随はない。業務的な挙動の変化もない
+  - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+
 ### スキルについて気づいたこと
 
 Step 3〜4-b と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。この Step は、スキルの見直し（#33）の流れを初めて試す Step でもある。
