@@ -2662,7 +2662,32 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 | 2 mutex_m | 3 アプリの Gemfile の test グループに `gem 'mutex_m'` を明示する（理由のコメント付き、版は書かない）。Rails 7.2.4 のコミットに入れる | activesupport 7.2 が依存から外し、lock から mutex_m 0.2.0 が消える。minitest 5.14.4 が `require "mutex_m"` するので、Ruby 3.3 の bundled_gems の警告がテストのたびに出る（再現した）。PLAN.md の 7 章の「警告が出たら明示」に当たる。明示すると lock は 0.2.0 のままで、`vendor/bundle` にもある。minitest を上げる案は、間接の gem で方針の外なので採らない（人間が判断） |
 | 3 annotaterb の範囲 | OP は Gemfile を `annotaterb` にし、`bin/rails g annotate_rb:install` の雛形（`lib/tasks/annotate_rb.rake`・`.annotaterb.yml`）に追随して、旧 rake の値と違う 2 つ（`hide_limit_column_types`・`hide_default_column_types`）を `.annotaterb.yml` に移し、旧 rake を消す。注釈を付け直して差分が出ないことを E2E 用の DB で確かめる。RP は Gemfile を `annotaterb` にするだけで、generator は流さない | 今の使われ方と同じにする。OP は migrate の後に注釈を付けている。RP は gem があるだけで rake も注釈もなく、hook を入れると使っていない機能を動かし始める（3 章の 2 の境目 5）。旧 rake の `rubocop:disable` は、雛形の rake に `task` のブロックがないので要らなくなる見込み（人間が判断） |
 | 4 rubocop・webmock | Step 5 では上げない。次の Step（6）の research の最初に、その時点の最新版と公開から 2 週間たっているかを確かめる。webmock を上げるときは、版ごとに RS の `body:` で照合するテストが通ることを見る | rubocop 1.92.0（10-10）・webmock 3.27.0〜3.29.0（10-10・10-11）は 2 週間たっていない（10-24・10-25）。人間の求めで webmock を掘り下げた。3 つの版は、メンテナーが 10-10〜10-11 に溜まった Issue・PR（2015 年からの 19 件）を片付けた区切りごとのリリースで、前の版の不具合を直す連続リリースではない（10-10 以降の新しい Issue・PR は 0 件）。3.28.0 の破壊的な変更（`to_rack` に `rack.session` を入れない。#985・#1093）は、Rails 7 のアプリを `to_rack` に渡すと落ちる不具合の修正で、3 アプリのテストは `to_rack` を使わない。Unreleased に次の版の変更（#1128）があり、待つ間に版が増えるおそれがある。開発・テスト用の道具で advisory もない（人間が判断） |
+| 5 手動確認の時期 | verify で 1 回（`load_defaults 7.2` と `TargetRailsVersion` の後）。RP の my_op のログインと introspection 用 RP の流れ、OP の「Redirected to」行の `code=` を見る。直前に、3 アプリの development DB の本体と `-wal` を各アプリの `tmp/manual_check_backup/` に写す | sqlite3 2.x のドライバーと Rails 7.2 で、手動確認用の DB を初めて開く。Step 3 では 7.1 で初めて開いたときに DB が変わった（DEF-7.1-47・48）ので、元に戻す選択肢を残す（Step 3 の気づきの 22）。secret_key_base は 7.2.4 も `tmp/local_secret.txt` を読み（`master.key`・`SECRET_KEY_BASE` はない）、`load_defaults 7.2` に Cookie の形式を変える項目はない。全部が揃った状態で 1 回にすると、手動確認用の DB を開く回数が少ない（人間が判断）。この論点への返事で、作業計画（ダウンロードの確認を含む）の承認も得た |
+
+- 上げないもの: rubocop・webmock（論点 4）、web-console 4.3.0（railties `>= 8.0`。Step 6）、rack 3.x（間接の gem）、minitest（論点 2）
+- ダウンロード: sqlite3 2.9.6-arm64-darwin・annotaterb 4.25.0・Rails の構成 gem 7.2.4 の 13 個・tzinfo 2.0.6・useragent 0.16.11（計 5,244,416 B）。各 `.gem` は 1 回だけ落とし、照合してほかのアプリのキャッシュにコピーする。作業計画で示し、論点 5 への返事で承認を得た
+- 調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 5: Rails 7.2」に書いた。PLAN.md の 7 章の sqlite3 の行と、Step 3 の「調べたこと」の誤り（Rails 7.1 は sqlite3 1.x だけ）も直した
 
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 5 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4-b と見直しの PR へのリンク）の後も、14 ファイルのハッシュは同じ
+
+### スキルについて気づいたこと
+
+Step 3〜4-b と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。この Step は、スキルの見直し（#33）の流れを初めて試す Step でもある。
+
+見直しの流れを試した結果（research まで）:
+
+1. `/rails-upgrade` を引数なしで呼ぶと、resume（ブランチ、手動確認用の環境の控え、PR へのリンクのコミット）から research へ、止まらずに入れた。research は Plan モードを使わず、lock の試行・advisory・警告の再現を scratchpad で行えた
+2. 確認のまとめ方: 論点は 5 つで、人間の返事は 6 回（論点 4 の掘り下げの依頼を含む）。前の論点のまとめを次の論点のメッセージに載せたので、まとめへの同意だけの往復はなかった。掘り下げの依頼は同じ論点のまま調べて答え、その後の返事で決めた。最後の論点（5）への返事で、作業計画とダウンロードの承認を取れた。決めた論点は、そのたびに記録に足してコミットした（4 回。論点 5 は計画を移すコミットに入れた）
+
+resume:
+
+3. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#33 の取り込みが入っていなかった。resume の手順 2 は「ブランチを切る」だけで、切る前に epic を origin に合わせる手順がない。今回は fetch して早送りしてから切った
+
+research:
+
+4. Step 3 の気づきの 2（zsh で `--unpin` の値を配列にせずに繰り返すと「不明な引数」になる）に、また当たった
+5. Step 3 の気づきの 12（resolve-lock の「消えた gem」に出ない）が、mutex_m でまた起きた。解決した lock を、Gemfile を書き換えたコピーに持ち込んで `bundle lock` するところまで試して見つけ、消えた gem を読むもの（minitest 5.14.4）を探して警告を再現した。resolve-lock の最後に `bundle lock` を流して差分を出せば、research の時点で見える
+6. 計画の前提（PLAN.md の 7 章の「Rails 7.1 までは sqlite3 1.x のみ」）が誤っていて、順番が変わった。research の手順 3（周辺 gem の振り分け）は 7 章の時期を前提にしていて、時期の根拠を確かめ直す手順がない。今回はサブエージェントの報告から気づき、gem のソースで確かめた
+7. ダウンロードの数え方（Step 4-b の気づきの 2）は、TIPS.md の手順のとおり、解決した lock の gem のうち `vendor/bundle` にないものを数え、手元と CI の置き場所も確かめた。数える道具がないので、scratchpad のスクリプトで行った
