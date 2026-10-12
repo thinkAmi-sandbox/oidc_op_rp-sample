@@ -69,7 +69,7 @@
 |---|---|
 | research | TIPS.md の「gem の更新」（`--print` で lock を書かずに試す、`--patch`、advisory の確かめ方）。advisory は ruby-advisory-db にないものがある（gem のリポジトリの advisory も見る。LOG.md の Step 1-b-3-1）。非推奨警告は TIPS.md の「確認のコマンド」 |
 | gems | TIPS.md の「gem の更新」（一時固定、default gem と同じ名前の依存、SHA-256）、PLAN.md の 7 章。gem の雛形への追随の前例は defaults/ の「周辺 gem」の節 |
-| ruby | TIPS.md の「Ruby を上げる」、PLAN.md の 8 章の 4。Ruby の版を持つファイルは PLAN.md の Step 2 の「調べたこと」の「Ruby の版に依存する箇所」 |
+| ruby | TIPS.md の「Ruby を上げる」、PLAN.md の 8 章の 4。Ruby の版を持つファイルは PLAN.md の Step 4 の「調べたこと」の「Ruby の版を持つ箇所」 |
 | rails-lock | TIPS.md の「gem の更新」（Rails のマイナーを上げるときの lock の解決） |
 | rails-app-update | PLAN.md の 8 章の 3。前例は defaults/rails-7.0.md の「`app:update` の雛形」 |
 | rails-defaults | TIPS.md の「設定の値と応答の比較」「応答のスナップショット」。前例は PLAN.md の Step 1 の「`new_framework_defaults_7_0.rb` を有効にする順番」と defaults/rails-7.0.md |

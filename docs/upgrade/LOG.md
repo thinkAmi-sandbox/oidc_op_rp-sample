@@ -2445,6 +2445,18 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 - CI: push の後に確かめる（push は人間が行う）
 - 手動確認用の環境: HEAD で、14 ファイルのハッシュが手動確認の後の基準と同じ（上の「手動確認」）
 
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| TIPS.md の「Ruby を上げる」が、brakeman の EOLRuby の警告は無視リストに当たり続けると書いたまま（サポート中の Ruby に上げると使われない無視になり、Step 4 で消した） | 直した。EOL の Ruby の間は当たり続け、サポート中の Ruby に上げたら Ruby を上げるコミットで消す、と書き分けた（人間が判断） |
+| PLAN.md の 7 章の Step 4 の行が、「見込み」「確かめる」のまま、または「（済）」がない（default gem の各行、base64 などの警告、erb） | 直した。合わせ直した行に「（済）」を付け、警告は出なかったこと、erb は解消したことを書いた（人間が判断） |
+| PLAN.md の 8 章の 4 と TIPS.md の「gem の更新」が、benchmark・securerandom・tsort を「要件を満たす最小の版に固定した gem」としている（3.3.12 では default gem と同じ版） | 直した。3 つを default gem の版に合わせ直す側に移した。最小の版に固定した gem は reline だけ（人間が判断） |
+| 設定（`.claude/rails-upgrade-project.md`）の ruby の行が、Ruby の版を持つファイルの一覧として、古い Step 2 の一覧（`mise where ruby@3.1.7` を含む）を指している | 直した。Step 4 の「調べたこと」の「Ruby の版を持つ箇所」を指すようにした（人間が判断） |
+| キャッシュのコピーで default gem と同じ版の `.gem` を外す手順が TIPS.md の文だけで、今回は scratchpad の使い捨てのスクリプトで行った | 直さない。`scripts/` に道具を足すのは Step 4 の範囲を超える。下の「スキルについて気づいたこと」の 6 に足し、スキルを直すときに決める（人間が判断） |
+| TIPS.md の gem の置き場所の例が「3.2 系は `3.2.0`」のまま | 直した。「3.3 系は `3.3.0`」にした（人間が判断） |
+直した後（文書だけの変更）も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、件数は同じ。手動確認用の環境の 14 ファイルのハッシュは、手動確認の後の基準と同じ
+
 ### スキルについて気づいたこと
 
 Step 3・3-b と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
@@ -2460,6 +2472,8 @@ ruby:
 4. ruby.md の手順 4 は、gem の入れ直しで「意図しないダウンロードが起きない」ことを見るが、前の版のキャッシュに新しい Ruby の default gem と同じ版の `.gem` があると、ダウンロードなしで入って default gem の代わりに読まれる。default gem から読まれるかは TIPS.md にしかなく、RS のコミットの前の確かめで気づいた（TIPS.md の「Ruby を上げる」に足した）
 5. `scripts/compare-config` の書き出しは、その版にない設定を読んだときの例外のメッセージも含むので、Ruby を上げると、アプリの設定が同じでも例外の文言（`NoMethodError`）の差分が出る。前後の比較の手順に、道具の出力の差分とアプリの差分を分ける目安がない
 
+6. TIPS.md に足した、キャッシュのコピーで default gem と同じ版の `.gem` を外す手順は、今回は scratchpad の使い捨てのスクリプトで行った。`scripts/verify-gem-checksums` と同じく道具にすれば、Ruby を上げるたびに手で作らずに済む（コードレビューの指摘。直さずに、ここに控えた）
+
 manual-check:
 
-6. 手動確認でサーバーの出力を読むとき、元からあるエラー（RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`）の一覧が設定にも TIPS.md にもなく、新しいものかを判断するのに過去の記録とビューを探した（OP の分は、これまで記録していなかった）
+7. 手動確認でサーバーの出力を読むとき、元からあるエラー（RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`）の一覧が設定にも TIPS.md にもなく、新しいものかを判断するのに過去の記録とビューを探した（OP の分は、これまで記録していなかった）

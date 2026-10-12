@@ -50,7 +50,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 ## gem の更新
 
 - `bundle update <gem> --conservative` で上げ、`git diff -U0 Gemfile.lock | grep -E '^[-+]    [a-z]'` で、変わった gem を毎回見る
-- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb・rdoc・psych・stringio）と、一時固定した gem（benchmark・securerandom・faraday-net_http・reline・tsort・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
+- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb・rdoc・psych・stringio・benchmark・securerandom・tsort）と、一時固定した gem（faraday-net_http・reline・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
   - Gemfile に既にある gem を固定するときは、行を足さずに既にある行に版を書き、後で元に戻す（Step 2-b の brakeman）。作業の前に Gemfile を scratchpad にコピーしておき、コピーで戻すと確実
   - 依存で入る gem が default gem と同じ名前のとき（Step 2-b の byebug 13 の reline・io-console）は、default gem の版で要件を満たせるならその版に（ダウンロードもビルドもしない）、満たせないなら要件を満たす最小の版に固定する。固定しないと最新の版（io-console は C 拡張）が入る
@@ -77,14 +77,14 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - 同じ系列の別のパッチ（Step 2 では手元の 3.2.3）で試さない。後から入れた Bundler（3.2.3 には 4.0.6）があると、素の `bundle` がそれで動く
 - lock の試行は、scratchpad の Gemfile と lock のコピーで、`env -i HOME="$HOME" PATH="$(mise where ruby@<版>)/bin:/usr/bin:/bin" BUNDLER_VERSION=<その Ruby の Bundler> BUNDLE_GEMFILE=<コピー> bundle _<その Bundler>_ lock` のように流す。`BUNDLER_VERSION` を付けないと、lock の `BUNDLED WITH` の版に切り替えようとする（`bundle install` なら、その版を落とす）。付けて lock を書くと、`BUNDLED WITH` は実行中の Bundler の版になる
 - default gem の合わせ直しは、コピーの Gemfile の `ruby` を変えて、合わせる版を `gem '<名前>', '<版>'` で足して `bundle lock` → 足した行を消して `bundle lock --local`。lock の差分が default gem の行と `RUBY VERSION`・`BUNDLED WITH` だけなら、その lock をアプリに持ち込める（Step 2 では Gemfile の `ruby` だけを変えたアプリの Gemfile と同じになることを `diff` で確かめた）
-- gem の置き場所は `vendor/bundle/ruby/<ABI の版>`（3.2 系は `3.2.0`）なので、Ruby のマイナーを上げると入れ直しになる。前の版のキャッシュの `.gem` を `vendor/bundle/ruby/<新しい版>/cache` にコピーし、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/<新しい版>/cache mise exec -- bundle install --local --no-cache` で入れると、gem を落とさない
+- gem の置き場所は `vendor/bundle/ruby/<ABI の版>`（3.3 系は `3.3.0`）なので、Ruby のマイナーを上げると入れ直しになる。前の版のキャッシュの `.gem` を `vendor/bundle/ruby/<新しい版>/cache` にコピーし、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/<新しい版>/cache mise exec -- bundle install --local --no-cache` で入れると、gem を落とさない
   - `bundle install --local` は、インストール先のキャッシュではなく、アプリのキャッシュ（`cache_path`。既定は `vendor/cache`）しか見ない。`BUNDLE_CACHE_PATH` を付けないと、gem が見つからずに止まる
   - `--no-cache` を付けないと、入れた後でアプリのキャッシュを最新にしようとして、キャッシュにない default gem の `.gem` を、`--local` でも rubygems.org から落とす（Step 2 の RS・RP で起きた。LOG.md の Step 2「遭遇した問題」）
   - 前の版のキャッシュに、新しい Ruby の default gem と同じ名前・版の `.gem` があると、Bundler はそれを `vendor/bundle` に入れて、default gem ではなくそちらを読む（Step 4 の RS で、benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5 で起きた）。CI は同じ版の default gem を使うので、コピーするときに外す。新しい Ruby で `.gem` を `Gem::Package.new(<ファイル>).spec` で読み、`platform` が `ruby` で名前・版が default gem と同じものを外す
   - 入れた後は、`Fetching` の行がないこと、default gem が default gem から読まれること（`Gem.loaded_specs["json"].default_gem?`）を見る
   - コピーした `.gem` は、Bundler 2.4・2.5 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、rubygems.org の値と比べる（`scripts/verify-gem-checksums <rs|rp|op>` でキャッシュのすべてを照合する。名前・版・プラットフォームは `Gem::Package.new(<ファイル>).spec` で読む）
 - 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行（Ruby の非推奨の警告は既定で出ないので、`RUBYOPT=-W:deprecated` を付けた minitest と、development の `bin/rails runner 'Rails.application.eager_load!'` も流す）、応答と E2E のスナップショット、起動の途中に読み込み済みの部品と設定の値（`scripts/compare-config`。下の「設定の値と応答の比較」）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
-- brakeman の EOLRuby の警告は、Ruby の版がメッセージにだけ入り、fingerprint は変わらないので、無視リストに当たり続ける（無視リストのメッセージは古い版のまま残る）
+- brakeman の EOLRuby の警告は、Ruby の版がメッセージにだけ入り、fingerprint は変わらないので、EOL の Ruby から EOL の Ruby に上げる間は、無視リストに当たり続ける（無視リストのメッセージは古い版のまま残る。Step 2）。サポート中の Ruby に上げると警告が出なくなり、無視リストの項目は使われない無視（「Obsolete Ignore Entries」）になる。fingerprint が同じなので、残すと次の EOL も黙って無視する。Ruby を上げるコミットで項目を消す（Step 4）
 
 ## rails c を確かめる（Step 2-b）
 
