@@ -2374,3 +2374,54 @@ gems:
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 3-b の手動確認の後と同じだった（OP `oauth_access_grants` 23・`oauth_access_tokens` 57、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。
 
 - Step 3-b の verify で取った手動確認用の OP の development DB の写し（`rails_open_id_provider/tmp/manual_check_backup/`。migrate の前の本体と `-wal`）は、Step 3-b の PR が epic に入ったので、人間に確かめて消した。消した後も 14 ファイルのハッシュは控えと同じ。TIPS.md の項目は、写しの取り方と消す時期の一般の手順に書き直した
+- ruby の作業の間（RS・RP・OP のコミットの前後）も、手動確認の直前まで、14 ファイルのハッシュは作業の開始時と同じ。書き出しと検査は、development でも E2E 用の DB（`DATABASE_URL=sqlite3:db/e2e.sqlite3`）を指した
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| RS で、前の版のキャッシュからコピーした `.gem` のうち、3.3.12 の default gem と同じ名前・版の 3 つ（benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5）を、`vendor/bundle/ruby/3.3.0` から消して入れ直した。RP・OP では、コピーするときに外した（OP は ruby2_keywords の `.gem` がなかったので 2 つ） | RS を入れた後、この 3 つが default gem ではなく `vendor/bundle` から読まれていた。Bundler は、キャッシュに `.gem` があると、同じ版の default gem があっても入れてそちらを読む。benchmark・tsort は 3.2.11 では本物の gem として入れていて、ruby2_keywords は Step 2 で意図せず落とした `.gem` が残っていた。版は同じで Ruby だけの gem なので挙動は変わらない見込みだが、CI（setup-ruby が新しく入れる）は同じ版の default gem を使い、手元と読む場所がずれるので、止まって人間に確かめた（人間が判断）。消したのは gitignore の対象の手元のファイルだけで、`3.2.0/cache` に元の `.gem` が残る。TIPS.md の「Ruby を上げる」に書いた |
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| （Ruby） | 3.2.11 → 3.3.12 | `mise install ruby@3.3.12`。ruby-build 20260924（最新のリリースと同じなので、mise は入れ直さなかった）がソースからビルドし、Homebrew の OpenSSL 3.5.0・libyaml 0.2.5 にリンクした。落としたのは `ruby-3.3.12.tar.gz`（21,489,887 B）だけ。入れた Ruby の default gem の版は、research で GitHub のタグから調べた版とすべて同じ。`ERB.version` は 4.0.3.1（CVE-2026-41316 の修正版）。`RUBY_PATCHLEVEL` は 206 |
+| json / bigdecimal / logger / base64 / cgi / drb / mutex_m / io-console / irb / securerandom | 2.6.3 / 3.1.3 / 1.5.3 / 0.1.1 / 0.3.7 / 2.1.1 / 0.1.2 / 0.6.0 / 1.6.2 / 0.3.0 → 2.7.2 / 3.1.5 / 1.6.0 / 0.2.0 / 0.4.2 / 2.2.0 / 0.2.0 / 0.7.1 / 1.13.1 / 0.3.1 | 3.3.12 の default gem の版に合わせ直した（3 アプリ） |
+| ostruct | 0.5.5 → 0.6.0 | 同上（OP） |
+| rdoc / psych / stringio | （なし）→ 6.6.3.1 / 5.1.2 / 3.1.1 | irb 1.13.1 の依存で lock に増えた。3.3.12 の default gem の版に固定した（3 アプリ） |
+| benchmark / tsort / ruby2_keywords | 0.3.0 / 0.2.0 / 0.0.5（変更なし） | 3.3.12 の default gem と同じ版 |
+| reline | 0.6.0（変更なし） | 3.3.12 の default gem の 0.5.10 は、byebug 13 の `>= 0.6.0` を満たさない |
+
+- lock の試行（scratchpad のコピー。Ruby 3.3.12・`BUNDLER_VERSION=2.5.22`）: Gemfile の `ruby` を変えて default gem を固定して `bundle lock` → 固定を外して `bundle lock --local` で、3 アプリとも動いたのは上の行と `RUBY VERSION`（`ruby 3.3.12p206`）・`BUNDLED WITH`（2.5.22）だけ。`PLATFORMS` は変わらず、Bundler 2.5 でも `CHECKSUMS` の節は増えない。この lock をアプリに持ち込んだ（アプリの Gemfile とコピーの Gemfile が同じことを `diff` で確かめた）
+- gem の入れ直し: `3.2.0/cache` の `.gem` を `3.3.0/cache` にコピーし（上の 3 つを外した後は RS 125・RP 139・OP 181 個）、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。3 アプリとも `Fetching` の行はなく、キャッシュの `.gem` の数も増えていない。`scripts/verify-gem-checksums` で、キャッシュの `.gem` がすべて rubygems.org の SHA-256 と一致した。default gem と同じ版の gem はすべて default gem から読まれ、gem から読むのは reline 0.6.0 だけ
+- C 拡張は Ruby 3.3 向けにビルドし直した（bootsnap・byebug・date・msgpack・nio4r・prism・puma・racc・websocket-driver、RP・OP は bindex、OP は bcrypt）。nokogiri・sqlite3 は arm64-darwin のプラットフォーム版の 3.3 のバイナリを使う
+- brakeman の無視リスト: 3 アプリとも、EOLRuby の項目を消した（JSON を読んで項目を除き、書き戻した。差分は項目の削除だけ）。brakeman の結果は、警告 0、無視した警告は EOLRails の 1 件、使われない無視の項目は 0 件
+- `TargetRubyVersion` を 3.3 にした（`bc1a335`）。3 アプリとも新しい指摘はない。RuboCop が読む値が 3.3 になることを `RuboCop::ConfigStore` で確かめた
+- epic と比べて lock で動いたのは、上の行と `RUBY VERSION`・`BUNDLED WITH` だけ。一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）、Gemfile の `ruby` 以外の行は動いていない
+
+### 前後の比較
+
+Ruby を上げる前（3.2.11。計画の docs のコミット `bfd0f4f` の後）に次のものを書き出し、各アプリを上げた後に取り直して比べた。
+
+- `scripts/check-apps`: 3.2.11 で 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。各アプリを上げた後（`--app` とコミットの前の `commit-per-app`）も、件数は同じで、応答のスナップショットと E2E のスナップショットの差分はない
+- `scripts/compare-config dump`（3 アプリ、test・development）: 3.2.11 で 2 回取って同じことを確かめた。上げた後の違いは、3 アプリの test・development とも、書き出しの道具が Rails 7.1 にない設定（`ActionDispatch::Request.return_only_media_type_on_content_type`）を読んだときの `NoMethodError` の文言だけ（`for ActionDispatch::Re…` → `for class ActionDispat…`。書き出しは値を途中で切る。Ruby 3.3 の NEWS の Feature #18285 で、メッセージが対象の `#inspect` を使わなくなった）。設定の値と起動の途中に読み込み済みの部品は同じ
+- `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 3.2.11 でも 3.3.12 でも、Ruby の `warning:` の行と bundled_gems の警告は 0 件。DEPRECATION は前後とも OP のテストの `auth_time_from_resource_owner`（IMP-011）だけ
+- `scripts/check-console`（3 アプリの development）: 前は irb 1.6.2・io-console 0.6.0、後は irb 1.13.1・io-console 0.7.1（reline は 0.6.0 のまま）。前後とも、Tab の補完と複数行の入力ができ、終了の状態は 0
+- brakeman の JSON: 警告は前後とも 0。無視した警告は EOLRails・EOLRuby → EOLRails。エラーと使われない無視の項目は 0 件で、実行したチェックは同じ
+
+### 手動確認
+
+3 アプリの Ruby を上げた後（`TargetRubyVersion` の前）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Ruby 3.3.12・Rails 7.1.6・Puma 8.0.2 が出た。
+
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP のログイン画面も同意画面も出ずに RP に戻り、「ログインしました」が出た。OP のログは、認可エンドポイントが 302、トークン・userinfo・JWKS が 200
+- introspection 用 RP: 前回のトークンは revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke（OP は 200）の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回。Step 3-b と同じ
+- サーバーの出力: 3 アプリとも、warning・DEPRECATION はない。エラーは、RP の `/stylesheets/application.css` と OP の同意画面の `/stylesheets/doorkeeper/application.css` のルーティングのエラーだけ。どちらも元からのもの（OP は `app/views/layouts/doorkeeper/application.html.erb` の `stylesheet_link_tag` が、アセットパイプラインのない OP で出す要求。これまでの記録には RP の分しか書いていなかった）
+- 手動確認用の環境: 直前に、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時と同じことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 23 → 25 件、`oauth_access_tokens` が 57 → 62 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 12 件・`op_users` が 1 件のまま。どちらも `integrity_check` は ok。ハッシュが変わったのは OP・RP の DB の本体と `-wal` だけで、RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt`・`tmp/local_secret.txt` は変わっていない。以降の基準は手動確認の後の 14 ファイルのハッシュ
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RS で、default gem と同じ版の 3 つの gem が `vendor/bundle` から読まれた | 止まって人間に確かめ、消して入れ直した（上の「作業計画からの変更点」） |
+| `ruby -e` の中に日本語の文字列を書くと、`invalid multibyte char (US-ASCII)` で読めない | 確かめるためのスクリプトをファイルにして流した（`-e` は ASCII だけで書く） |

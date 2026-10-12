@@ -27,7 +27,7 @@
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
 | 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」 |
 | bundler-audit | `mise exec -- bundle exec bundle-audit check` | `No vulnerabilities found`（無視リスト込み） |
-| brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`、`Ignored Warnings: 2` |
+| brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`、`Ignored Warnings: 1`（EOLRails。Step 4 で EOLRuby の項目を消した） |
 | E2E | `e2e/` で `mise exec -- npm test` | 約 10 秒で 10 passed。手動確認用のサーバーが動いていると起動に失敗する |
 
 上の検査は、リポジトリ直下の `scripts/check-apps` でまとめて流せる（Step 1-b-3 から）。3 アプリの検査（`CI=1` の minitest と起動の途中の読み込みを含む）と E2E を順に流し、失敗しても後の検査を流して、最後に結果の一覧と minitest・E2E の件数を出す。各検査の出力は `CHECK_APPS_LOG_DIR`（scratchpad を指す）に残る。
@@ -45,7 +45,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - ジョブとステップの結果: `gh run view <run-id>`。失敗したステップのログだけを見るときは `gh run view <run-id> --log-failed`
 - bundler-audit だけが落ちたときは、CI が取った advisory のデータベースに新しい advisory が入った可能性が高い（CI は `--update` を付けて最新を使う。手元は `bundle-audit update` を流すまで古いまま）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」に従い、上げるか、無視リストに入れるかを人間に確かめる。変更と関係のない PR でも落ちる
 - E2E が失敗したときは、artifact `e2e-failure` にレポート・トレースと 3 アプリのログがある（`gh run download <run-id> -n e2e-failure -D <scratchpad のディレクトリ>`）。中のトークンは CI の使い捨てのものだが、LOG.md に貼るときは公開物の記載ルールに従う
-- 手元で mise なしの経路（CI と同じ）を試すときは、`env -i HOME="$HOME" LANG=ja_JP.UTF-8 PATH="$(mise where ruby@3.2.11)/bin:$(mise where node@24.21.0)/bin:/usr/bin:/bin"` の下で `npm test` を流す（Step 0-g）
+- 手元で mise なしの経路（CI と同じ）を試すときは、`env -i HOME="$HOME" LANG=ja_JP.UTF-8 PATH="$(mise where ruby@3.3.12)/bin:$(mise where node@24.21.0)/bin:/usr/bin:/bin"` の下で `npm test` を流す（Step 0-g）
 
 ## gem の更新
 
@@ -80,8 +80,9 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - gem の置き場所は `vendor/bundle/ruby/<ABI の版>`（3.2 系は `3.2.0`）なので、Ruby のマイナーを上げると入れ直しになる。前の版のキャッシュの `.gem` を `vendor/bundle/ruby/<新しい版>/cache` にコピーし、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/<新しい版>/cache mise exec -- bundle install --local --no-cache` で入れると、gem を落とさない
   - `bundle install --local` は、インストール先のキャッシュではなく、アプリのキャッシュ（`cache_path`。既定は `vendor/cache`）しか見ない。`BUNDLE_CACHE_PATH` を付けないと、gem が見つからずに止まる
   - `--no-cache` を付けないと、入れた後でアプリのキャッシュを最新にしようとして、キャッシュにない default gem の `.gem` を、`--local` でも rubygems.org から落とす（Step 2 の RS・RP で起きた。LOG.md の Step 2「遭遇した問題」）
+  - 前の版のキャッシュに、新しい Ruby の default gem と同じ名前・版の `.gem` があると、Bundler はそれを `vendor/bundle` に入れて、default gem ではなくそちらを読む（Step 4 の RS で、benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5 で起きた）。CI は同じ版の default gem を使うので、コピーするときに外す。新しい Ruby で `.gem` を `Gem::Package.new(<ファイル>).spec` で読み、`platform` が `ruby` で名前・版が default gem と同じものを外す
   - 入れた後は、`Fetching` の行がないこと、default gem が default gem から読まれること（`Gem.loaded_specs["json"].default_gem?`）を見る
-  - コピーした `.gem` は、Bundler 2.4 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、rubygems.org の値と比べる（`scripts/verify-gem-checksums <rs|rp|op>` でキャッシュのすべてを照合する。名前・版・プラットフォームは `Gem::Package.new(<ファイル>).spec` で読む）
+  - コピーした `.gem` は、Bundler 2.4・2.5 の lock に checksum がないので、入れるときに照らし合わされない。キャッシュの各 `.gem` の SHA-256 を、rubygems.org の値と比べる（`scripts/verify-gem-checksums <rs|rp|op>` でキャッシュのすべてを照合する。名前・版・プラットフォームは `Gem::Package.new(<ファイル>).spec` で読む）
 - 前後の比較には、`scripts/check-apps` の件数と、ログの `warning:`・`DEPRECATION` の行（Ruby の非推奨の警告は既定で出ないので、`RUBYOPT=-W:deprecated` を付けた minitest と、development の `bin/rails runner 'Rails.application.eager_load!'` も流す）、応答と E2E のスナップショット、起動の途中に読み込み済みの部品と設定の値（`scripts/compare-config`。下の「設定の値と応答の比較」）を使う。Ruby を上げる前に、前の Ruby で書き出しておく
 - brakeman の EOLRuby の警告は、Ruby の版がメッセージにだけ入り、fingerprint は変わらないので、無視リストに当たり続ける（無視リストのメッセージは古い版のまま残る）
 

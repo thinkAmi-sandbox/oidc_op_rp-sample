@@ -816,11 +816,11 @@ Step 3 が epic に入ってから、`/rails-upgrade research` で調べた。�
 
 Step 3-b が epic に入ってから、`/rails-upgrade research` で調べた。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-12）。「8. 各 Step 共通の手順」の 4 に従い、Rails 7.1.6 のまま Ruby を 3.2.11 から 3.3.12 に上げる。経緯と作業の記録は LOG.md の Step 4。
 
-- [ ] ruby: RS（Ruby 3.3.12、lock の default gem、`BUNDLED WITH` 2.5.22、brakeman の無視リストの EOLRuby の項目を消す）
-- [ ] ruby: RP（同上）
-- [ ] ruby: OP（同上）
-- [ ] ruby: RuboCop の `TargetRubyVersion` を 3.3 にする
-- [ ] verify（手動確認は、3 アプリの Ruby を上げた後、`TargetRubyVersion` の前に 1 回）
+- [x] ruby: RS（Ruby 3.3.12、lock の default gem、`BUNDLED WITH` 2.5.22、brakeman の無視リストの EOLRuby の項目を消す）
+- [x] ruby: RP（同上）
+- [x] ruby: OP（同上）
+- [x] ruby: RuboCop の `TargetRubyVersion` を 3.3 にする
+- [ ] verify（手動確認は、3 アプリの Ruby を上げた後、`TargetRubyVersion` の前に行った。結果は LOG.md の Step 4 の「手動確認」）
 - [ ] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:
