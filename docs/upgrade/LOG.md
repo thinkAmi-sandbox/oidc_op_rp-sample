@@ -2879,3 +2879,16 @@ Step 全体（見直しの流れ）:
 
 19. `scripts/restore-app-config` は、戻す設定の上に続くコメントも HEAD のものに戻すので、雛形がそのコメントを変えたときに、戻した後の差分には出ない。rails-app-update の手順 3（差分の振り分け）で、戻す前の差分（`app:update` の直後）も見る手順があるとよい（コードレビューの指摘。直さずに控えた）
 20. `scripts/lib/restore_app_config.rb` の `autoload_lib_once` の戻し方は、`restore_setting` と同じ探し方を、雛形側の名前と続く行だけ変えて書き直した。設定ごとに「HEAD の探し方・雛形の探し方・続く行」を渡せる形にまとめられる（コードレビューの指摘。直さずに控えた）
+
+## Step 6: Rails 8.0（2026-10-12）
+
+- ブランチ / PR: `upgrade/step6-rails80` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 7.2.4 → 8.0.5.1
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 2 つ: Rails 8.0 の事実、周辺 gem の事実。lock の解決と持ち込んだ後の `bundle lock`、advisory、cgi の読み込み、connection_pool、brakeman の EOL の条件と fingerprint、to_time の非推奨、CI の YJIT は自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 lock の解決 | uri は Ruby 3.3.12 の default gem と同じ 0.13.3 に一時固定する（`--pin uri=0.13.3`）。RS・OP で cgi 0.4.2 が lock から消えるのは受け入れ、Gemfile に足さない。上限が外れる connection_pool 2.5.5・minitest 5.14.4・rack 2.2.24 は動かさない | activesupport 8.0.5.1 が `uri >= 0.13.1` を足し、固定しないと 1.1.2 が入る（default gem と同じ名前の依存は default gem の版に固定する。PLAN.md の 7 章・8 章）。cgi は actionpack・actionview・railties 8.0.5.1 が依存から外した（7.2 系は rails/rails#55043 で宣言、8-0-stable は #55102 で cgi から要るものだけを読む形）。resolve-lock の「消えた gem」には出ず、解決した lock を Gemfile を `~> 8.0.5` にしたコピーに持ち込んで `bundle lock --local` して見つけた。lock になくても default gem の同じ版（0.4.2）が読まれ、`-W:deprecated` でも警告は出ない（Step 5 の mutex_m と違う）。RP は activerecord-session_store の依存で残る。3 つの間接の gem は、8.0 で上限（`< 3`・`< 6`・`< 3.3`）が外れるが、lock はそのまま解決する。8.0.5.1 のキャッシュストアは `ConnectionPool.new(**pool_options)` で 3.x でも壊れない（人間が判断） |
