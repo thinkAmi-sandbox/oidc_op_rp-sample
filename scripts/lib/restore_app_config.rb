@@ -2,7 +2,7 @@
 
 # scripts/restore-app-config から、アプリのディレクトリで呼ぶ。`bin/rails app:update` が雛形で上書きしたファイルに、
 # HEAD（app:update の前のコミット）にあったアプリの独自設定を戻し、使わない機能のマイグレーションを消す。
-# 戻す設定の一覧は下の「戻す設定」。どれも、雛形に合わせずに残すと人間が決めたもの（docs/upgrade/defaults/ の DEF-7.0-10・14、
+# 戻す設定の一覧は下の「戻す設定」。どれも、雛形に合わせずに残すと人間が決めたもの（docs/upgrade/defaults/ の DEF-7.0-10・14・DEF-7.1-10、
 # LOG.md の Step 1）。一覧にないものは戻さないので、最後に出す差分を人間が確かめる。
 
 # Rails アプリの外で動くスクリプトなので、標準出力への出力と exit を使う
@@ -48,6 +48,10 @@ restore_setting = lambda do |path, pattern|
   puts "#{path}: #{pattern.source} とその上のコメントを HEAD のものに戻した"
 end
 restore_setting.call('config/environments/test.rb', /^\s*config\.active_support\.deprecation\s*=/)
+
+# 1-2. puma.rb の port（雛形は 3000。3 アプリは 3780〜3782 で、README の `rails s` はこの値で起動する。
+#      Step 5 の app:update で、一覧になく雛形の 3000 になったので足した）
+restore_setting.call('config/puma.rb', /^port\s/)
 
 # 2. filter_parameter_logging.rb（:code と、伏せる対象の理由のコメント。DEF-7.0-10）
 #    配列は、このリポジトリが足した要素（CUSTOM_FILTER_ELEMENTS）のうち、雛形にないものを末尾に足す。HEAD にあって雛形にない
@@ -104,7 +108,27 @@ if app_head
   end
 end
 
-# 4. app:update が足した Active Storage のマイグレーション（3 アプリとも Active Storage を使わない。DEF-7.0-14）
+# 4. config/application.rb の autoload_lib_once と inflector（RP の独自ストラテジー。DEF-7.1-10）。
+#    雛形の config.autoload_lib とその上のコメントを、HEAD の autoload_lib_once とその上の理由のコメント、
+#    直後の Rails.autoloaders.once の行に置き換える（Step 5 の app:update で、一覧になく戻らなかったので足した）
+if app_head && (head_lines = app_head.lines).any? { |line| line.match?(/^\s*config\.autoload_lib_once\(/) }
+  head_range = setting_block.call(head_lines, /^\s*config\.autoload_lib_once\(/)
+  head_last = head_range.last
+  head_last += 1 while head_lines[head_last + 1]&.match?(/^\s*Rails\.autoloaders\.once\./)
+  wanted = head_lines[head_range.first..head_last]
+  current_lines = File.read(app_path, encoding: 'UTF-8').lines
+  if current_lines.each_cons(wanted.size).include?(wanted)
+    puts "#{app_path}: autoload_lib_once は HEAD と同じ"
+  elsif (current_range = setting_block.call(current_lines, /^\s*config\.autoload_lib\(/))
+    current_lines[current_range] = wanted
+    File.write(app_path, current_lines.join)
+    puts "#{app_path}: config.autoload_lib とその上のコメントを、HEAD の autoload_lib_once とその前後の行に戻した"
+  else
+    failures << "#{app_path}: 雛形に config.autoload_lib がない"
+  end
+end
+
+# 5. app:update が足した Active Storage のマイグレーション（3 アプリとも Active Storage を使わない。DEF-7.0-14）
 untracked, = Open3.capture2('git', 'ls-files', '--others', '--exclude-standard', '--', 'db/migrate')
 untracked.lines.map(&:chomp).grep(/\.active_storage\.rb\z/).each do |path|
   File.delete(path)
