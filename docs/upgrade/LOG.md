@@ -2648,7 +2648,7 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 
 ## Step 5: Rails 7.2（2026-10-12）
 
-- ブランチ / PR: `upgrade/step5-rails72` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step5-rails72` / [#34](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/34)
 - バージョン: Ruby 3.3.12（変更なし）/ Rails 7.1.6 → 7.2.4。その前に sqlite3 1.7.3 → 2.9.6、OP の annotate 3.2.0 → annotaterb 4.25.0（RP は annotate を外した）
 - 追随した Rails と gem の既定値・雛形は、[defaults/rails-7.2.md](defaults/rails-7.2.md) に記録した（DEF-7.2-01〜29）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空になった（Rails の 10 件、sqlite3 の 2 件が解消）
 - スキルの見直し（[#33](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/33)）の後、`/rails-upgrade` を引数なしで始めた最初の Step。resume から research へ止まらずに入り、research は Plan モードを使わずに行った
