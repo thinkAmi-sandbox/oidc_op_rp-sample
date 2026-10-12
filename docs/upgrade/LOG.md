@@ -2918,6 +2918,7 @@ Step 全体（見直しの流れ）:
 | uri | （なし）→ 0.13.3 | activesupport 8.0 の `uri >= 0.13.1`。Ruby 3.3.12 の default gem と同じ版に一時固定した（論点 1。Rails 8.0.5.1 と同じコミット） |
 | cgi | 0.4.2 → （なし）（RS・OP） | actionpack・actionview・railties 8.0 が依存から外し、RS・OP の lock から消えた（論点 1。受け入れた）。RP は activerecord-session_store の依存で 0.4.2 のまま |
 | connection_pool・minitest・rack | 2.5.5・5.14.4・2.2.24（変更なし） | 8.0 で上限が外れたが、lock は動いていない（論点 1） |
+| web-console | 4.2.1 → 4.3.0（RP・OP） | Rails 8.0.5.1 の直後（論点 4）。RP は `bundle lock --update web-console --conservative` と `bundle install`（`Fetching` は web-console 4.3.0 だけ）。OP は `--local` を付けると、ほかのプラットフォームの sqlite3 が手元になく解決できなかったので、付けずに lock を書き、RP で照合した `.gem` をキャッシュにコピーして `--local` で入れた（`Installing` は web-console だけ）。lock で動いたのは web-console の行だけ（依存から activemodel が外れ、bindex は同じ）。`scripts/verify-gem-checksums` で 2 アプリとも一致した。前後で、compare-config の設定の値と読み込み済みの部品（3 アプリの test・development）、警告、brakeman、development だけのヘッダーは同じ。Gemfile の `'>= 4.1.0'` は変えていない。DEF-8.0-09・10（`587b8f8`・`e68426d`） |
 
 ### 非推奨警告と対応
 
