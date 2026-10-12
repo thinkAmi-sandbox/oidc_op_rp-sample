@@ -3091,3 +3091,31 @@ verify:
 
 16. 手動確認で、research・rails-lock の検査では出なかった Rails 8.0.5.1 の不具合（ルーティングを描く処理の競合）が、プレビューの起動直後の同時の要求で見つかった。E2E と minitest は要求を 1 つずつ送るので出ない。development を threads 3 の Puma で動かす手動確認が、同時の要求を試す唯一の場になっている
 17. Step 5 の気づきの 16 と同じく、ブラウザペインが隠れていて、人間に開いてもらう往復が 1 回増えた。今回は依頼のメッセージに開き方と操作の順を一緒に書いたので、往復はその 1 回で済んだ
+
+## Step 7: Rails 8.1（2026-10-12）
+
+- ブランチ / PR: `upgrade/step7-rails81` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 8.0.5.1 → 8.1.4（予定）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 2 つ: Rails 8.1 の事実、周辺 gem の事実。lock の解決と持ち込んだ後の `bundle lock`、advisory、benchmark の依存、brakeman の EOL、omniauth-rails_csrf_protection の 8.1 の分岐、`load_defaults 8.1` の各項目が読まれる時期、`app:update` が作るファイルは自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 research で Rails 8.1.4 を起動して試す | 試す。scratchpad に HEAD の git worktree を作り、3 アプリに解決した lock と Gemfile（rails を `~> 8.1.4`）を置き、`BUNDLE_PATH` を本体の各アプリの `vendor/bundle` に向けて入れる。worktree で `scripts/check-apps --no-e2e` と `scripts/compare-config dump` を流す。本体の Gemfile・lock と手動確認用の環境は変えない。ダウンロード（Rails の構成 gem 8.1.4 の 13 個と action_text-trix 2.1.19。計 1,967,616 B）は、この論点への返事で承認を得た。RS で 1 回だけ落として照合し、RP・OP のキャッシュにコピーする | Step 6 では research で起動しなかったので、Rails 8.0.5.1 自身の起動の途中の読み込み（DEF-8.0-02）を rails-lock で初めて見つけた（Step 6 の気づきの 9）。今回は、RP の omniauth-rails_csrf_protection 2.0.1 が Rails 8.1 で require の時点に `ActionController::Base` を読み込むことが、コードからは見込まれる（`railtie.rb:2` → `token_verifier.rb:20-34` → v8.1.4 の `request_forgery_protection.rb` の `included do`。上流の cookpad/omniauth-rails_csrf_protection#33 は open）。検出の中身と、config/initializers の設定が効かなくなる範囲を、後の論点の前に実行で確かめる。落とした gem は rails-lock でそのまま使う（人間が判断） |
+
+### スキルについて気づいたこと
+
+Step 3〜6 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+resume:
+
+1. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#35 の取り込みが入っていなかった（Step 5 の気づきの 3、Step 6 の気づきの 1 と同じ）。人間の指示にあったので、fetch して早送りしてから切った
+2. 前のセッション（Ruby 3.2 の頃）の調査で起動した RS の puma（ポート 3992）が残っていて、development.log に書き込んでいた。resume の手順 3 で手動確認用の環境を控えるときに、サーバーが動いていないかを確かめる手順がない（ps で見つけた）
+
+research:
+
+3. resolve-lock の「消えた gem」に出ずに lock から消える gem が、また出た（3 アプリの benchmark 0.3.0）。Step 3 の method_source、Step 5 の mutex_m、Step 6 の cgi に続いて 4 回目。持ち込んだ後の `bundle lock` まで試して見つけた
+4. 新しい Rails を research で起動して試すには、ダウンロードが先に要る。templates.md の「質問」は、ダウンロードの承認を最後の論点（作業計画の承認）の返事に含める形なので、今回は最初の論点で先に承認をもらった
+5. omniauth-rails_csrf_protection の Rails 8.1 の分岐による早い読み込みは、サブエージェントが gem のソースを読んで見つけた。research の手順 2 は「上げるものの事実」を調べるが、lock の gem が新しい Rails で別の分岐（`ActionPack.version` などの条件）を通るかを見る手順はない
