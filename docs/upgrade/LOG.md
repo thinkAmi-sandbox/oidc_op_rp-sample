@@ -2920,6 +2920,34 @@ Step 全体（見直しの流れ）:
 | connection_pool・minitest・rack | 2.5.5・5.14.4・2.2.24（変更なし） | 8.0 で上限が外れたが、lock は動いていない（論点 1） |
 | web-console | 4.2.1 → 4.3.0（RP・OP） | Rails 8.0.5.1 の直後（論点 4）。RP は `bundle lock --update web-console --conservative` と `bundle install`（`Fetching` は web-console 4.3.0 だけ）。OP は `--local` を付けると、ほかのプラットフォームの sqlite3 が手元になく解決できなかったので、付けずに lock を書き、RP で照合した `.gem` をキャッシュにコピーして `--local` で入れた（`Installing` は web-console だけ）。lock で動いたのは web-console の行だけ（依存から activemodel が外れ、bindex は同じ）。`scripts/verify-gem-checksums` で 2 アプリとも一致した。前後で、compare-config の設定の値と読み込み済みの部品（3 アプリの test・development）、警告、brakeman、development だけのヘッダーは同じ。Gemfile の `'>= 4.1.0'` は変えていない。DEF-8.0-09・10（`587b8f8`・`e68426d`） |
 
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update`（DB は E2E 用）を流し、戻す前の差分を控えてから `scripts/restore-app-config` で独自設定を戻し、差分を人間が確かめた。項目ごとの解説は [defaults/rails-8.0.md](defaults/rails-8.0.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| 環境のファイルのコメント、`cache-control` の小文字、test.rb の先頭の require | 採用 | 書き方だけ（DEF-8.0-11） |
+| development の `cache_store` が常に `:memory_store` | 採用 | キャッシュを使っていない（DEF-8.0-12） |
+| development の `query_log_tags_enabled = true` | 採用 | development のログだけ（DEF-8.0-13） |
+| development・test の `disallowed_deprecation` の 2 行の削除 | 採用 | 一覧が空で、効き目がなかった（DEF-8.0-14） |
+| test の `perform_caching = false` の 2 行の削除 | 採用 | cache_store が `:null_store` のまま（DEF-8.0-15） |
+| test のメーラーの host が `example.com` | 採用 | メールを送らない（DEF-8.0-16） |
+| `filter_parameter_logging.rb` の `:cvv`・`:cvc` | 採用 | ログと `inspect` だけ（DEF-8.0-17） |
+| `config/puma.rb` のコメント | 採用（port は道具で戻した） | DEF-8.0-18 |
+| `config/puma.rb` の `plugin :solid_queue` | 採用しない | 新しい構成（DEF-8.0-19） |
+| `bin/setup` の変化と `bin/dev` | 採用 | DEF-8.0-20 |
+| `bin/rubocop`・`bin/brakeman` | 採用しない | DEF-7.2-20 と同じ（DEF-8.0-21） |
+| public の 404・422・500 の作り直しと `400.html`（RP・OP） | 採用 | production だけで使う（DEF-8.0-22） |
+| `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`（RP・OP） | 採用しない | DEF-7.2-21 と同じ（DEF-8.0-23） |
+| production.rb | 採用 | 雛形に追従するだけ（DEF-8.0-24） |
+| test の `deprecation = :raise`、puma の port、`filter_parameter_logging.rb` の `:code` とコメント、RP の `autoload_lib_once` と inflector | 戻した | アプリの独自設定（`scripts/restore-app-config`。戻せない項目はなかった） |
+| `config/application.rb` の `to_time_preserves_timezone = :zone` | 手で戻した | rails-lock で足した一時的な設定（DEF-8.0-01。作業計画の論点 2）。雛形に上書きされた。rails-defaults で移すので、道具の一覧には足していない |
+| `active_storage:update` のマイグレーション 3 本 | 採用しない | Active Storage を使わない（DEF-7.0-14。道具で消した） |
+| `new_framework_defaults_8_0.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- 戻す前の差分で、戻した設定（puma の port、test の deprecation）の上の雛形のコメントが 7.2.4 から変わっていないことを確かめた（Step 5 の気づきの 19）
+- コミット: RS `ae985e1`・RP `22533d5`・OP `72960a1`
+
 ### 非推奨警告と対応
 
 | 警告 | 対応 |
@@ -2938,6 +2966,13 @@ lock を変える前（`5359cc2` の後）に次のものを書き出し、3 ア
   - brakeman: 無視の項目を足す前は、3 アプリとも Medium の `pending_eol_rails`（「Support for Rails 8.0.5.1 ends on 2026-11-07」）で終了コード 3。足した後は警告 0、無視 1、チェックの数は同じ（79）。今ある High の EOLRails の項目は、11-07 まで当たらない
   - SQLite のトランザクション: RP・OP の test.log で、アプリの書き込みが `BEGIN immediate TRANSACTION`、transactional fixtures が `BEGIN deferred TRANSACTION` になった（DEF-8.0-04）
   - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- `app:update`（rails-app-update）。前は web-console の後の書き出し（その後アプリは変わっていない）
+  - `scripts/check-apps`: 36 の検査がすべて通った（件数は前と同じ）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`: 変わったのは、development の `cache_store`（`Rails.cache` を含む。DEF-8.0-12）と query log tags（DEF-8.0-13）、`disallowed_deprecation` の 2 つの設定（DEF-8.0-14）、test の `perform_caching` の設定（DEF-8.0-15。クラスの値は書き出しに出ないので runner で確かめた）、test のメーラーの host（DEF-8.0-16）、`filter_parameters`・`filter_attributes` の `cvv`・`cvc`（DEF-8.0-17）だけ。読み込み済みの部品は同じ（DEF-8.0-02 で許した検出の後ろに、新しい読み込みは増えていない）
+  - `RUBYOPT=-W:deprecated` の警告、brakeman、development だけのヘッダー: 前後で同じ
+  - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- web-console 4.3.0（gems）。前は rails-lock の後の書き出し
+  - `scripts/compare-config dump`（設定の値と読み込み済みの部品）、警告、brakeman、development だけのヘッダー: 前後で同じ。検査と E2E は、各アプリのコミットの前（`commit-per-app`）に通った（RP 33・OP 69 runs、E2E 10 passed）
 
 ### 遭遇した問題
 
@@ -2976,3 +3011,8 @@ rails-lock:
 10. 「その系の最新パッチ」を選んでも、それがセキュリティ修正だけの版（8.0.5.1）だと、stable で直った不具合（#58276）が入っていない。research の版の選び方に、最新パッチと stable の差（`compare/v<版>...<系>-stable`）を見る手順がない
 11. サブエージェントの見立て（`to_time` の警告は after_initialize で出る）は、結論は合っていたが位置が違った（initializer `active_support.set_configs`）。実際に流して確かめるまで、出典の位置は見立てとして扱う必要がある
 12. 検出の gem は最初の 1 件で止まるので、検査で 1 件を許すと、その後ろが見えない。許すと決めたときに、隠れる分を補う比べ方（compare-config の読み込み済みの部品）を一緒に決める必要があった。スキルの「検査の失敗の原因が分からない」以外に、原因が分かっていて直せないときの扱い（①〜④）が、gem の未対応の場合しか書かれていない
+
+rails-app-update:
+
+13. `app:update` の雛形が、rails-lock で足した一時的な設定（`config/application.rb` の `to_time_preserves_timezone`）を上書きした。`scripts/restore-app-config` は決まった独自設定だけを戻すので、作業の途中で足した一時的な設定は、差分を読んで手で戻した。rails-lock で設定を足すときに、rails-app-update で上書きされることを見込んでおく必要がある
+14. `scripts/compare-config` は、設定のキー（`config.action_controller.perform_caching` など）が消えると、そのキーに結び付けたクラスの値も出さないので、test の `perform_caching` が false → true になったことが書き出しの差分に出なかった。雛形の差分（行の削除）から気づき、runner で確かめた
