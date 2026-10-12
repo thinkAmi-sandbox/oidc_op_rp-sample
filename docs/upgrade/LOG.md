@@ -2227,7 +2227,7 @@ verify:
 
 ## Step 3-b: doorkeeper-openid_connect 2.0.0（2026-10-11）
 
-- ブランチ / PR: `upgrade/step3b-doorkeeper-oidc20` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step3b-doorkeeper-oidc20` / [#30](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/30)
 - バージョン: Ruby 3.2.11（変更なし）/ Rails 7.1.6（変更なし）/ doorkeeper-openid_connect 1.10.5 → 2.0.0（OP）
 
 ### 作業計画で決めたこと
@@ -2348,3 +2348,132 @@ gems:
 
 2. gems の手順は「gem を上げる」だけを想定していて、gem が求めるマイグレーション（generator を流す、DB を migrate する、schema.rb を書き出す）の手順と、どの DB で流すか（手動確認用の DB に触れない）が書いていない。今回は作業計画で決めた
 3. `scripts/commit-per-app` は、アプリの外のファイル（E2E の baseline）を、アプリの変更と同じコミットに入れられない。応答の変化が E2E の baseline にも出る gem では、手で同じ手順を行うことになる。注釈だけのコミットのように、アプリの中の変更の一部だけをコミットするときも、退避を手で行った
+
+## Step 4: Ruby 3.3（2026-10-12）
+
+- ブランチ / PR: `upgrade/step4-ruby33` / （PR 作成後に記入）
+- バージョン: Ruby 3.2.11 → 3.3.12 / Rails 7.1.6（変更なし）。Bundler 2.4.19 → 2.5.22（`BUNDLED WITH`）。lock の default gem を 3.3.12 の版に合わせ直した。erb の CVE-2026-41316 は default gem の erb 4.0.3.1 で解消した
+- Ruby だけを上げる Step。既定値への追随（A）と業務的な挙動の変化（B）は、どちらも起きなかった（下の「前後の比較」）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade research` で、Plan モードで調べた（サブエージェント 3 つ: Ruby 3.3 の事実、gem の対応、リポジトリの中の版の箇所。mise の入れ方、irb の依存、resolv を読む gem は自分で確かめた）。作業計画を出し、論点を 1 つずつ人間と確かめてから承認を得た。調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 4」に書いた。lock の合わせ直しの試行は、Plan モードではファイルを書けないので、Ruby 3.3.12 を入れてから scratchpad のコピーで行う（Step 2 と同じ）。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版 | 3.3.12 | 3.3 系の最新で最後のリリース（v3_3_13 のタグはない）。公開から 2 週間以上たち、erb の CVE-2026-41316 の修正版（erb 4.0.3.1）を含む |
+| irb の合わせ直し | irb 1.13.1 にし、依存で増える rdoc・psych・stringio も 3.3.12 の default gem の版（6.6.3.1・5.1.2・3.1.1）に固定する | 8 章の 4 の方針どおり。落とさず、ビルドもしない。固定しないと最新の rdoc 8.1.0・psych 5.5.0・stringio 3.2.0 が入る。`rails c` の irb が 1.6.2 → 1.13.1 になるので、`scripts/check-console` で起動と入力を確かめる（人間が判断） |
+| brakeman の無視リストの EOLRuby の項目 | 3 アプリとも、各アプリの Ruby を上げるコミットで消す | 3.3 は EOL でなくなり、無視の理由がなくなる。fingerprint は Ruby の版を含まないので、残すと 3.3 の EOL も黙って無視する（人間が判断） |
+| resolv の CVE-2026-80212・80213 | Gemfile に足さず、記録だけにする（PLAN.md の 7 章の resolv の行） | research で新しく見つかった。3.2 の 0.2 系も 3.3 の 0.3.1 も対象で、Ruby を上げて増えるリスクではない。lock の gem で `Resolv` を使うのは bundler-audit と rubocop だけで、アプリの実行時には読まれない。Step 2 の erb と同じ扱い（人間が判断） |
+| 手動確認 | 3 アプリの Ruby を上げた後（`TargetRubyVersion` の前）に 1 回。introspection の流れまで | Step 2 と同じ（人間が判断） |
+
+- 上げないもの: rubocop・webmock（2 週間たった最新版が今の版）、simplecov 1.3（サブステップ 4-b）、faraday-net_http（Step 8）、connection_pool（Step 5）、reline（0.6.0 のまま。3.3.12 の default gem の 0.5.10 は byebug 13 の要件を満たさない）、mise（2026.5.10 のまま）
+- ダウンロード: `ruby-3.3.12.tar.gz`（21,489,887 B、2026-07-16 公開）。作業計画で示し、入れる直前に改めて人間に確かめる
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| RS で、前の版のキャッシュからコピーした `.gem` のうち、3.3.12 の default gem と同じ名前・版の 3 つ（benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5）を、`vendor/bundle/ruby/3.3.0` から消して入れ直した。RP・OP では、コピーするときに外した（OP は ruby2_keywords の `.gem` がなかったので 2 つ） | RS を入れた後、この 3 つが default gem ではなく `vendor/bundle` から読まれていた。Bundler は、キャッシュに `.gem` があると、同じ版の default gem があっても入れてそちらを読む。benchmark・tsort は 3.2.11 では本物の gem として入れていて、ruby2_keywords は Step 2 で意図せず落とした `.gem` が残っていた。版は同じで Ruby だけの gem なので挙動は変わらない見込みだが、CI（setup-ruby が新しく入れる）は同じ版の default gem を使い、手元と読む場所がずれるので、止まって人間に確かめた（人間が判断）。消したのは gitignore の対象の手元のファイルだけで、`3.2.0/cache` に元の `.gem` が残る。TIPS.md の「Ruby を上げる」に書いた |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 3-b の手動確認の後と同じだった（OP `oauth_access_grants` 23・`oauth_access_tokens` 57、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。
+
+- Step 3-b の verify で取った手動確認用の OP の development DB の写し（`rails_open_id_provider/tmp/manual_check_backup/`。migrate の前の本体と `-wal`）は、Step 3-b の PR が epic に入ったので、人間に確かめて消した。消した後も 14 ファイルのハッシュは控えと同じ。TIPS.md の項目は、写しの取り方と消す時期の一般の手順に書き直した
+- ruby の作業の間（RS・RP・OP のコミットの前後）も、手動確認の直前まで、14 ファイルのハッシュは作業の開始時と同じ。書き出しと検査は、development でも E2E 用の DB（`DATABASE_URL=sqlite3:db/e2e.sqlite3`）を指した
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| （Ruby） | 3.2.11 → 3.3.12 | `mise install ruby@3.3.12`。ruby-build 20260924（最新のリリースと同じなので、mise は入れ直さなかった）がソースからビルドし、Homebrew の OpenSSL 3.5.0・libyaml 0.2.5 にリンクした。落としたのは `ruby-3.3.12.tar.gz`（21,489,887 B）だけ。入れた Ruby の default gem の版は、research で GitHub のタグから調べた版とすべて同じ。`ERB.version` は 4.0.3.1（CVE-2026-41316 の修正版）。`RUBY_PATCHLEVEL` は 206 |
+| json / bigdecimal / logger / base64 / cgi / drb / mutex_m / io-console / irb / securerandom | 2.6.3 / 3.1.3 / 1.5.3 / 0.1.1 / 0.3.7 / 2.1.1 / 0.1.2 / 0.6.0 / 1.6.2 / 0.3.0 → 2.7.2 / 3.1.5 / 1.6.0 / 0.2.0 / 0.4.2 / 2.2.0 / 0.2.0 / 0.7.1 / 1.13.1 / 0.3.1 | 3.3.12 の default gem の版に合わせ直した（3 アプリ） |
+| ostruct | 0.5.5 → 0.6.0 | 同上（OP） |
+| rdoc / psych / stringio | （なし）→ 6.6.3.1 / 5.1.2 / 3.1.1 | irb 1.13.1 の依存で lock に増えた。3.3.12 の default gem の版に固定した（3 アプリ） |
+| benchmark / tsort / ruby2_keywords | 0.3.0 / 0.2.0 / 0.0.5（変更なし） | 3.3.12 の default gem と同じ版 |
+| reline | 0.6.0（変更なし） | 3.3.12 の default gem の 0.5.10 は、byebug 13 の `>= 0.6.0` を満たさない |
+
+- lock の試行（scratchpad のコピー。Ruby 3.3.12・`BUNDLER_VERSION=2.5.22`）: Gemfile の `ruby` を変えて default gem を固定して `bundle lock` → 固定を外して `bundle lock --local` で、3 アプリとも動いたのは上の行と `RUBY VERSION`（`ruby 3.3.12p206`）・`BUNDLED WITH`（2.5.22）だけ。`PLATFORMS` は変わらず、Bundler 2.5 でも `CHECKSUMS` の節は増えない。この lock をアプリに持ち込んだ（アプリの Gemfile とコピーの Gemfile が同じことを `diff` で確かめた）
+- gem の入れ直し: `3.2.0/cache` の `.gem` を `3.3.0/cache` にコピーし（上の 3 つを外した後は RS 125・RP 139・OP 181 個）、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。3 アプリとも `Fetching` の行はなく、キャッシュの `.gem` の数も増えていない。`scripts/verify-gem-checksums` で、キャッシュの `.gem` がすべて rubygems.org の SHA-256 と一致した。default gem と同じ版の gem はすべて default gem から読まれ、gem から読むのは reline 0.6.0 だけ
+- C 拡張は Ruby 3.3 向けにビルドし直した（bootsnap・byebug・date・msgpack・nio4r・prism・puma・racc・websocket-driver、RP・OP は bindex、OP は bcrypt）。nokogiri・sqlite3 は arm64-darwin のプラットフォーム版の 3.3 のバイナリを使う
+- brakeman の無視リスト: 3 アプリとも、EOLRuby の項目を消した（JSON を読んで項目を除き、書き戻した。差分は項目の削除だけ）。brakeman の結果は、警告 0、無視した警告は EOLRails の 1 件、使われない無視の項目は 0 件
+- `TargetRubyVersion` を 3.3 にした（`bc1a335`）。3 アプリとも新しい指摘はない。RuboCop が読む値が 3.3 になることを `RuboCop::ConfigStore` で確かめた
+- epic と比べて lock で動いたのは、上の行と `RUBY VERSION`・`BUNDLED WITH` だけ。一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）、Gemfile の `ruby` 以外の行は動いていない
+
+### 意図的な仕様変更
+
+なし。既定値・雛形への追随（3 章の 2 の A）も、業務的な挙動の変化（B）も起きなかった（下の「前後の比較」）。defaults/ への記録はない
+
+### 前後の比較
+
+Ruby を上げる前（3.2.11。計画の docs のコミット `bfd0f4f` の後）に次のものを書き出し、各アプリを上げた後に取り直して比べた。
+
+- `scripts/check-apps`: 3.2.11 で 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。各アプリを上げた後（`--app` とコミットの前の `commit-per-app`）も、件数は同じで、応答のスナップショットと E2E のスナップショットの差分はない
+- `scripts/compare-config dump`（3 アプリ、test・development）: 3.2.11 で 2 回取って同じことを確かめた。上げた後の違いは、3 アプリの test・development とも、書き出しの道具が Rails 7.1 にない設定（`ActionDispatch::Request.return_only_media_type_on_content_type`）を読んだときの `NoMethodError` の文言だけ（`for ActionDispatch::Re…` → `for class ActionDispat…`。書き出しは値を途中で切る。Ruby 3.3 の NEWS の Feature #18285 で、メッセージが対象の `#inspect` を使わなくなった）。設定の値と起動の途中に読み込み済みの部品は同じ
+- `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 3.2.11 でも 3.3.12 でも、Ruby の `warning:` の行と bundled_gems の警告は 0 件。DEPRECATION は前後とも OP のテストの `auth_time_from_resource_owner`（IMP-011）だけ
+- `scripts/check-console`（3 アプリの development）: 前は irb 1.6.2・io-console 0.6.0、後は irb 1.13.1・io-console 0.7.1（reline は 0.6.0 のまま）。前後とも、Tab の補完と複数行の入力ができ、終了の状態は 0
+- brakeman の JSON: 警告は前後とも 0。無視した警告は EOLRails・EOLRuby → EOLRails。エラーと使われない無視の項目は 0 件で、実行したチェックは同じ
+
+### 手動確認
+
+3 アプリの Ruby を上げた後（`TargetRubyVersion` の前）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Ruby 3.3.12・Rails 7.1.6・Puma 8.0.2 が出た。
+
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP のログイン画面も同意画面も出ずに RP に戻り、「ログインしました」が出た。OP のログは、認可エンドポイントが 302、トークン・userinfo・JWKS が 200
+- introspection 用 RP: 前回のトークンは revoke 済みなので同意画面が出て、Authorize の後、RS は正しいトークンで 200、`_bad` を付けたトークンで 401、revoke（OP は 200）の後は 401。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回。Step 3-b と同じ
+- サーバーの出力: 3 アプリとも、warning・DEPRECATION はない。エラーは、RP の `/stylesheets/application.css` と OP の同意画面の `/stylesheets/doorkeeper/application.css` のルーティングのエラーだけ。どちらも元からのもの（OP は `app/views/layouts/doorkeeper/application.html.erb` の `stylesheet_link_tag` が、アセットパイプラインのない OP で出す要求。これまでの記録には RP の分しか書いていなかった）
+- 手動確認用の環境: 直前に、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時と同じことを確かめた。手動確認で、OP の development DB は `oauth_access_grants` が 23 → 25 件、`oauth_access_tokens` が 57 → 62 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP の development DB は `sessions` が 12 件・`op_users` が 1 件のまま。どちらも `integrity_check` は ok。ハッシュが変わったのは OP・RP の DB の本体と `-wal` だけで、RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt`・`tmp/local_secret.txt` は変わっていない。以降の基準は手動確認の後の 14 ファイルのハッシュ
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RS で、default gem と同じ版の 3 つの gem が `vendor/bundle` から読まれた | 止まって人間に確かめ、消して入れ直した（上の「作業計画からの変更点」） |
+| `ruby -e` の中に日本語の文字列を書くと、`invalid multibyte char (US-ASCII)` で読めない | 確かめるためのスクリプトをファイルにして流した（`-e` は ASCII だけで書く） |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`c913afe`）で 36 の検査がすべて通った。各アプリのコミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分はない。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で作り直している
+- RuboCop（`TargetRubyVersion: 3.3`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）。brakeman は 3 アプリとも `Security Warnings: 0`・`Ignored Warnings: 1`（EOLRails）で、使われない無視の項目はない。bundler-audit の無視リストは変わらない（この Step で解消した advisory はない。erb・resolv は default gem で lock にないので、bundler-audit の対象外）
+- lock: epic（`34bc460`）からの動きは、default gem の合わせ直し（OP は ostruct も）、増えた rdoc・psych・stringio、`RUBY VERSION`・`BUNDLED WITH` だけ。一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）と、benchmark・tsort・ruby2_keywords は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.13.1・reline 0.6.0・io-console 0.7.1。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: HEAD で、14 ファイルのハッシュが手動確認の後の基準と同じ（上の「手動確認」）
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| TIPS.md の「Ruby を上げる」が、brakeman の EOLRuby の警告は無視リストに当たり続けると書いたまま（サポート中の Ruby に上げると使われない無視になり、Step 4 で消した） | 直した。EOL の Ruby の間は当たり続け、サポート中の Ruby に上げたら Ruby を上げるコミットで消す、と書き分けた（人間が判断） |
+| PLAN.md の 7 章の Step 4 の行が、「見込み」「確かめる」のまま、または「（済）」がない（default gem の各行、base64 などの警告、erb） | 直した。合わせ直した行に「（済）」を付け、警告は出なかったこと、erb は解消したことを書いた（人間が判断） |
+| PLAN.md の 8 章の 4 と TIPS.md の「gem の更新」が、benchmark・securerandom・tsort を「要件を満たす最小の版に固定した gem」としている（3.3.12 では default gem と同じ版） | 直した。3 つを default gem の版に合わせ直す側に移した。最小の版に固定した gem は reline だけ（人間が判断） |
+| 設定（`.claude/rails-upgrade-project.md`）の ruby の行が、Ruby の版を持つファイルの一覧として、古い Step 2 の一覧（`mise where ruby@3.1.7` を含む）を指している | 直した。Step 4 の「調べたこと」の「Ruby の版を持つ箇所」を指すようにした（人間が判断） |
+| キャッシュのコピーで default gem と同じ版の `.gem` を外す手順が TIPS.md の文だけで、今回は scratchpad の使い捨てのスクリプトで行った | 直さない。`scripts/` に道具を足すのは Step 4 の範囲を超える。下の「スキルについて気づいたこと」の 6 に足し、スキルを直すときに決める（人間が判断） |
+| TIPS.md の gem の置き場所の例が「3.2 系は `3.2.0`」のまま | 直した。「3.3 系は `3.3.0`」にした（人間が判断） |
+直した後（文書だけの変更）も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、件数は同じ。手動確認用の環境の 14 ファイルのハッシュは、手動確認の後の基準と同じ
+
+### スキルについて気づいたこと
+
+Step 3・3-b と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+research:
+
+1. ruby.md の手順 3（新しい Ruby の default gem の版を調べ、合わせ直す方針を決める）は、Ruby を入れた後の作業になっているが、版は GitHub のタグのソースから、増える依存（irb 1.13.1 の rdoc・psych・stringio）は rubygems.org の API から、research の時点で決められた。方針は判断の関門なので、research に前倒しできる。lock の試行だけは Ruby を入れた後になる（Plan モードではファイルを書けず、Ruby もない）
+2. research の手順 2 の advisory の確かめ方（設定の「作業ごとの参照」の research の行）は、lock の gem を前提にしている。default gem（erb・resolv）の advisory は lock になく bundler-audit で検出できないので、ruby-lang.org の告知で見つけた（resolv の CVE-2026-80212・80213 は、research のサブエージェントが告知の一覧から見つけた）。Ruby を上げる Step で、Ruby の告知の脆弱性を確かめる項目がない
+3. brakeman の EOLRuby の無視の項目が、Ruby を上げると使われない無視になることを、research でソースを読んで見つけた。ruby.md と設定の「前後の比較」に、無視リストの項目が当たり続けるかを見る手順がない（Step 2 では当たり続けた）
+
+ruby:
+
+4. ruby.md の手順 4 は、gem の入れ直しで「意図しないダウンロードが起きない」ことを見るが、前の版のキャッシュに新しい Ruby の default gem と同じ版の `.gem` があると、ダウンロードなしで入って default gem の代わりに読まれる。default gem から読まれるかは TIPS.md にしかなく、RS のコミットの前の確かめで気づいた（TIPS.md の「Ruby を上げる」に足した）
+5. `scripts/compare-config` の書き出しは、その版にない設定を読んだときの例外のメッセージも含むので、Ruby を上げると、アプリの設定が同じでも例外の文言（`NoMethodError`）の差分が出る。前後の比較の手順に、道具の出力の差分とアプリの差分を分ける目安がない
+
+6. TIPS.md に足した、キャッシュのコピーで default gem と同じ版の `.gem` を外す手順は、今回は scratchpad の使い捨てのスクリプトで行った。`scripts/verify-gem-checksums` と同じく道具にすれば、Ruby を上げるたびに手で作らずに済む（コードレビューの指摘。直さずに、ここに控えた）
+
+manual-check:
+
+7. 手動確認でサーバーの出力を読むとき、元からあるエラー（RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`）の一覧が設定にも TIPS.md にもなく、新しいものかを判断するのに過去の記録とビューを探した（OP の分は、これまで記録していなかった）
