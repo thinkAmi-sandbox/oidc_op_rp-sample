@@ -2351,7 +2351,7 @@ gems:
 
 ## Step 4: Ruby 3.3（2026-10-12）
 
-- ブランチ / PR: `upgrade/step4-ruby33` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step4-ruby33` / [#31](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/31)
 - バージョン: Ruby 3.2.11 → 3.3.12 / Rails 7.1.6（変更なし）。Bundler 2.4.19 → 2.5.22（`BUNDLED WITH`）。lock の default gem を 3.3.12 の版に合わせ直した。erb の CVE-2026-41316 は default gem の erb 4.0.3.1 で解消した
 - Ruby だけを上げる Step。既定値への追随（A）と業務的な挙動の変化（B）は、どちらも起きなかった（下の「前後の比較」）
 
