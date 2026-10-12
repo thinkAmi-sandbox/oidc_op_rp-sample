@@ -2376,6 +2376,8 @@ gems:
 |---|---|
 | RS で、前の版のキャッシュからコピーした `.gem` のうち、3.3.12 の default gem と同じ名前・版の 3 つ（benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5）を、`vendor/bundle/ruby/3.3.0` から消して入れ直した。RP・OP では、コピーするときに外した（OP は ruby2_keywords の `.gem` がなかったので 2 つ） | RS を入れた後、この 3 つが default gem ではなく `vendor/bundle` から読まれていた。Bundler は、キャッシュに `.gem` があると、同じ版の default gem があっても入れてそちらを読む。benchmark・tsort は 3.2.11 では本物の gem として入れていて、ruby2_keywords は Step 2 で意図せず落とした `.gem` が残っていた。版は同じで Ruby だけの gem なので挙動は変わらない見込みだが、CI（setup-ruby が新しく入れる）は同じ版の default gem を使い、手元と読む場所がずれるので、止まって人間に確かめた（人間が判断）。消したのは gitignore の対象の手元のファイルだけで、`3.2.0/cache` に元の `.gem` が残る。TIPS.md の「Ruby を上げる」に書いた |
 
+- 追記（Step 4-b）: 「CI（setup-ruby が新しく入れる）は同じ版の default gem を使う」は、Bundler 2.4 までの振る舞いで、`BUNDLED WITH` 2.5.22 にした Step 4 からは誤りだった。Bundler 2.5.12 以上（rubygems/rubygems#7673）は、lock にある default gem と同じ版の gem も `vendor/bundle` に入れ、CI は Step 4 の PR から、これらを `vendor/bundle` から読んでいた。手元だけ default gem から読むずれを、Step 4-b で 3 アプリとも `vendor/bundle` に入れて直した（下の Step 4-b の「遭遇した問題」）
+
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 3-b の手動確認の後と同じだった（OP `oauth_access_grants` 23・`oauth_access_tokens` 57、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。
@@ -2469,7 +2471,7 @@ research:
 
 ruby:
 
-4. ruby.md の手順 4 は、gem の入れ直しで「意図しないダウンロードが起きない」ことを見るが、前の版のキャッシュに新しい Ruby の default gem と同じ版の `.gem` があると、ダウンロードなしで入って default gem の代わりに読まれる。default gem から読まれるかは TIPS.md にしかなく、RS のコミットの前の確かめで気づいた（TIPS.md の「Ruby を上げる」に足した）
+4. ruby.md の手順 4 は、gem の入れ直しで「意図しないダウンロードが起きない」ことを見るが、前の版のキャッシュに新しい Ruby の default gem と同じ版の `.gem` があると、ダウンロードなしで入って default gem の代わりに読まれる。default gem から読まれるかは TIPS.md にしかなく、RS のコミットの前の確かめで気づいた（TIPS.md の「Ruby を上げる」に足した）。追記（Step 4-b）: default gem の代わりに `vendor/bundle` から読まれること自体は、Bundler 2.5 では CI と同じ状態で、問題ではなかった（上の「作業計画からの変更点」の追記）
 5. `scripts/compare-config` の書き出しは、その版にない設定を読んだときの例外のメッセージも含むので、Ruby を上げると、アプリの設定が同じでも例外の文言（`NoMethodError`）の差分が出る。前後の比較の手順に、道具の出力の差分とアプリの差分を分ける目安がない
 
 6. TIPS.md に足した、キャッシュのコピーで default gem と同じ版の `.gem` を外す手順は、今回は scratchpad の使い捨てのスクリプトで行った。`scripts/verify-gem-checksums` と同じく道具にすれば、Ruby を上げるたびに手で作らずに済む（コードレビューの指摘。直さずに、ここに控えた）
@@ -2555,6 +2557,19 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。手動確認は�
 - 公開物の安全チェック: 各コミットの hooks で通った
 - CI: push の後に確かめる（push は人間が行う）。lock の変化は simplecov だけなので、CI の入れ方は Step 4 と同じ見込み
 - 手動確認用の環境: HEAD で、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時の基準と同じ
+
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| Step 4 の記録（「作業計画からの変更点」と、スキルについて気づいたことの 4）に、「CI は同じ版の default gem を使う」という前提が、追記なしで残っている | 直した。前例の「追記（Step 1-b-3-2）」の形で、Step 4 の 2 か所に追記（Step 4-b）を足し、この節の「遭遇した問題」を指した。元の文は当時の記録として残した（人間が判断） |
+| PLAN.md の 8 章の 4（Ruby を上げるときの手順）が、Bundler 2.5 で default gem と同じ版の gem も `vendor/bundle` に入れることに触れていない | 直した。手元も CI に揃えて入れること、そのための `.gem` を research でダウンロードの確認に入れることを書き、TIPS.md を指した（人間が判断） |
+| PLAN.md の 7 章の simplecov の行で、1.3.2 に「（済）」がない | 直した（人間が判断） |
+| PLAN.md の Step 4-b の節の「ダウンロード: 3 アプリで 1 回ずつ」が、実際と違う | 直した。計画の文は残し、実際に落としたもの（RS 17 個・OP の ostruct 1 個・RP 0 個）と、この節の「作業計画からの変更点」を書き足した（人間が判断） |
+| TIPS.md の「CI は毎回これらを入れて読む」は、キャッシュが当たった実行では入れ直さないので不正確 | 直した。キャッシュの有無で分けて書き、CI のログで確かめるときはキャッシュなしで入れた実行を見る、とした（人間が判断） |
+
+直した後（文書だけの変更）も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、件数は同じ。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時の基準と同じ
 
 ### スキルについて気づいたこと
 

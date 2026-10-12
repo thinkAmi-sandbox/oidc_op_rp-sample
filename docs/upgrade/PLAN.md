@@ -882,7 +882,7 @@ Step 4 が epic に入ってから、`/rails-upgrade research` で調べた。�
 4. rubocop 1.92.0（2026-10-10）・webmock 3.27.0〜3.29.0（10-10・10-11）は、この Step では扱わない。公開から 1〜2 日で、2 週間たっていない。Step 5 の research の最初に確かめる（rubocop 1.92.0 は 10-24、webmock 3.29.0 は 10-25 から）
 
 - 上げないもの: rails・sqlite3（Step 5）、web-console（Step 6）。`bundle outdated --only-explicit` に出たが、時期は 7 章で決まっている
-- ダウンロード: simplecov 1.3.2 の `.gem`（218,624 B）を、3 アプリで 1 回ずつ。`scripts/verify-gem-checksums` で rubygems.org の SHA-256 と照合する
+- ダウンロード: simplecov 1.3.2 の `.gem`（218,624 B）を、3 アプリで 1 回ずつ。`scripts/verify-gem-checksums` で rubygems.org の SHA-256 と照合する。実際に落としたのは、RS の 17 個（simplecov と、lock にある default gem と同じ版の 16 個）と OP の ostruct 0.6.0 で、RP は落としていない（LOG.md の Step 4-b の「作業計画からの変更点」）
 - コミットは RS → RP → OP。その前に、DEF-7.1-52 を記録する docs のコミット。PR は 1 つ
 - 前後の比較: 設定の「前後の比較」の項目（`check-apps`、`compare-config dump`、`RUBYOPT=-W:deprecated` の警告）に、カバレッジの出力（`coverage/coverage.json` の `total`・ファイルごとの値・`groups` の名前と順と中身、`.last_run.json`、テストの最後に出る結果の行）と、テストの実行で prism が読まれるかを足す
 
@@ -961,7 +961,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
 | a-nti_manner_kick_course | — | 1-b-1 で 0.5.0 を足す → Rails 8.2 以上で外すかを判断（今回の目標の外なので、epic の間は残す） | development・test だけ。Gemfile の先頭に置く。Rails 8.2 で入る Load hook guard（rails/rails#56201）は既定が警告だけで、`eager_load` が true のときは見ない。README によると、Rails 7.2 以上は `rails runner 1` の代わりに `rails boot` で起動できる |
 | rubocop 系 / oxlint 系 | — | 各 Step の最初（rubocop 1.92.0 は 2026-10-10 公開で、Step 4-b の着手時に 2 週間たっていない。Step 5 の最初に確かめる） | バージョン固定。更新は単独コミット |
 | brakeman / bundler-audit | 7.1.1 / 0.9.3（0-d-1 で導入） | 各 Step の最初（brakeman 8.0.6 は Step 2-b（済）、8.1.0 は Step 3 の最初。公開から 2 週間の決まりの例外（人間が判断）） | brakeman 8 系は Ruby 3.1 では入らない。8.1.0 は 2026-10-01 公開で、Step 2-b の時点では 2 週間たっていない |
-| simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初（simplecov 1.2.0 は Step 2-b（済。DEF-7.0-50）、1.3.2 は Step 4-b（公開から 2 週間の決まりの例外。人間が判断。DEF-7.1-52）。webmock は Step 4 の着手時も 3.26.4。3.27.0〜3.29.0（10-10・10-11）は Step 4-b の着手時に 2 週間たっていないので、Step 5 の最初に確かめる） | simplecov 1.x は Ruby 3.2 以上が必要。1.3 は Ruby 3.3 以上（Step 2 の着手時）。1.3.1（2026-09-24）・1.3.2（09-30）。CHANGELOG の Unreleased は Ruby 3.4 以上にする予定（Step 4 の着手時）で、Ruby 3.3 の間は 1.3 系が最後になる見込み |
+| simplecov / webmock | 0.22.0 / 3.26.4（0-d-2 で導入） | 各 Step の最初（simplecov 1.2.0 は Step 2-b（済。DEF-7.0-50）、1.3.2 は Step 4-b（済。公開から 2 週間の決まりの例外。人間が判断。DEF-7.1-52）。webmock は Step 4 の着手時も 3.26.4。3.27.0〜3.29.0（10-10・10-11）は Step 4-b の着手時に 2 週間たっていないので、Step 5 の最初に確かめる） | simplecov 1.x は Ruby 3.2 以上が必要。1.3 は Ruby 3.3 以上（Step 2 の着手時）。1.3.1（2026-09-24）・1.3.2（09-30）。CHANGELOG の Unreleased は Ruby 3.4 以上にする予定（Step 4 の着手時）で、Ruby 3.3 の間は 1.3 系が最後になる見込み |
 | json（rubocop 経由） | 2.6.1（0-d-1 で lock に入った） | Step 2 で 2.6.3（済）→ Step 4 で 2.7.2（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 3.0.2 が lock に入り、アプリが読む json が変わるため、一時固定で 2.6.1 にした |
 | bigdecimal（webmock → crack 経由） | 3.1.1（0-d-2 で lock に入った） | Step 2 で 3.1.3（済）→ Step 4 で 3.1.5（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4） | Ruby 3.1.7 の default gem と同じ版。そのままでは 4.1.3 が lock に入り、アプリが読む bigdecimal が変わるため、一時固定で 3.1.1 にした |
 | concurrent-ruby（Rails 経由） | 1.1.9 | Step 1 で 1.3.8（済。Rails 7.0.10 にした後） | 1.3.5 以上は Rails 6.1 と 7.0.8.7 では起動しない（LOG.md の Step 0-a、Step 0-d-1）。7.0.10 は activesupport が logger を require する（rails/rails#54264）。advisory は 1.3.7 で解消する |
@@ -993,7 +993,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
    - `new_framework_defaults_X_Y.rb` を 1 つずつ有効化してテスト → 全部有効になったら `load_defaults` を上げてファイルを削除
    - RuboCop の `TargetRailsVersion` を上げ、新しい指摘は別コミットで直す
 4. **Ruby を上げる場合**: Ruby を上げてコミット → `TargetRubyVersion` を上げて新しい指摘を直す（別コミット）
-   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb、Step 4 から irb の依存の rdoc・psych・stringio と、default gem と同じ版になった benchmark・securerandom・tsort）を、新しい Ruby の default gem の版に一時固定で合わせ直す。default gem の版では要件を満たせず、要件を満たす最小の版に固定した gem（reline。benchmark・securerandom・tsort は Step 4 で default gem と同じ版になり、合わせ直す側に移った）は、新しい Ruby の default gem の版で要件を満たせるようになるかを見る。Ruby を上げるコミットに入れ、`BUNDLED WITH` もその Ruby の Bundler の版にする（Step 2）。その Ruby で default gem でなくなったものは 7 章の表に従う。手順は TIPS.md の「Ruby を上げる」
+   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb、Step 4 から irb の依存の rdoc・psych・stringio と、default gem と同じ版になった benchmark・securerandom・tsort）を、新しい Ruby の default gem の版に一時固定で合わせ直す。default gem の版では要件を満たせず、要件を満たす最小の版に固定した gem（reline。benchmark・securerandom・tsort は Step 4 で default gem と同じ版になり、合わせ直す側に移った）は、新しい Ruby の default gem の版で要件を満たせるようになるかを見る。Ruby を上げるコミットに入れ、`BUNDLED WITH` もその Ruby の Bundler の版にする（Step 2）。その Ruby で default gem でなくなったものは 7 章の表に従う。Bundler 2.5.12 以上は、lock にある default gem と同じ版の gem も `vendor/bundle` に入れ、CI もそこから読むので、手元も揃えて入れる（Step 4-b で決めた）。そのための `.gem`（前の版のキャッシュにないもの）は、research でダウンロードの確認に入れる。手順は TIPS.md の「Ruby を上げる」と「gem の更新」
 5. **確認**: 「10. 完了条件」
 6. **記録**: LOG.md を更新 → `/code-review` → PR（向き先は epic）
 
