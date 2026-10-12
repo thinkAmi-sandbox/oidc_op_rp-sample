@@ -33,6 +33,8 @@
 | DEF-8.0-23 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
 | DEF-8.0-24 | production.rb | Rails の雛形 | 3 アプリ | 追随 |
 | DEF-8.0-25 | `Regexp.timeout` が 1 秒になる | Rails の既定値（8.0） | 3 アプリ | 追随 |
+| DEF-8.0-26 | `load_defaults 8.0` にし、`new_framework_defaults_8_0.rb` と一時的な `to_time` の設定を消す | Rails の既定値 | 3 アプリ | 追随 |
+| DEF-8.0-27 | `config/initializers/permissions_policy.rb` を消す | Rails の雛形 | RP・OP | 追随 |
 
 ## Rails 8.0.5.1 の lock（rails-lock）
 
@@ -296,3 +298,23 @@ web-console 4.2.1 → 4.3.0（RP・OP。railties・actionview `>= 8.0` なので
 - 扱い: 追随（rails-defaults のグループ 3 で defaults のファイルで有効にした。`load_defaults 8.0` でファイルごと消える）
 - 出典: rails/rails#53490・#53582、`railties-8.0.5.1/CHANGELOG.md` の「Set `Regexp.timeout` to `1`s by default to improve security over Regexp Denial-of-Service attacks.」、`railties-8.0.5.1/lib/rails/application/configuration.rb:348`。Rails ガイド v8.0 の「Rails アプリケーションを設定する」の 3.18.3「Regexp.timeout」
 - コミット: RS・RP・OP（`enable the Rails 8.0 Regexp.timeout default`）
+
+### DEF-8.0-26: `load_defaults 8.0` にし、`new_framework_defaults_8_0.rb` と一時的な `to_time` の設定を消す
+
+- 種類: Rails の既定値 / 対象: RS・RP・OP
+- 何が変わるか: `config.load_defaults 7.2` → `8.0`。`config/application.rb` の `to_time_preserves_timezone = :zone`（DEF-8.0-01）と `new_framework_defaults_8_0.rb` を消す。値で変わるのは `action_dispatch.strict_freshness`（`ActionDispatch::Http::Cache::Request.strict_freshness`）の false → true だけ。`to_time_preserves_timezone` は `:zone`、`Regexp.timeout` は `1.0` のまま（`load_defaults 8.0` が同じ値を入れる）
+- なぜ: 8.0 の 3 項目を、すべて `load_defaults` で受け取る。`strict_freshness` は、`If-None-Match` と `If-Modified-Since` の両方が来たとき、RFC 7232 6 節のとおり `If-None-Match` だけで判定する。defaults のファイルからは入らなかった（rails-defaults のグループ 2）ので、ここで初めて効く
+- 3 アプリへの影響: `strict_freshness` が効くのは Rails の `request.fresh?`（`fresh_when`・`stale?`・responders の HttpCacheResponder）だけで、3 アプリと lock の gem は使っていない。OP の discovery への条件付きの要求 4 通り（条件なし、`If-None-Match` が合う、合う＋古い `If-Modified-Since`、合わない＋未来の `If-Modified-Since`）は、前後とも 200・304・304・200（ETag と 304 は `Rack::ETag`・`Rack::ConditionalGet` が出す）。`scripts/compare-config` の 3 アプリの test・development で、ほかの値と読み込み済みの部品は同じ。検査・E2E・スナップショット・`RUBYOPT=-W:deprecated` の警告・brakeman・development だけのヘッダーは同じ
+- 扱い: 追随
+- 出典: `railties-8.0.5.1/lib/rails/application/configuration.rb:337-348`、`actionpack-8.0.5.1/lib/action_dispatch/http/cache.rb` の `fresh?`。Rails ガイド v8.0 の「Rails アプリケーションを設定する」の 3.1.1「ターゲットバージョン8.0のデフォルト値」・3.10.24「config.action_dispatch.strict_freshness」
+- コミット: RS・RP・OP（`set load_defaults to 8.0`）
+
+### DEF-8.0-27: `config/initializers/permissions_policy.rb` を消す
+
+- 種類: Rails の雛形 / 対象: RP・OP（RS にはない）
+- 何が変わるか: すべてコメントの `permissions_policy.rb` を消す。中身は 7.2.4 の雛形と同じで、アプリは手を加えていない
+- なぜ: 使われることが少ないので、既定の構成から外した（機能は残り、ドキュメントで案内する）。`app:update` は既にあるファイルを消さないので、雛形の `config/initializers` の一覧と比べて見つけた
+- 3 アプリへの影響: すべてコメントなので、設定の値と応答（`Permissions-Policy` のヘッダーは前後とも出ない）は同じ
+- 扱い: 追随（消す。Step 5 の `backtrace_silencers.rb`（DEF-7.2-28）と同じ扱い）
+- 出典: rails/rails#52341、railsdiff/rails-new-output の v7.2.4・v8.0.5.1 の `config/initializers` の一覧。Rails ガイドに該当の節はない
+- コミット: RP・OP（`set load_defaults to 8.0`）
