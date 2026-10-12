@@ -979,7 +979,7 @@ Step 5 が epic に入ってから（[#34](https://github.com/thinkAmi-sandbox/o
 - [x] rails-lock: Rails 8.0.5.1（3 アプリ。uri 0.13.3 を一時固定、RS・OP は cgi が lock から消える。`application.rb` に `to_time_preserves_timezone = :zone`、`brakeman.ignore` に `pending_eol_rails`。Rails 8.0.5.1 自身の起動の途中の読み込みを、`scripts/check-load-hooks` で 1 件だけ Step 7 まで許す。DEF-8.0-01〜08）
 - [x] gems: web-console 4.3.0（RP・OP。DEF-8.0-09・10）
 - [x] rails-app-update（DEF-8.0-11〜24。Solid 系の `plugin :solid_queue`、`bin/rubocop`・`bin/brakeman`、406 のページとアイコンは採用しない。`to_time_preserves_timezone` は手で戻した）
-- [ ] rails-defaults（`new_framework_defaults_8_0.rb`。グループ 1 `to_time_preserves_timezone`（移せないので `application.rb` に残し、コメントを直す）→ 2 `strict_freshness`（defaults のファイルからは効かないので、理由のコメントを足して `load_defaults 8.0` で確かめる）→ 3 `Regexp.timeout`）
+- [x] rails-defaults（`new_framework_defaults_8_0.rb`。DEF-8.0-25。グループ 1 `to_time_preserves_timezone`（移せないので `application.rb` に残し、コメントを直す）→ 2 `strict_freshness`（defaults のファイルからは効かないので、理由のコメントを足して `load_defaults 8.0` で確かめる）→ 3 `Regexp.timeout`）
 - [ ] rails-load-defaults（`load_defaults 8.0`、RuboCop の `TargetRailsVersion` 8.0）
 - [ ] verify（手動確認は、写しを取ってから 1 回。CI は push の後）
 - [ ] pr

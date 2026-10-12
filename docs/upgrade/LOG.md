@@ -2950,6 +2950,18 @@ Step 全体（見直しの流れ）:
 - 戻す前の差分で、戻した設定（puma の port、test の deprecation）の上の雛形のコメントが 7.2.4 から変わっていないことを確かめた（Step 5 の気づきの 19）
 - コミット: RS `ae985e1`・RP `22533d5`・OP `72960a1`
 
+### `new_framework_defaults_8_0.rb` を有効にした順番
+
+グループと順番は人間が決めた。前の書き出しを取る前に、`scripts/lib/dump_config.rb` に、クラスの値が書き出しに出ない 2 つの値（`ActionDispatch::Http::Cache::Request.strict_freshness`・`Regexp.timeout`）を足した（`5e3f661`。前の書き出しは 2 回取って同じ）。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べた。項目ごとの解説は [defaults/rails-8.0.md](defaults/rails-8.0.md) の「`load_defaults 8.0`」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 移すだけ | `active_support.to_time_preserves_timezone` | defaults のファイルに移すと、test が起動時に止まった（`active_support.set_configs` が config/initializers より前に古い値で警告を出す）。`config/application.rb` に置いたまま、コメントを直し、defaults のファイルに理由のコメントを足した（人間が判断。DEF-8.0-01。`68c91e2`・`804690b`・`642e3f0`） |
+| 2 | 条件付きの GET | `action_dispatch.strict_freshness` | defaults のファイルで有効にしても、値が入らなかった（`action_dispatch.configure` が config/initializers より前に値を入れる）。理由のコメントを付けてコメントのまま残し、`load_defaults 8.0` で確かめる（人間が判断。`456a5b0`・`5bfd79d`・`22adc1e`） |
+| 3 | プロセス全体 | `Regexp.timeout` | `nil` → `1.0`。ほかの値・検査・警告・development だけのヘッダーは同じ。ログに `Regexp::TimeoutError` はない（DEF-8.0-25。`9b7c580`・`c43f8d8`・`33b4471`） |
+
+- 3 グループとも、検査と E2E の件数は前と同じで、応答と E2E のスナップショットの差分はない。読み込み済みの部品は同じ（DEF-8.0-02 で許した検出の後ろに、新しい読み込みは増えていない）。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+
 ### 非推奨警告と対応
 
 | 警告 | 対応 |
