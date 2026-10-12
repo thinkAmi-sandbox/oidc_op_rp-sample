@@ -2995,6 +2995,16 @@ lock を変える前（`5359cc2` の後）に次のものを書き出し、3 ア
 - web-console 4.3.0（gems）。前は rails-lock の後の書き出し
   - `scripts/compare-config dump`（設定の値と読み込み済みの部品）、警告、brakeman、development だけのヘッダー: 前後で同じ。検査と E2E は、各アプリのコミットの前（`commit-per-app`）に通った（RP 33・OP 69 runs、E2E 10 passed）
 
+### 手動確認
+
+verify で、`load_defaults 8.0` と `TargetRailsVersion` の後（`8ec70d3`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Puma 8.0.2・`ruby 3.3.12 … +YJIT`・threads 3 が出た。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 6）
+- ログイン（RP の my_op）: 人間が「Re Login」を押した（OP のセッションが残っていて、パスワードは求められなかった）。OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。RS が受け取った introspect は `active: true`（`exp - iat = 600`）→ `active: false` が 2 回。Step 5 と同じ
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。SQL のログに query log tags のコメントが付いた（DEF-8.0-13）。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・OP の歓迎ページの `/icon.png` と、プレビューが起動の直後に同時に送った `HEAD "/"`・`GET "/"` の片方の `ActionController::RoutingError`（3 アプリ。RS は `GET`、RP・OP は `HEAD`）。後者は、Rails 8.0 のルーティングを最初の要求まで描く仕組みが、スレッドに対して安全でないため（rails/rails#58225 で直り、8.1.4 に入っている。8.0.5.1 にはない）。描き終わった後は、RS・OP の `HEAD`・`GET` とも 200。業務的な挙動ではないとして、DEF-8.0-03 の補足と TIPS.md の元からあるエラーの一覧に書いた
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 27 → 29 件、`oauth_access_tokens` が 67 → 72 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 12 → 13）、RP は `sessions` 12 件・`op_users` 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（`immutable=1` で開くと `journal_mode` は `delete` と出るので、見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+
 ### 遭遇した問題
 
 | 問題 | 対応 |
@@ -3003,10 +3013,26 @@ lock を変える前（`5359cc2` の後）に次のものを書き出し、3 ア
 | `to_time` の非推奨の警告が、research の見立て（after_initialize）より前の initializer `active_support.set_configs` で出た | 対処は見立てどおり（DEF-8.0-01）。記録の出典を実際の位置に直した |
 | bundle-audit の `--gemfile-lock` の使い方を誤り、無視リストなしの検査が 0 件に見えた（research） | 古い lock で advisory が出ることを確かめてから、ディレクトリを渡す形で流し直した |
 | `ruby -e` に日本語を書くと `invalid multibyte char`（research で PLAN.md を直すとき） | スクリプトをファイルにした（Step 4・5 と同じ） |
+| プレビューが起動の直後に同時に送る `HEAD "/"`・`GET "/"` の片方が `ActionController::RoutingError` になった（手動確認） | 描き終わった後は 200 になることを確かめ、Rails の `RoutesReloader` がスレッドに対して安全でないこと（rails/rails#58225）が原因と分かった。業務的な挙動ではないので、DEF-8.0-03 の補足と TIPS.md に書いた |
+| `git log -n` を `git commit` と同じコマンドに書くと、安全チェックの hook が `-n` を `git commit -n` と見て止めた | コマンドを分けた |
 
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 6 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 5 の手動確認の後と同じだった（OP `oauth_access_grants` 27・`oauth_access_tokens` 67、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。最初のコミット（Step 5 の PR へのリンク）の後も、12 ファイルのハッシュは同じ。research の出口で、Step 5 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（OP・RP は本体と `-wal`、RS は本体）を、人間に確かめて消した。消した後も 12 ファイルのハッシュは同じ
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: `TargetRailsVersion` 8.0 のコミットの前に 36 の検査がすべて通った（その後は文書だけ）。各コミットの前には、そのアプリと E2E で流した。起動の途中の読み込みは、Step 7 まで `scripts/check-load-hooks` で Rails 8.0.5.1 自身の 1 件だけを許している（DEF-8.0-02）
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この Step を通して出なかった
+- RuboCop（`TargetRailsVersion: 8.0`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空）・brakeman: すべて通った（`check-apps` の項目）。brakeman は 3 アプリとも `Security Warnings: 0`・`Ignored Warnings: 1`（Medium の `pending_eol_rails`。High の EOLRails の項目は 11-07 まで当たらない）
+- lock: epic（`4b8e5c8`）からの動きは、Rails の構成 gem（8.0.5.1）、増えた uri 0.13.3（一時固定）、RS・OP から消えた cgi 0.4.2、RP・OP の web-console 4.3.0、`DEPENDENCIES` の rails だけ。default gem に合わせた版と、一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.13.1・reline 0.6.0。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。`scripts/check-load-hooks` を呼ぶ CI の 2 つのステップが、許した 1 件で通ることも、そのときに見る
+- 手動確認用の環境: 上の「手動確認」。HEAD で、12 ファイルのハッシュが手動確認の後の基準と同じ
 
 ### スキルについて気づいたこと
 
@@ -3041,3 +3067,8 @@ rails-app-update:
 rails-defaults:
 
 15. `new_framework_defaults_8_0.rb` の 3 項目のうち 2 つ（`to_time_preserves_timezone`・`strict_freshness`）が、defaults のファイルからは扱えなかった（前者は警告で test が止まり、後者は値が入らない）。どちらも、railtie の initializer が config/initializers より前に値を読むため。rails-defaults の手順 3.3 は「値が変わらないときは起動の途中の読み込みを疑う」としているが、今回は読み込みではなく initializer の順番が原因だった。research で、defaults の各項目が「どの initializer で、いつ読まれるか」を確かめる手順があれば、計画の段階で分かった
+
+verify:
+
+16. 手動確認で、research・rails-lock の検査では出なかった Rails 8.0.5.1 の不具合（ルーティングを描く処理の競合）が、プレビューの起動直後の同時の要求で見つかった。E2E と minitest は要求を 1 つずつ送るので出ない。development を threads 3 の Puma で動かす手動確認が、同時の要求を試す唯一の場になっている
+17. Step 5 の気づきの 16 と同じく、ブラウザペインが隠れていて、人間に開いてもらう往復が 1 回増えた。今回は依頼のメッセージに開き方と操作の順を一緒に書いたので、往復はその 1 回で済んだ

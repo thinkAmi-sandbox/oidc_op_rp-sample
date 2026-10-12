@@ -65,9 +65,9 @@ Rails を 7.2.4 → 8.0.5.1 にしたとき（`load_defaults` は 7.2 のまま�
 - 種類: Rails の既定値 / 対象: RS・RP・OP（`eager_load = false` の環境）
 - 何が変わるか: compare-config の「initialize! の後」に読み込み済みの部品から、`action_cable`・`action_cable_channel`・`after_routes_loaded` が消える。OP では `active_record`・`active_record_encryption`・`active_record_sqlite3adapter`・`devise_failure_app` と、モデルの `ApplicationRecord`・`User` も消える（`devise_for` がルーティングを描くときに User を読んでいた）
 - なぜ: 大きなアプリの起動を速くするため、ルーティングを最初の要求（か url_helpers を使ったとき）まで描かないようにした。`eager_load = true` の環境（`CI=1` と production）は、今までどおり起動時に描く
-- 3 アプリへの影響: minitest（`CI=1` を含む）・E2E・スナップショットは同じ。最初の要求でルーティングを描く
+- 3 アプリへの影響: minitest（`CI=1` を含む）・E2E・スナップショットは同じ。最初の要求でルーティングを描く。verify の手動確認で、プレビューが起動の直後に同時に送る `HEAD "/"`・`GET "/"` の片方が、3 アプリとも `ActionController::RoutingError` になった（描き終わった後は、RS・OP の `HEAD`・`GET` とも 200）。8.0.5.1 の `RoutesReloader#execute` は、描き終わる前に `@loaded = true` にするので、同時に来た 2 つ目の要求が描きかけのルーティングで処理される。rails/rails#58225「Make lazy route loading thread-safe」（2026-07-24）と続く修正（#58252・#58405・#58423）で直り、8-0-stable と 8.1.4 に入ったが、8.0.5.1 には入っていない。development（Puma の threads 3）の起動直後だけで、production（起動時に描く）と test（要求を 1 つずつ送る）では起きない。業務的な挙動ではないとして、TIPS.md の元からあるエラーの一覧に足した（Step 7 で消える見込み）
 - 扱い: 追随
-- 出典: rails/rails#52353、`railties-8.0.5.1/CHANGELOG.md` の「Defer route drawing to the first request, or when url_helpers are called」。Rails ガイドに該当の節はない
+- 出典: rails/rails#52353・#58225、`railties-8.0.5.1/CHANGELOG.md` の「Defer route drawing to the first request, or when url_helpers are called」、`railties-8.0.5.1/lib/rails/application/routes_reloader.rb` の `execute`。Rails ガイドに該当の節はない
 - コミット: RS・RP・OP（`update Rails to 8.0.5.1`）
 
 ### DEF-8.0-04: SQLite のトランザクションが IMMEDIATE になり、待ち方が変わる
