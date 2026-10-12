@@ -2690,6 +2690,30 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 | connection_pool | 2.5.5（変更なし） | activesupport 7.2.4 が `>= 2.2.5, < 3` なので、一時固定の理由がなくなった。lock は動いていない |
 | annotate | 3.2.0 → （なし）（RP） | Gemfile から外した（上の「作業計画からの変更点」）。lock で消えたのは annotate の行だけ（rake は railties の依存で残る）。annotaterb 4.25.0 の `.gem` は、RP で `bundle install` したときに落とし（`Fetching` は annotaterb だけ）、`scripts/verify-gem-checksums` で rubygems.org の SHA-256 と一致した（`7a7aeaa`） |
 
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update`（DB は E2E 用）を流し、`scripts/restore-app-config` で独自設定を戻してから、差分を人間が確かめた。項目ごとの解説は [defaults/rails-7.2.md](defaults/rails-7.2.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| `config/application.rb` の `%w[assets tasks]` | RS・OP は採用 | 書き方だけ（DEF-7.2-11） |
+| RP の `config/application.rb` の `autoload_lib_once` と inflector | 戻した | Step 3 で決めた独自設定（DEF-7.1-10）。雛形の `config.autoload_lib` に上書きされ、道具の一覧になく戻らなかったので、人間に確かめて戻し、一覧に足した（`b048482`） |
+| development の `annotate_rendered_view_with_filenames` | 採用 | development の HTML にコメントが入るだけ（DEF-7.2-12） |
+| development・test のメーラーの `default_url_options` | 採用 | メールを送らない（DEF-7.2-13） |
+| test の `public_file_server.enabled` の削除 | 採用 | 既定が true（DEF-7.2-14） |
+| 環境のファイルのコメントと書き方 | 採用 | DEF-7.2-15 |
+| `filter_parameter_logging.rb` の `:email` | 採用 | ログと `inspect` だけ（DEF-7.2-16） |
+| production.rb | 採用 | 雛形に追従するだけ（DEF-7.2-17） |
+| `config/puma.rb` | 採用（port は戻した） | 3 アプリの port（3782・3781・3780）が雛形の 3000 になり、道具の一覧になかった。README の `rails s` はこの値で起動するので、人間に確かめて残し、雛形の書き方と理由のコメントにして、一覧に足した（DEF-7.2-18、`b048482`） |
+| `bin/setup` | 採用 | DEF-7.2-19 |
+| `bin/rubocop`・`bin/brakeman` | 採用しない | 使う場所がなく、`bin/brakeman` の `--ensure-latest` が 2 週間の決まりと食い違う（DEF-7.2-20） |
+| `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`（RP・OP） | 採用しない | `allow_browser` と PWA を使わない（DEF-7.2-21） |
+| test の `deprecation = :raise`、`filter_parameter_logging.rb` の `:code` とコメント | 戻した | アプリの独自設定（`scripts/restore-app-config`） |
+| `active_storage:update` のマイグレーション 3 本（RS） | 採用しない | Active Storage を使わない（DEF-7.0-14。道具で消した） |
+| `new_framework_defaults_7_2.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- コミット: RS `55348ca`・RP `bb57416`・OP `e1c65b4`
+
 ### 前後の比較
 
 sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。
@@ -2716,6 +2740,11 @@ sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のも�
   - development だけのヘッダー（E2E 用の DB で Puma に通した。RS の `/apples/show`、RP のトップ、OP の discovery・ログイン画面。日付・ID・数値と `x-miniprofiler-ids` は伏せた）: RP のトップの Server-Timing に `start_transaction.active_record` が増えただけ（DEF-7.2-04）
   - brakeman: 警告 0、エラー 0、使われない無視の項目 0、チェックの数は同じ（79）。無視した EOLRails は同じ fingerprint で当たり、メッセージが「Rails 7.2.4 ended on 2026-08-09」になった
   - OP のテストのログ: 「Redirected to」行の `code=` が、72 行すべて `[FILTERED]` になった（DEF-7.2-03）。RP のテストのログの「Redirected to」行は変わらない
+  - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+- `app:update`（rails-app-update）。前は rails-lock の後の書き出し
+  - `scripts/check-apps`: 36 の検査がすべて通った（件数は前と同じ）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`: 変わったのは、development・test のメーラーの `default_url_options`（DEF-7.2-13）、development の `annotate_rendered_view_with_filenames`（DEF-7.2-12）、`filter_parameters`・`ActiveRecord::Base.filter_attributes` の `email`（DEF-7.2-16）だけ。test の `public_file_server.enabled` は true のまま（DEF-7.2-14）
+  - `RUBYOPT=-W:deprecated` の警告と development だけのヘッダー（本文の長さは伏せている）: 前後で同じ。development の HTML のビューの注釈は、`Rack::MockRequest` で OP のログイン画面（6 個）と RP のトップ（4 個）を数えた
   - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
 
 ### スキルについて気づいたこと
@@ -2748,3 +2777,8 @@ rails-lock:
 10. Step 3 の気づきの 15 のとおり、development だけのヘッダーの前を rails-lock の始め（lock を変える前）に取り、コミットの前に比べられた。ただし書き出しの道具がなく、Puma に通して毎回変わる値を伏せるスクリプトを scratchpad で作った。`x-miniprofiler-ids` は前の要求の ID が積み上がるので、1 回目の書き出しで 2 回分が食い違い、伏せる対象に足した（Step 3 の記録にある Content-Length の件と同じ原因）
 11. `scripts/compare-config diff` の差分は 570 行あり、3 アプリ × 2 環境で同じ違いが繰り返されていた。同じ行をまとめると 26 種類だった。Rails のマイナーを上げると、`load_defaults` を変えなくても設定の値が変わる（非推奨の設定が外れる、クラスに設定が増える）ので、まとめて数える手順か道具があるとよい
 12. 解説の項目の出典で、日本語版のガイドの本文を探すのに `ruby -e` へ日本語を書き、Step 4 の「遭遇した問題」と同じく `invalid multibyte char` になった。スクリプトをファイルにして読んだ
+
+rails-app-update:
+
+13. `scripts/restore-app-config` の一覧になかった独自設定が 2 つ（RP の `autoload_lib_once`、3 アプリの puma の port）、雛形に上書きされた。どちらも 7.1 では雛形が変わらなかったので、一覧に足す機会がなかった。手順 3 の「雛形にない独自設定が消えた」に当たり、差分を読んで見つけた。道具の一覧に足すのは手順 2 にあるが、HEAD との差分で独自設定（日本語のコメントや、雛形と違う値）が消えた箇所を機械的に拾う手順はない
+14. 解説の材料として、development の HTML を `Rack::MockRequest` で読むときに、zsh の特別な変数 `path`（PATH と結びついている）に `read` で値を入れてしまい、後のコマンドが見つからなくなった（scratchpad の使い捨てのコマンド。TIPS.md の zsh の注意に足す候補）

@@ -929,7 +929,7 @@ Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` 
 - [x] gems: sqlite3 2.9.6（3 アプリ。Gemfile `~> 1.4` → `~> 2.9`。bundler-audit の無視リストから sqlite3 の 2 件を消す）
 - [x] gems: annotate → annotaterb 4.25.0（OP。`annotate_rb:install` の雛形、`.annotaterb.yml` に旧 rake の 2 つの値、旧 rake の削除。DEF-7.2-01・02）。RP は annotate を外す（着手後に決めた）
 - [x] rails-lock: Rails 7.2.4（3 アプリ。tzinfo 2.0.6・useragent 0.16.11 が増え、mutex_m を Gemfile に明示する。無視リストから Rails の 10 件を消す。connection_pool の一時固定の理由がなくなる。DEF-7.2-03〜10）
-- [ ] rails-app-update
+- [x] rails-app-update（DEF-7.2-11〜21。RP の `autoload_lib_once` と 3 アプリの puma の port は戻し、道具の一覧に足した）
 - [ ] rails-defaults（`new_framework_defaults_7_2.rb`）
 - [ ] rails-load-defaults（`load_defaults 7.2`、RuboCop の `TargetRailsVersion` 7.2、`backtrace_silencers.rb` の見直し）
 - [ ] verify（手動確認。直前に 3 アプリの development DB を写す）
