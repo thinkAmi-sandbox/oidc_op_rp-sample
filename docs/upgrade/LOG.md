@@ -2660,6 +2660,7 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 |---|---|---|
 | 1 sqlite3・annotaterb の順番 | Rails 7.2.4 の前に、sqlite3 2.9.6 → annotaterb の順で上げる | PLAN.md の「Rails 7.1 までは sqlite3 1.x のみ」は誤りで、Rails は 7.1.4 から 2.x を使える（`activerecord-7.1.6/CHANGELOG.md` の 7.1.4 の節）。今の 7.1.6 の lock で 2.9.6 にしても、動くのは sqlite3 の行だけ。annotaterb も Rails に依存しない。7 章の振り分けの 1（今の Rails のまま上げられる gem は前に）に当たり、sqlite3 は advisory 2 件の修正版で、DB のドライバーの変化と Rails の変化を別のコミットで検査できる（人間が判断） |
 | 2 mutex_m | 3 アプリの Gemfile の test グループに `gem 'mutex_m'` を明示する（理由のコメント付き、版は書かない）。Rails 7.2.4 のコミットに入れる | activesupport 7.2 が依存から外し、lock から mutex_m 0.2.0 が消える。minitest 5.14.4 が `require "mutex_m"` するので、Ruby 3.3 の bundled_gems の警告がテストのたびに出る（再現した）。PLAN.md の 7 章の「警告が出たら明示」に当たる。明示すると lock は 0.2.0 のままで、`vendor/bundle` にもある。minitest を上げる案は、間接の gem で方針の外なので採らない（人間が判断） |
+| 3 annotaterb の範囲 | OP は Gemfile を `annotaterb` にし、`bin/rails g annotate_rb:install` の雛形（`lib/tasks/annotate_rb.rake`・`.annotaterb.yml`）に追随して、旧 rake の値と違う 2 つ（`hide_limit_column_types`・`hide_default_column_types`）を `.annotaterb.yml` に移し、旧 rake を消す。注釈を付け直して差分が出ないことを E2E 用の DB で確かめる。RP は Gemfile を `annotaterb` にするだけで、generator は流さない | 今の使われ方と同じにする。OP は migrate の後に注釈を付けている。RP は gem があるだけで rake も注釈もなく、hook を入れると使っていない機能を動かし始める（3 章の 2 の境目 5）。旧 rake の `rubocop:disable` は、雛形の rake に `task` のブロックがないので要らなくなる見込み（人間が判断） |
 
 ### 手動確認用の環境
 
