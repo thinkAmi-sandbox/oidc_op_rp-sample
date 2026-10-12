@@ -927,7 +927,7 @@ Step 4-b が epic に入った後、Step 5 の前に、Step 4-b で `/rails-upgr
 Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` の research で調べた（Plan モードは使っていない）。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-12）。Ruby 3.3.12 のまま Rails を 7.1.6 から 7.2.4 に上げる。その前に、今の Rails で上げられる sqlite3 2.9.6 と annotaterb を上げる。経緯と作業の記録は LOG.md の Step 5。
 
 - [x] gems: sqlite3 2.9.6（3 アプリ。Gemfile `~> 1.4` → `~> 2.9`。bundler-audit の無視リストから sqlite3 の 2 件を消す）
-- [ ] gems: annotate → annotaterb 4.25.0（RP は Gemfile の gem だけ。OP は `annotate_rb:install` の雛形、`.annotaterb.yml` に旧 rake の 2 つの値、旧 rake の削除）
+- [ ] gems: annotate → annotaterb 4.25.0（OP。`annotate_rb:install` の雛形、`.annotaterb.yml` に旧 rake の 2 つの値、旧 rake の削除。DEF-7.2-01・02）。RP は annotate を外す（着手後に決めた）
 - [ ] rails-lock: Rails 7.2.4（3 アプリ。tzinfo 2.0.6・useragent 0.16.11 が増え、mutex_m を Gemfile に明示する。無視リストから Rails の 10 件を消す。connection_pool の一時固定の理由がなくなる）
 - [ ] rails-app-update
 - [ ] rails-defaults（`new_framework_defaults_7_2.rb`）
@@ -939,7 +939,7 @@ Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` 
 
 1. 順番は sqlite3 2.9.6 → annotaterb → Rails 7.2.4。Rails は 7.1.4 から sqlite3 2.x を使える（`activerecord-7.1.6/CHANGELOG.md` の 7.1.4 の節）ので、7 章の振り分けの 1 に当たる。7 章の sqlite3 の行と Step 3 の「調べたこと」の「Rails 7.1 は 1.x だけ」は誤りだった（直した）。sqlite3 は advisory 2 件の修正版で、DB のドライバーの変化と Rails の変化を別のコミットで検査できる
 2. mutex_m は、3 アプリの Gemfile の test グループに明示する（理由のコメント付き、版は書かない）。Rails 7.2.4 のコミットに入れる。activesupport 7.2 が依存から外し、lock から消えると、minitest 5.14.4 の `require "mutex_m"` で Ruby 3.3 の bundled_gems の警告が出る（7 章の base64 などの行の「警告が出たら明示」）。minitest は間接の gem なので上げない
-3. annotaterb: OP は Gemfile を `annotaterb` にし、`bin/rails g annotate_rb:install` の雛形（`lib/tasks/annotate_rb.rake`・`.annotaterb.yml`）に追随する。旧 rake の値と annotaterb の既定値で違う `hide_limit_column_types`（`integer,bigint,boolean`）・`hide_default_column_types`（`json,jsonb,hstore`）を `.annotaterb.yml` に移し、旧 rake（`rubocop:disable` を含む）を消す。注釈を付け直して差分が出ないことを E2E 用の DB で確かめる。RP は Gemfile を `annotaterb` にするだけで generator は流さない（rake も注釈もなく、hook を入れると使っていない機能を動かし始める）
+3. annotaterb: OP は Gemfile を `annotaterb` にし、`bin/rails g annotate_rb:install` の雛形（`lib/tasks/annotate_rb.rake`・`.annotaterb.yml`）に追随する。旧 rake の値と annotaterb の既定値で違う `hide_limit_column_types`（`integer,bigint,boolean`）・`hide_default_column_types`（`json,jsonb,hstore`）を `.annotaterb.yml` に移し、旧 rake（`rubocop:disable` を含む）を消す。注釈を付け直して差分が出ないことを E2E 用の DB で確かめる。RP は Gemfile を `annotaterb` にするだけで generator は流さない（rake も注釈もなく、hook を入れると使っていない機能を動かし始める）。着手後に、RP は annotate を使っていなかったので、annotaterb に置き換えずに外すことにした（人間が判断。LOG.md の Step 5 の「作業計画からの変更点」）
 4. rubocop 1.92.0・webmock 3.27.0〜3.29.0 は Step 5 では上げない。公開から 2 週間たっていない（10-24・10-25）。Step 6 の research の最初に、その時点の最新版で確かめる。webmock の 3 つの版は、メンテナーが溜まった Issue・PR を片付けた区切りごとのリリースで、3.28.0 の破壊的な変更（`to_rack` の `rack.session`）は 3 アプリのテストに当たらない（LOG.md の Step 5）
 5. 手動確認は verify で 1 回。直前に、3 アプリの development DB の本体と `-wal` を `tmp/manual_check_backup/` に写す（TIPS.md の「手動確認用の環境」）。OP の「Redirected to」行の `code=` も見る
 

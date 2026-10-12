@@ -2668,6 +2668,12 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 - ダウンロード: sqlite3 2.9.6-arm64-darwin・annotaterb 4.25.0・Rails の構成 gem 7.2.4 の 13 個・tzinfo 2.0.6・useragent 0.16.11（計 5,244,416 B）。各 `.gem` は 1 回だけ落とし、照合してほかのアプリのキャッシュにコピーする。作業計画で示し、論点 5 への返事で承認を得た
 - 調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 5: Rails 7.2」に書いた。PLAN.md の 7 章の sqlite3 の行と、Step 3 の「調べたこと」の誤り（Rails 7.1 は sqlite3 1.x だけ）も直した
 
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| RP は annotate を annotaterb に置き換えず、Gemfile から外した（論点 3 では「RP は gem だけ置き換える」としていた） | 追随の解説（DEF-7.2-01・02 の関門）で、人間が「そもそも RP では annotate が不要と考えてよいか」と確かめた。RP の annotate は、OP と同じ最初のコミット（`b422079`、2021-08-14）で Gemfile に入ったが、注釈の rake が足されたのも注釈が付いたのも OP だけで、RP には一度も注釈が付いていない（`git log -S'== Schema Information'`）。アップグレード中に動かしたのは、Step 1 で注釈の形を比べるためだけだった。使っていない gem を新しい gem に置き換える理由がないので外した。Step 1 で使われなくなった listen を外したのと同じ扱い（人間が判断）。annotaterb の `.gem` は RP で落として照合し、OP はそのコピーを使った |
+
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 5 の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4-b と見直しの PR へのリンク）の後も、14 ファイルのハッシュは同じ
