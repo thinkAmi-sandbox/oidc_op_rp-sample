@@ -2659,6 +2659,7 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 | 論点 | 決めたこと | 理由 |
 |---|---|---|
 | 1 sqlite3・annotaterb の順番 | Rails 7.2.4 の前に、sqlite3 2.9.6 → annotaterb の順で上げる | PLAN.md の「Rails 7.1 までは sqlite3 1.x のみ」は誤りで、Rails は 7.1.4 から 2.x を使える（`activerecord-7.1.6/CHANGELOG.md` の 7.1.4 の節）。今の 7.1.6 の lock で 2.9.6 にしても、動くのは sqlite3 の行だけ。annotaterb も Rails に依存しない。7 章の振り分けの 1（今の Rails のまま上げられる gem は前に）に当たり、sqlite3 は advisory 2 件の修正版で、DB のドライバーの変化と Rails の変化を別のコミットで検査できる（人間が判断） |
+| 2 mutex_m | 3 アプリの Gemfile の test グループに `gem 'mutex_m'` を明示する（理由のコメント付き、版は書かない）。Rails 7.2.4 のコミットに入れる | activesupport 7.2 が依存から外し、lock から mutex_m 0.2.0 が消える。minitest 5.14.4 が `require "mutex_m"` するので、Ruby 3.3 の bundled_gems の警告がテストのたびに出る（再現した）。PLAN.md の 7 章の「警告が出たら明示」に当たる。明示すると lock は 0.2.0 のままで、`vendor/bundle` にもある。minitest を上げる案は、間接の gem で方針の外なので採らない（人間が判断） |
 
 ### 手動確認用の環境
 
