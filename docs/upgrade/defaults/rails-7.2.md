@@ -32,6 +32,7 @@
 | DEF-7.2-22 | Active Job の enqueue を、コミットの後に遅らせるかをアダプターに任せる | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 | DEF-7.2-23 | Active Storage が WebP を画像として扱う | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 | DEF-7.2-24 | PostgreSQL のアダプターが、手で書いたクエリの日付を Date にする | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
+| DEF-7.2-25 | マイグレーションのファイル名のタイムスタンプを検証する | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 5）
 
@@ -288,3 +289,14 @@ Rails を 7.1.6 → 7.2.4 にしたとき（`load_defaults` は 7.1 のまま）
 - 扱い: 追随
 - 出典: rails/rails#51763、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.8.55「config.active_record.postgresql_adapter_decode_dates」
 - コミット: RS・RP・OP（`enable the unused Rails 7.2 framework defaults`）
+
+### DEF-7.2-25: マイグレーションのファイル名のタイムスタンプを検証する
+
+- 種類: Rails の既定値（`load_defaults 7.2`。グループ 2）/ 対象: RS・RP・OP（マイグレーションがあるのは RP・OP）
+- 何が変わるか: `config.active_record.validate_migration_timestamps = true`。マイグレーションのファイルを読むとき（`db:migrate`、development の未実行のマイグレーションの検査、`db:migrate:status`）に、ファイル名のタイムスタンプが今（UTC）より 1 日以上先なら `ActiveRecord::InvalidMigrationTimestampError` になる（`timestamped_migrations` が有効なときだけ。`activerecord-7.2.4/lib/active_record/migration.rb` の `migrations`・`migrations_status`・`valid_migration_timestamp?`）。設定の値の比較: `ActiveRecord.validate_migration_timestamps` が false → true（3 アプリ・test と development）
+- なぜ: 先の日付のマイグレーションがあると、後から作ったマイグレーションの順番が狂うのを防ぐため（rails/rails#50400）
+- 3 アプリへの影響: RP の 2 本（2021-08-13）と OP の 5 本（最も新しいのは `20261011134937`）は、どれも今より前の日付。RS にはマイグレーションがない。E2E（development のサーバーは要求のたびに未実行のマイグレーションを検査する。起動で `db:drop` → `db:setup`）と、E2E 用の DB での RP・OP の `db:migrate:status`・`db:migrate`（OP は注釈の hook も）が通った
+- 扱い: 追随
+- 出典: rails/rails#50400、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.8.14「config.active_record.validate_migration_timestamps」
+- コミット: RS・RP・OP（`validate migration timestamps`）
+- 補足: 確かめるために流した `db:migrate` が schema.rb を書き出し、OP は見出しが `Schema[7.1]` → `Schema[7.2]` に、RP は Rails 6.1 の形 → 7.2 の形（`Schema[7.2]`、datetime の `precision: 6` を省く、空行）に書き換わった。この設定の変化ではない（DEF-7.1-51 と同じ書き出しの仕組み）ので戻した。次に RP・OP でマイグレーションを流すと、同じ差分が出る
