@@ -12,7 +12,9 @@
 # KNOWN（Step 7 で Rails 8.1 に上げたら消す。docs/upgrade/PLAN.md の Step 6、LOG.md の Step 6）:
 #   Rails 8.0.5.1 の initializer `action_controller.live_streaming_excluded_keys` が、起動の途中で ActionController::Live を
 #   読み込み、ActionDispatch::Response の load hook が config/initializers より先に走る（rails/rails#58145）。
-#   8-0-stable では直った（#58276）が、8.0.5.1 には入っていない。8.1.4 は直っている
+#   8-0-stable では直った（#58276）が、8.0.5.1 には入っていない。8.1.4 は直っている。
+#   版と行で絞っているので、Step 7 の前に 8.0 系のパッチ（セキュリティ修正など）に上げると、この検出も失敗になる。
+#   そのときは、同じ initializer による検出かを ANTI_MANNER_DEBUG のスタックトレースで確かめてから、KNOWN_LINE を直す
 
 set -u
 
@@ -33,5 +35,9 @@ if grep -qF "$KNOWN_HOOK" <<<"$output" && grep -qF "$KNOWN_LINE" <<<"$output"; t
   exit 0
 fi
 
+# 許していない検出は、gem の短い表示（疑わしい行）で出し直す。ANTI_MANNER_DEBUG の表示は、スタックトレースが 1 行の配列になる
+ANTI_MANNER=1 bin/rails runner 1 2>&1
+echo
+echo "== スタックトレース全体（ANTI_MANNER_DEBUG）"
 echo "$output"
 exit 1
