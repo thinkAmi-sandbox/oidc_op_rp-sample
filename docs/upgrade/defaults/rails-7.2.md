@@ -34,6 +34,8 @@
 | DEF-7.2-24 | PostgreSQL のアダプターが、手で書いたクエリの日付を Date にする | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 | DEF-7.2-25 | マイグレーションのファイル名のタイムスタンプを検証する | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 | DEF-7.2-26 | YJIT を有効にする | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
+| DEF-7.2-27 | `load_defaults 7.2` にし、`new_framework_defaults_7_2.rb` を消す | Rails の既定値 | 3 アプリ | 追随 |
+| DEF-7.2-28 | `config/initializers/backtrace_silencers.rb` を消す | Rails の既定値（雛形にない initializer） | 3 アプリ | 追随（消す） |
 
 ## 周辺 gem（Step 5）
 
@@ -311,3 +313,23 @@ Rails を 7.1.6 → 7.2.4 にしたとき（`load_defaults` は 7.1 のまま）
 - 扱い: 追随
 - 出典: rails/rails#49947・#51894、`railties-7.2.4/lib/rails/application/finisher.rb`、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.2.62「config.yjit」
 - コミット: RS・RP・OP（`enable YJIT`）
+
+### DEF-7.2-27: `load_defaults 7.2` にし、`new_framework_defaults_7_2.rb` を消す
+
+- 種類: Rails の既定値（rails-load-defaults）/ 対象: RS・RP・OP
+- 何が変わるか: `config/application.rb` の `config.load_defaults 7.1` を `7.2` にし、`config/initializers/new_framework_defaults_7_2.rb` を消す。rails-defaults で一時的に足した設定はほかにない
+- なぜ: `load_defaults 7.2` の 5 つの設定（`railties-7.2.4/lib/rails/application/configuration.rb` の `"7.2"` の節）は、rails-defaults ですべて有効にした（DEF-7.2-22〜26）。7.2 には、`load_defaults` に任せるしかない設定（7.1 の `log_file_size` のようなもの）はない
+- 3 アプリへの影響: 3 アプリの test・development の設定の値と、起動の途中に読み込み済みの部品は、前後で同じ。検査と E2E は通り、スナップショットの差分はない
+- 扱い: 追随
+- 出典: 上のソース、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.1.1「ターゲットバージョン7.2のデフォルト値」
+- コミット: RS・RP・OP（`load the Rails 7.2 defaults`）
+
+### DEF-7.2-28: `config/initializers/backtrace_silencers.rb` を消す
+
+- 種類: Rails の既定値（雛形にない initializer の見直し）/ 対象: RS・RP・OP（3 つとも同じ内容）
+- 何が変わるか: ファイルを消す。前は `Rails.backtrace_cleaner.remove_silencers! if ENV["BACKTRACE"]` で、`BACKTRACE` があるとサイレンサーを外していた
+- なぜ: 雛形からは Rails 7.0 で消えていた（DEF-7.0-37）。7.1 までは `BACKTRACE` を扱う処理がこのファイルにしかないので、理由のコメントを付けて残していた（PLAN.md の Step 3）。7.2.0 から、railties の `Rails::BacktraceCleaner#clean`・`#clean_frame` が `ENV["BACKTRACE"]` があると絞り込みをしない（rails/rails#50563・#51670）ので、残す理由がなくなった
+- 3 アプリへの影響: RS の test で、ファイルの有無と `BACKTRACE` の有無の 4 通りを比べた。`BACKTRACE` がないときは、どちらも絞り込む（`clean` は 0 行）。`BACKTRACE=1` のときは、どちらも全部を返す（`clean`・`:noise` とも 18 行）。違うのは、ファイルがあるとサイレンサーを外すという中の仕組み（サイレンサーの数 4 → 0）だけ。設定の値、検査と E2E も同じ
+- 扱い: 追随（消す）
+- 出典: rails/rails#50563・#51670、`railties-7.2.4/lib/rails/backtrace_cleaner.rb`、`railties-7.2.4/CHANGELOG.md` の 7.2.0 の「Support the `BACKTRACE` environment variable to turn off backtrace cleaning」。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`load the Rails 7.2 defaults`）
