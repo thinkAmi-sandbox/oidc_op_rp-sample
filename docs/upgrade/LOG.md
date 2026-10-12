@@ -2882,7 +2882,7 @@ Step 全体（見直しの流れ）:
 
 ## Step 6: Rails 8.0（2026-10-12）
 
-- ブランチ / PR: `upgrade/step6-rails80` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step6-rails80` / [#35](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/35)
 - バージョン: Ruby 3.3.12（変更なし）/ Rails 7.2.4 → 8.0.5.1。その直後に RP・OP の web-console 4.2.1 → 4.3.0
 - 追随した Rails と gem の既定値・雛形は、[defaults/rails-8.0.md](defaults/rails-8.0.md) に記録した（DEF-8.0-01〜27）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま
 - Rails 8.0.5.1 には、8-0-stable で直った不具合が 2 つ入っていない（起動の途中の `ActionController::Live` の読み込み（rails/rails#58145）、ルーティングを描く処理の競合（#58225））。前者は検査で 1 件だけ Step 7 まで許した（DEF-8.0-02）。Rails 8.0 のセキュリティ保守は 2026-11-07 まで
