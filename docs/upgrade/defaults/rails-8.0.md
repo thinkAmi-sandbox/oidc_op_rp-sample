@@ -18,6 +18,20 @@
 | DEF-8.0-08 | パラメーターの解析を Rails が自前で行い、Rack 2 との互換の設定が増える | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-8.0-09 | development で web-console のコンソールを常に許す IP に、IPv4 を IPv6 の形で表したループバックが増える | 周辺 gem の既定値（web-console 4.3.0） | RP・OP（development） | 追随 |
 | DEF-8.0-10 | web-console のコンソールの閉じるボタンの文字が `x` → `×` になる | 周辺 gem の雛形（web-console 4.3.0） | RP・OP（development） | 追随 |
+| DEF-8.0-11 | 環境のファイルのコメントと書き方 | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.0-12 | development の `cache_store` が、常に `:memory_store` になる | Rails の雛形 | 3 アプリ（development） | 追随 |
+| DEF-8.0-13 | development で query log tags が有効になる | Rails の雛形 | 3 アプリ（development） | 追随 |
+| DEF-8.0-14 | development・test の `disallowed_deprecation` の 2 行が消える | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.0-15 | test の `perform_caching = false` の 2 行が消える | Rails の雛形 | 3 アプリ（test） | 追随 |
+| DEF-8.0-16 | test のメーラーの `default_url_options` の host が `www.example.com` → `example.com` | Rails の雛形 | 3 アプリ（test） | 追随 |
+| DEF-8.0-17 | `filter_parameter_logging.rb` に `:cvv`・`:cvc` が増える | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.0-18 | `config/puma.rb` のコメント | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.0-19 | `config/puma.rb` の `plugin :solid_queue` | Rails の雛形（新しい構成） | 3 アプリ | 採用しない |
+| DEF-8.0-20 | `bin/setup` が最後に `bin/dev` でサーバーを起動し、`bin/dev` が増える | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.0-21 | `bin/rubocop`・`bin/brakeman` | Rails の雛形 | 3 アプリ | 採用しない |
+| DEF-8.0-22 | public のエラーページの作り直しと `400.html` の追加 | Rails の雛形 | RP・OP | 追随 |
+| DEF-8.0-23 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
+| DEF-8.0-24 | production.rb | Rails の雛形 | 3 アプリ | 追随 |
 
 ## Rails 8.0.5.1 の lock（rails-lock）
 
@@ -128,3 +142,142 @@ web-console 4.2.1 → 4.3.0（RP・OP。railties・actionview `>= 8.0` なので
 - 扱い: 追随
 - 出典: `web-console-4.3.0/lib/web_console/templates/_inner_console_markup.html.erb`（`web-console-4.2.1/` と比べた）。Rails ガイドに該当の節はない
 - コミット: RP・OP（`update web-console to 4.3.0`）
+
+## `app:update` の雛形（rails-app-update）
+
+3 アプリで `yes a | bin/rails app:update`（Rails 8.0.5.1。DB は E2E 用）を流し、`scripts/restore-app-config` で独自設定を戻した後の差分。戻したのは test の `deprecation = :raise`、`config/puma.rb` の port、`filter_parameters` の `:code` とコメント、RP の `autoload_lib_once` と inflector で、戻せない項目は出なかった。戻す前の差分（`app:update` の直後）も控え、戻した設定の上の雛形のコメントが 7.2.4 から変わっていないことを確かめた（Step 5 のコードレビューの指摘。LOG.md の Step 5 の気づきの 19）。`config/application.rb` の雛形で、rails-lock で足した `to_time_preserves_timezone`（DEF-8.0-01）が消えたので、手で戻した（rails-defaults で移すまでの一時的な設定なので、道具の一覧には足していない）。`new_framework_defaults_8_0.rb` は、すべてコメントのまま足し、rails-defaults で扱う。`active_storage:update` のマイグレーション 3 本は、DEF-7.0-14 のとおり道具で消した。差分を当てた状態で、3 アプリの検査と E2E が通り、応答と E2E のスナップショット、警告、brakeman、development だけのヘッダー、`scripts/compare-config` の読み込み済みの部品は変わらなかった。設定の値で変わったのは DEF-8.0-12〜17 の値だけ。
+
+### DEF-8.0-11: 環境のファイルのコメントと書き方
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: development.rb・test.rb のコメントの言い換え。`public_file_server.headers` のキーが小文字の `"cache-control"` になり、test は `max-age=3600` と数字で書く。test.rb の先頭の `require "active_support/core_ext/integer/time"` を消す。値は同じ
+- なぜ: 環境のファイルを簡潔にし、ヘッダー名を HTTP/2 に合わせて小文字にした
+- 3 アプリへの影響: 値は同じ。public のファイルを返す応答のヘッダー名の大文字・小文字だけが変わりうる。応答のスナップショットは同じ
+- 扱い: 追随
+- 出典: rails/rails#52999、rails/rails の commit `67302d8e8b`（Downcase cache-control in generated env files）・`44548856c4`。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-12: development の `cache_store` が、常に `:memory_store` になる
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP の development
+- 何が変わるか: `tmp/caching-dev.txt` がないときの `:null_store` が `:memory_store` になる（`Rails.cache`、コントローラーとメーラーの cache_store）。`perform_caching = false` は残る
+- なぜ: Rails 7.2 の `rate_limit` は `Rails.cache` を使うので、development でもそのまま試せるようにした
+- 3 アプリへの影響: `Rails.cache`・`rate_limit`・`json.cache!` を使わない（lock の gem で `Rails.cache` を使うのは jbuilder の `cache!` だけ）。development の画面とヘッダーは同じ
+- 扱い: 追随
+- 出典: rails/rails#52434。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-13: development で query log tags が有効になる
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP の development
+- 何が変わるか: `config.active_record.query_log_tags_enabled = true` になり、development のログの SQL に `/*application='…',controller='…',action='…'*/` のコメントが付く（形式は `load_defaults 7.1` の sqlcommenter。タグは `application`・`controller`・`action`・`job`）。有効にすると prepared statement を使わなくなる（`activerecord-8.0.5.1/lib/active_record/railtie.rb` の initializer `active_record.query_log_tags_config`）
+- なぜ: SQL を、それを出したコードにたどれるようにした
+- 3 アプリへの影響: development のログと SQL の実行のしかただけで、結果は同じ。test・E2E（development で動く）は同じ
+- 扱い: 追随
+- 出典: rails/rails の commit `e29ad0bcf7`、`railties-8.0.5.1/CHANGELOG.md` の「Enable query log tags by default on development env」。Rails ガイド v8.0 の「Rails アプリケーションを設定する」の 3.8.48〜3.8.50（query_log_tags）
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-14: development・test の `disallowed_deprecation` の 2 行が消える
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: `config.active_support.disallowed_deprecation = :raise` と `disallowed_deprecation_warnings = []` の行が消える
+- なぜ: 新しいアプリには非推奨がないので、既定の環境のファイルに出す必要がないとした
+- 3 アプリへの影響: 禁止する警告の一覧が空なので、もともと効き目がなかった。test の `deprecation = :raise` は独自設定として残る
+- 扱い: 追随
+- 出典: rails/rails#51831。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-15: test の `perform_caching = false` の 2 行が消える
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP の test
+- 何が変わるか: `ActionController::Base.perform_caching`・`ActionMailer::Base.perform_caching` が false → 既定の true になる（RP の test で runner で確かめた。`scripts/compare-config` は、設定の行が消えるとクラスの値も出さない）
+- なぜ: test は `cache_store = :null_store` なので、キャッシュを有効にしても何も残らない。行を減らす整理
+- 3 アプリへの影響: キャッシュは NullStore のままで何も保存されない。キャッシュを使っていない
+- 扱い: 追随
+- 出典: rails/rails#52999。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-16: test のメーラーの `default_url_options` の host が `www.example.com` → `example.com`
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP の test
+- 何が変わるか: host の値とコメント。development の port 3000 は DEF-7.2-13 のまま
+- なぜ: メーラーの既定の設定の整理
+- 3 アプリへの影響: メールを送らない
+- 扱い: 追随
+- 出典: rails/rails#52513。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-17: `filter_parameter_logging.rb` に `:cvv`・`:cvc` が増える
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: ログと `inspect` で伏せる名前に `cvv`・`cvc` が増える（`filter_parameters`・`ActiveRecord::Base.filter_attributes`）。アプリの `:code` は末尾に戻した
+- なぜ: カードのセキュリティコードを既定で伏せる
+- 3 アプリへの影響: この名前のパラメーター・属性はない。ログだけ
+- 扱い: 追随
+- 出典: rails/rails の commit `53a52e3150`。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-18: `config/puma.rb` のコメント
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: `WEB_CONCURRENCY` の説明が増え、文の誤りが直る。port と threads の値は同じ
+- なぜ: Puma 5 以上が `WEB_CONCURRENCY` を直接読むことを説明するため
+- 3 アプリへの影響: なし
+- 扱い: 追随
+- 出典: rails/rails の commit `1e279be880`・`cda8c70c05`（`railties/lib/rails/generators/rails/app/templates/config/puma.rb.tt` の履歴）。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-19: `config/puma.rb` の `plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]`
+
+- 種類: Rails の雛形（新しい構成）/ 対象: RS・RP・OP
+- 何が変わるか: 環境変数があると、Solid Queue の supervisor を Puma の中で動かす 2 行（コメントと設定）が入る
+- なぜ: 8.0 から、production の Active Job の既定が Solid Queue になった。`app:update` は `skip_solid` を渡さないので、この行が入る
+- 3 アプリへの影響: solid_queue の gem はない
+- 扱い: 採用しない（CLAUDE.md の新しい構成。2 行を消した）。Step 7 の `app:update` でもまた出る
+- 出典: rails/rails#52804、`railties-8.0.5.1/lib/rails/generators/rails/app/templates/config/puma.rb.tt`
+- コミット: なし（採用しない）
+
+### DEF-8.0-20: `bin/setup` が最後に `bin/dev` でサーバーを起動し、`bin/dev` が増える
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: `bin/setup` から `APP_NAME` と `gem install bundler` を消し、最後の `bin/rails restart` を、`--skip-server` がなければ `exec "bin/dev"` にする。`bin/dev`（`exec "./bin/rails", "server", *ARGV`）が増える
+- なぜ: 新しいアプリのサーバーの起動を `bin/dev` にそろえた（#52433、commit `7ed09d3a38`）。bundler は Ruby 2.6 から default gem なので入れる手順を外した（#52771）。サーバーを起動しない選択肢として `--skip-server` を足した（`e59153a0b6`）
+- 3 アプリへの影響: `bin/setup` は README・E2E・CI・道具のどれからも使っていない。前からある `db:prepare` が development の DB に触れるので、手動確認用の DB があるうちは流さない。`bin/dev` は `rails server` と同じで、port は `config/puma.rb` の値
+- 扱い: 追随（`bin/setup` が使うので `bin/dev` も足す）
+- 出典: rails/rails#52433・#52771、rails/rails の commit `7ed09d3a38`・`e59153a0b6`・`ec48cfa9cc`。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-21: `bin/rubocop`・`bin/brakeman`
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: Step 5 と同じく、作成の提案が出る
+- 3 アプリへの影響: 使う場所がない。`bin/brakeman` の `--ensure-latest` は 2 週間の決まりと食い違う
+- 扱い: 採用しない（DEF-7.2-20 と同じ。作られたファイルを消した）
+- 出典: DEF-7.2-20
+- コミット: なし（採用しない）
+
+### DEF-8.0-22: public のエラーページの作り直しと `400.html` の追加
+
+- 種類: Rails の雛形 / 対象: RP・OP（RS は API なので作られない）
+- 何が変わるか: `404.html`・`422.html`・`500.html` のマークアップと見た目が新しくなり、`400.html` が増える
+- なぜ: エラーページの見た目の整理（#53045）。`400.html` は `params.expect` などで出る 400 の応答のため（#51674）
+- 3 アプリへの影響: production だけで使われる。development と test は `consider_all_requests_local = true` でデバッグ用の画面が出る。応答と E2E のスナップショットは同じ
+- 扱い: 追随
+- 出典: rails/rails#53045・#51674。Rails ガイドに該当の節はない
+- コミット: RP・OP（`apply the Rails 8.0 app:update templates`）
+
+### DEF-8.0-23: `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`
+
+- 種類: Rails の雛形 / 対象: RP・OP
+- 扱い: 採用しない（DEF-7.2-21 と同じ。`allow_browser` と PWA を使わない。作られたファイルを消した）
+- 出典: DEF-7.2-21
+- コミット: なし（採用しない）
+
+### DEF-8.0-24: production.rb
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: `assume_ssl = true` を有効にし、logger を `ActiveSupport::TaggedLogging.logger(STDOUT)` にし、`silence_healthcheck_path = "/up"`・メーラーの `default_url_options`・SMTP のコメントを足し、public のファイルに 1 年のキャッシュを付け、コメントを整理する
+- 3 アプリへの影響: 動作保証の外（雛形に追従するだけ。PLAN.md の 2 章）
+- 扱い: 追随
+- 出典: rails/rails#52999 など（`railties/lib/rails/generators/rails/app/templates/config/environments/production.rb.tt` の履歴）。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
