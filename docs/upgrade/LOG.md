@@ -2482,7 +2482,7 @@ manual-check:
 
 ## Step 4-b: simplecov 1.3.2（2026-10-12）
 
-- ブランチ / PR: `upgrade/step4b-simplecov13` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step4b-simplecov13` / [#32](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/32)
 - バージョン: Ruby 3.3.12・Rails 7.1.6（変更なし）。3 アプリの simplecov 1.2.0 → 1.3.2
 - 追随した gem の既定値は、[defaults/rails-7.1.md](defaults/rails-7.1.md) の「周辺 gem（Step 4-b）」に記録した（DEF-7.1-52）。業務的な挙動の変化（B）は起きなかった
 - lock にある default gem と同じ版の gem（16 個。OP は ostruct を足して 17 個）を、3 アプリとも `vendor/bundle` に入れた。Step 4 の後、手元は default gem から、CI は `vendor/bundle` から読んでいて、ずれていた（下の「遭遇した問題」）
@@ -2592,7 +2592,7 @@ gems:
 
 ## スキルの見直し: 作業の切り替えと確認のまとめ方（2026-10-12）
 
-- ブランチ / PR: `upgrade/skill-workflow` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/skill-workflow` / [#33](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/33)
 - バージョン: Ruby 3.3.12・Rails 7.1.6（変更なし）。gem は上げていない。アプリのコードと lock も変えていない
 
 ### 作業計画で決めたこと

@@ -3,7 +3,7 @@
 - 版: Rails 7.0.10 → 7.1.6（Ruby 3.2.11）
 - Step: 3（ブランチ `upgrade/step3-rails71`）/ PR: [#29](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/29)
 - Step: 3-b（周辺 gem。ブランチ `upgrade/step3b-doorkeeper-oidc20`）/ PR: [#30](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/30)
-- Step: 4-b（周辺 gem。Ruby 3.3.12。ブランチ `upgrade/step4b-simplecov13`）/ PR: （PR 作成後に記入）
+- Step: 4-b（周辺 gem。Ruby 3.3.12。ブランチ `upgrade/step4b-simplecov13`）/ PR: [#32](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/32)
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
