@@ -2883,8 +2883,9 @@ Step 全体（見直しの流れ）:
 ## Step 6: Rails 8.0（2026-10-12）
 
 - ブランチ / PR: `upgrade/step6-rails80` / （PR 作成後に記入）
-- バージョン: Ruby 3.3.12（変更なし）/ Rails 7.2.4 → 8.0.5.1
-- 追随した Rails と gem の既定値・雛形は、[defaults/rails-8.0.md](defaults/rails-8.0.md) に記録した
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 7.2.4 → 8.0.5.1。その直後に RP・OP の web-console 4.2.1 → 4.3.0
+- 追随した Rails と gem の既定値・雛形は、[defaults/rails-8.0.md](defaults/rails-8.0.md) に記録した（DEF-8.0-01〜27）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま
+- Rails 8.0.5.1 には、8-0-stable で直った不具合が 2 つ入っていない（起動の途中の `ActionController::Live` の読み込み（rails/rails#58145）、ルーティングを描く処理の競合（#58225））。前者は検査で 1 件だけ Step 7 まで許した（DEF-8.0-02）。Rails 8.0 のセキュリティ保守は 2026-11-07 まで
 
 ### 作業計画で決めたこと
 
@@ -2911,6 +2912,11 @@ Step 全体（見直しの流れ）:
 | Rails 8.0.5.1 自身の起動の途中の読み込み（initializer `action_controller.live_streaming_excluded_keys` が `ActionController::Live`・`ActionDispatch::Response` を読み込む）を、検査で 1 件だけ Step 7 まで許すことにした。`scripts/check-load-hooks` を足し、check-apps と CI から呼ぶ（`9a53b51`） | rails-lock で、3 アプリの「起動の途中の読み込み」が test・`CI=1`・development で失敗した（research では見つけていなかった）。Rails の不具合（rails/rails#58145）で、8-0-stable の修正（#58276）は 8.0.5.1 に入っていない。自前のパッチは保守ができなくなるのでとらず（人間が判断）、未リリースの 8-0-stable・修正の入らない 8.0.4.1 もとらず、許す範囲を検出の hook と版・行で 1 件に絞った。隠れる分は、各作業の前後の compare-config の「読み込み済みの部品」で補う（DEF-8.0-02。人間が判断） |
 | `to_time_preserves_timezone` は、rails-defaults で `new_framework_defaults_8_0.rb` に移さず、`config/application.rb` に置いたまま `load_defaults 8.0` で消すことにした（論点 2 では移すとしていた）。rails-defaults のグループ 1 は、application.rb と defaults のファイルのコメントを直すだけにした | 移すと 3 アプリの test が起動時に止まった。initializer `active_support.set_configs` は config/initializers より前に走り、その時点の `:offset` で非推奨の警告を出す（`activesupport-8.0.5.1/lib/active_support/railtie.rb:125-130`）。defaults のファイルの値が効かない不具合（rails/rails#54015）は #54017 で直ったが、警告は残っている。「application.rb で設定する」とガイドに書く #54449 はマージされずに閉じた。test の `:raise` を緩める案、2 か所に書く案はとらない（人間が判断。DEF-8.0-01） |
 | rails-defaults のグループ 2（`action_dispatch.strict_freshness`）は、defaults のファイルで有効にせず、理由のコメントを付けてコメントのまま残した。値の変化は rails-load-defaults で確かめる | defaults のファイルで有効にしても、`ActionDispatch::Http::Cache::Request.strict_freshness` は false のままだった。ActionDispatch の railtie の initializer `action_dispatch.configure`（`actionpack-8.0.5.1/lib/action_dispatch/railtie.rb:79`）が、config/initializers より前に値を入れる（8-0-stable・8.1.4・main も同じ。Rails の Issue・PR に報告は見当たらない）。`load_defaults 8.0` なら入る。OP の `config/application.rb` に一時的に置いて効かせても、discovery への条件付きの要求 4 通り（`If-None-Match`・`If-Modified-Since` の組み合わせ）の応答は 200・304・304・200 で前と同じだった（ETag と 304 は `Rack::ETag`・`Rack::ConditionalGet` が出し、この設定は Rails の `request.fresh?` だけに効く）。一時的な設定を `application.rb` に足す案、効かないまま有効にする案はとらない（人間が判断） |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 6 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 5 の手動確認の後と同じだった（OP `oauth_access_grants` 27・`oauth_access_tokens` 67、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。最初のコミット（Step 5 の PR へのリンク）の後も、12 ファイルのハッシュは同じ。research の出口で、Step 5 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（OP・RP は本体と `-wal`、RS は本体）を、人間に確かめて消した。消した後も 12 ファイルのハッシュは同じ
+
 
 ### gem ごとの対応
 
@@ -2975,6 +2981,10 @@ Step 全体（見直しの流れ）:
 |---|---|
 | Rails 8.0 は `to_time_preserves_timezone` が `:zone` でないと非推奨の警告を出し、`load_defaults 7.2` の `:offset` のままでは、test の `deprecation = :raise` で起動時に止まった（initializer `active_support.set_configs`、`activesupport-8.0.5.1/lib/active_support/railtie.rb:128`） | `config/application.rb` で `:zone` を先に取り込んだ（DEF-8.0-01）。その後、`RUBYOPT=-W:deprecated` を付けたテストと eager load の `warning:` は 0 件、DEPRECATION は前からある OP の `auth_time_from_resource_owner`（IMP-011）だけ |
 
+### 意図的な仕様変更
+
+なし。応答のスナップショット・E2E・verify の手動確認で、業務的な挙動の変化は見つからなかった。応答とファイルの変化はすべて既定値・雛形への追随として解説し、人間の返事を得た（[defaults/rails-8.0.md](defaults/rails-8.0.md) の DEF-8.0-01〜27）。手動確認で見つかった起動の直後の RoutingError は、Rails の不具合で development の起動直後だけに起きる（DEF-8.0-03 の補足）
+
 ### 前後の比較
 
 lock を変える前（`5359cc2` の後）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた。
@@ -2987,13 +2997,14 @@ lock を変える前（`5359cc2` の後）に次のものを書き出し、3 ア
   - brakeman: 無視の項目を足す前は、3 アプリとも Medium の `pending_eol_rails`（「Support for Rails 8.0.5.1 ends on 2026-11-07」）で終了コード 3。足した後は警告 0、無視 1、チェックの数は同じ（79）。今ある High の EOLRails の項目は、11-07 まで当たらない
   - SQLite のトランザクション: RP・OP の test.log で、アプリの書き込みが `BEGIN immediate TRANSACTION`、transactional fixtures が `BEGIN deferred TRANSACTION` になった（DEF-8.0-04）
   - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- web-console 4.3.0（gems）。前は rails-lock の後の書き出し
+  - `scripts/compare-config dump`（設定の値と読み込み済みの部品）、警告、brakeman、development だけのヘッダー: 前後で同じ。検査と E2E は、各アプリのコミットの前（`commit-per-app`）に通った（RP 33・OP 69 runs、E2E 10 passed）
 - `app:update`（rails-app-update）。前は web-console の後の書き出し（その後アプリは変わっていない）
   - `scripts/check-apps`: 36 の検査がすべて通った（件数は前と同じ）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
   - `scripts/compare-config dump`: 変わったのは、development の `cache_store`（`Rails.cache` を含む。DEF-8.0-12）と query log tags（DEF-8.0-13）、`disallowed_deprecation` の 2 つの設定（DEF-8.0-14）、test の `perform_caching` の設定（DEF-8.0-15。クラスの値は書き出しに出ないので runner で確かめた）、test のメーラーの host（DEF-8.0-16）、`filter_parameters`・`filter_attributes` の `cvv`・`cvc`（DEF-8.0-17）だけ。読み込み済みの部品は同じ（DEF-8.0-02 で許した検出の後ろに、新しい読み込みは増えていない）
   - `RUBYOPT=-W:deprecated` の警告、brakeman、development だけのヘッダー: 前後で同じ
   - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
-- web-console 4.3.0（gems）。前は rails-lock の後の書き出し
-  - `scripts/compare-config dump`（設定の値と読み込み済みの部品）、警告、brakeman、development だけのヘッダー: 前後で同じ。検査と E2E は、各アプリのコミットの前（`commit-per-app`）に通った（RP 33・OP 69 runs、E2E 10 passed）
+- rails-defaults・rails-load-defaults。前はそれぞれ直前の書き出し。結果は上の「`new_framework_defaults_8_0.rb` を有効にした順番」「`load_defaults 8.0`」（変わった値は `Regexp.timeout`・`strict_freshness` だけ。読み込み済みの部品・警告・brakeman・development だけのヘッダーは同じ）
 
 ### 手動確認
 
@@ -3015,10 +3026,6 @@ verify で、`load_defaults 8.0` と `TargetRailsVersion` の後（`8ec70d3`）�
 | `ruby -e` に日本語を書くと `invalid multibyte char`（research で PLAN.md を直すとき） | スクリプトをファイルにした（Step 4・5 と同じ） |
 | プレビューが起動の直後に同時に送る `HEAD "/"`・`GET "/"` の片方が `ActionController::RoutingError` になった（手動確認） | 描き終わった後は 200 になることを確かめ、Rails の `RoutesReloader` がスレッドに対して安全でないこと（rails/rails#58225）が原因と分かった。業務的な挙動ではないので、DEF-8.0-03 の補足と TIPS.md に書いた |
 | `git log -n` を `git commit` と同じコマンドに書くと、安全チェックの hook が `-n` を `git commit -n` と見て止めた | コマンドを分けた |
-
-### 手動確認用の環境
-
-作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 6 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 5 の手動確認の後と同じだった（OP `oauth_access_grants` 27・`oauth_access_tokens` 67、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。最初のコミット（Step 5 の PR へのリンク）の後も、12 ファイルのハッシュは同じ。research の出口で、Step 5 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（OP・RP は本体と `-wal`、RS は本体）を、人間に確かめて消した。消した後も 12 ファイルのハッシュは同じ
 
 ### 確認結果
 
