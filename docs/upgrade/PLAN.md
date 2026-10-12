@@ -980,7 +980,7 @@ Step 5 が epic に入ってから（[#34](https://github.com/thinkAmi-sandbox/o
 - [x] gems: web-console 4.3.0（RP・OP。DEF-8.0-09・10）
 - [x] rails-app-update（DEF-8.0-11〜24。Solid 系の `plugin :solid_queue`、`bin/rubocop`・`bin/brakeman`、406 のページとアイコンは採用しない。`to_time_preserves_timezone` は手で戻した）
 - [x] rails-defaults（`new_framework_defaults_8_0.rb`。DEF-8.0-25。グループ 1 `to_time_preserves_timezone`（移せないので `application.rb` に残し、コメントを直す）→ 2 `strict_freshness`（defaults のファイルからは効かないので、理由のコメントを足して `load_defaults 8.0` で確かめる）→ 3 `Regexp.timeout`）
-- [ ] rails-load-defaults（`load_defaults 8.0`、RuboCop の `TargetRailsVersion` 8.0）
+- [x] rails-load-defaults（`load_defaults 8.0`、RuboCop の `TargetRailsVersion` 8.0、RP・OP の `permissions_policy.rb` を消した。DEF-8.0-26・27）
 - [ ] verify（手動確認は、写しを取ってから 1 回。CI は push の後）
 - [ ] pr
 

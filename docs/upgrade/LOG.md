@@ -2962,6 +2962,13 @@ Step 全体（見直しの流れ）:
 
 - 3 グループとも、検査と E2E の件数は前と同じで、応答と E2E のスナップショットの差分はない。読み込み済みの部品は同じ（DEF-8.0-02 で許した検出の後ろに、新しい読み込みは増えていない）。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
 
+### `load_defaults 8.0`
+
+- 3 アプリを `config.load_defaults 8.0` にし、`new_framework_defaults_8_0.rb` と、`config/application.rb` の一時的な `to_time_preserves_timezone`（DEF-8.0-01）を消した（ステージしない `rm`）。前（グループ 3 の後の書き出し）と比べて、値で変わったのは `action_dispatch.strict_freshness`（`ActionDispatch::Http::Cache::Request.strict_freshness`）の false → true だけ。`to_time_preserves_timezone` は `:zone`、`Regexp.timeout` は `1.0` のまま。読み込み済みの部品は同じ。OP の discovery への条件付きの要求 4 通りは、前後とも 200・304・304・200（DEF-8.0-26）
+- 雛形にない initializer は、RP・OP の `permissions_policy.rb` だけ（すべてコメントで、7.2.4 の雛形と同じ。8.0 の雛形から外れた）。消した（DEF-8.0-27）。ほかは 8.0 の雛形にあるもの（`content_security_policy.rb`・`filter_parameter_logging.rb`・`inflections.rb`）か、アプリの独自のもの
+- 解説（DEF-8.0-26・27）に人間の返事を得てから、記録（`c535756`）、RS `c5d02ae`・RP `2617461`・OP `edc7394` の順にコミットした。検査と E2E は通り、スナップショットの差分はない
+- RuboCop の `TargetRailsVersion` を 8.0 にした（`ecbb970`）。3 アプリとも新しい指摘はない。`RuboCop::ConfigStore` で読む値が 8.0 になることを確かめた。rubocop-rails 2.38.0 で 8.0 を条件にする cop は `Rails/StrongParametersExpect` だけで、pending のまま無効（`NewCops: disable`）
+
 ### 非推奨警告と対応
 
 | 警告 | 対応 |
