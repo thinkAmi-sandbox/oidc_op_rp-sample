@@ -2,6 +2,25 @@
   "ignored_warnings": [
     {
       "warning_type": "Unmaintained Dependency",
+      "warning_code": 122,
+      "fingerprint": "98b26f60d776fd41ee6f088c833725145be9aac2d7c5b33780241c273622db42",
+      "check_name": "EOLRails",
+      "message": "Support for Rails 8.0.5.1 ends on 2026-11-07",
+      "file": "Gemfile.lock",
+      "line": 192,
+      "link": "https://brakemanscanner.org/docs/warning_types/unmaintained_dependency/",
+      "code": null,
+      "render_path": null,
+      "location": null,
+      "user_input": null,
+      "confidence": "Medium",
+      "cwe_id": [
+        1104
+      ],
+      "note": "Rails 8.0 のセキュリティ保守は 2026-11-07 まで（30 日前から Medium で出る。11-07 からは下の EOLRails（code 120）の項目に当たる）。Step 7 で Rails 8.1 に上げたら消す（docs/upgrade/PLAN.md の Step 6 の決めたことの 3）"
+    },
+    {
+      "warning_type": "Unmaintained Dependency",
       "warning_code": 120,
       "fingerprint": "d84924377155b41e094acae7404ec2e521629d86f97b0ff628e3d1b263f8101c",
       "check_name": "EOLRails",

@@ -23,6 +23,11 @@ module RailsOpenIdProvider
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 7.2
 
+    # Rails 8.0 は、この値が :zone でないと起動時に非推奨の警告を出し、test の deprecation = :raise で起動できない。
+    # 8.0 の既定値を先に取り込む。rails-defaults で new_framework_defaults_8_0.rb に移し、load_defaults 8.0 で消す
+    # （docs/upgrade/PLAN.md の Step 6 の決めたことの 2）
+    config.active_support.to_time_preserves_timezone = :zone
+
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
