@@ -21,7 +21,7 @@ Bundler.require(*Rails.groups)
 module RailsRelyingPartyOfBackend
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 7.2
+    config.load_defaults 8.0
 
     # 雛形の config.autoload_lib ではなく、lib を once のローダーで読む。lib/omniauth/strategies/my_op.rb は
     # 起動時に一度だけ作られる OmniAuth のミドルウェアが使うので、リロードしない。lib/omniauth は既定の推測では

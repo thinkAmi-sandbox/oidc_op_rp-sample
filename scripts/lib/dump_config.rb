@@ -200,7 +200,12 @@ extras = {
   'config.yjit' => -> { Rails.application.config.yjit },
   'RubyVM::YJIT.enabled?' => -> { defined?(RubyVM::YJIT) ? RubyVM::YJIT.enabled? : 'RubyVM::YJIT がない' },
   'ActiveJob::Base.enqueue_after_transaction_commit' => -> { ActiveJob::Base.enqueue_after_transaction_commit },
-  'ActiveRecord.validate_migration_timestamps' => -> { ActiveRecord.validate_migration_timestamps }
+  'ActiveRecord.validate_migration_timestamps' => -> { ActiveRecord.validate_migration_timestamps },
+  # Rails 8.0 の new_framework_defaults_8_0.rb の設定で、上の config.<名前> の節にクラスの値が出ないもの（Step 6）
+  'ActionDispatch::Http::Cache::Request.strict_freshness' => lambda {
+    ActionDispatch::Http::Cache::Request.strict_freshness
+  },
+  'Regexp.timeout' => -> { Regexp.timeout }
 }
 extras.each { |label, block| lines << "#{label} = #{read.call(&block)}" }
 
