@@ -21,13 +21,7 @@ Bundler.require(*Rails.groups)
 module RailsRelyingPartyOfBackend
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 7.2
-
-    # Rails 8.0 は、この値が :zone でないと起動時に非推奨の警告を出し、test の deprecation = :raise で起動できない。
-    # 8.0 の既定値を先に取り込む。config/initializers より前の initializer（active_support.set_configs）が値を渡すので、
-    # new_framework_defaults_8_0.rb では間に合わない（rails/rails#54015・#54449）。load_defaults 8.0 で消す
-    # （docs/upgrade/PLAN.md の Step 6 の決めたことの 2）
-    config.active_support.to_time_preserves_timezone = :zone
+    config.load_defaults 8.0
 
     # 雛形の config.autoload_lib ではなく、lib を once のローダーで読む。lib/omniauth/strategies/my_op.rb は
     # 起動時に一度だけ作られる OmniAuth のミドルウェアが使うので、リロードしない。lib/omniauth は既定の推測では
