@@ -2425,3 +2425,17 @@ Ruby を上げる前（3.2.11。計画の docs のコミット `bfd0f4f` の後�
 |---|---|
 | RS で、default gem と同じ版の 3 つの gem が `vendor/bundle` から読まれた | 止まって人間に確かめ、消して入れ直した（上の「作業計画からの変更点」） |
 | `ruby -e` の中に日本語の文字列を書くと、`invalid multibyte char (US-ASCII)` で読めない | 確かめるためのスクリプトをファイルにして流した（`-e` は ASCII だけで書く） |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`c913afe`）で 36 の検査がすべて通った。各アプリのコミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分はない。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で作り直している
+- RuboCop（`TargetRubyVersion: 3.3`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）。brakeman は 3 アプリとも `Security Warnings: 0`・`Ignored Warnings: 1`（EOLRails）で、使われない無視の項目はない。bundler-audit の無視リストは変わらない（この Step で解消した advisory はない。erb・resolv は default gem で lock にないので、bundler-audit の対象外）
+- lock: epic（`34bc460`）からの動きは、default gem の合わせ直し（OP は ostruct も）、増えた rdoc・psych・stringio、`RUBY VERSION`・`BUNDLED WITH` だけ。一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）と、benchmark・tsort・ruby2_keywords は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.13.1・reline 0.6.0・io-console 0.7.1。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: HEAD で、14 ファイルのハッシュが手動確認の後の基準と同じ（上の「手動確認」）

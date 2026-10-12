@@ -820,7 +820,7 @@ Step 3-b が epic に入ってから、`/rails-upgrade research` で調べた。
 - [x] ruby: RP（同上）
 - [x] ruby: OP（同上）
 - [x] ruby: RuboCop の `TargetRubyVersion` を 3.3 にする
-- [ ] verify（手動確認は、3 アプリの Ruby を上げた後、`TargetRubyVersion` の前に行った。結果は LOG.md の Step 4 の「手動確認」）
+- [x] verify（手動確認は、3 アプリの Ruby を上げた後、`TargetRubyVersion` の前に行った。結果は LOG.md の Step 4 の「手動確認」と「確認結果」。CI は push の後）
 - [ ] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:
