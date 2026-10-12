@@ -8,7 +8,7 @@
 
 | ID | 項目 | 種類 | 対象 | 扱い |
 |---|---|---|---|---|
-| DEF-8.0-01 | `to_time_preserves_timezone = :zone` を先に取り込む | Rails の既定値（8.0） | 3 アプリ | 追随（`application.rb` に足し、rails-defaults で移す） |
+| DEF-8.0-01 | `to_time_preserves_timezone = :zone` を先に取り込む | Rails の既定値（8.0） | 3 アプリ | 追随（`application.rb` に足し、`load_defaults 8.0` で消す。defaults のファイルには移せない） |
 | DEF-8.0-02 | Rails 8.0.5.1 の initializer が、起動の途中で `ActionController::Live`・`ActionDispatch::Response` を読み込む | Rails の既定値（読み込みの順番） | 3 アプリ | 追随（検査で、この 1 件だけを Step 7 まで許す） |
 | DEF-8.0-03 | development・test の起動の時点で、ルーティングを描かなくなる | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-8.0-04 | SQLite のトランザクションが IMMEDIATE になり、待ち方が変わる | Rails の既定値 | 3 アプリ | 追随 |
@@ -43,9 +43,9 @@ Rails を 7.2.4 → 8.0.5.1 にしたとき（`load_defaults` は 7.2 のまま�
 - 何が変わるか: `ActiveSupport.to_time_preserves_timezone` が `:offset` → `:zone` になる。`to_time` の戻り値が、受け手の UTC からのずれではなく、タイムゾーンを保つ
 - なぜ: 8.0 は、値が `:zone` でないと非推奨の警告を出す（8.1 で常に `:zone` になる）。警告は、initializer `active_support.set_configs` が `config.active_support` の値を `ActiveSupport` に渡すところで出る（`activesupport-8.0.5.1/lib/active_support/railtie.rb:128`）。`load_defaults 7.2` のままだと 5.0 の節の `:offset`（`railties-8.0.5.1/lib/rails/application/configuration.rb:119`）が入り、test の `deprecation = :raise` で起動時に止まった（RS で確かめた。research では after_initialize で出る見込みとしていたが、それより前だった）
 - 3 アプリへの影響: app・config・lib・test に `to_time` はない。`:zone` と `:offset` は表す時刻が同じで、差が出るのは夏時間をまたぐ計算だけ。応答と E2E のスナップショットは同じ
-- 扱い: 追随。rails-lock のコミットで 3 アプリの `config/application.rb` に理由のコメント付きで足し、rails-defaults で `new_framework_defaults_8_0.rb` の同じ項目に移し、`load_defaults 8.0` で消す（PLAN.md の Step 6 の決めたことの 2）
-- 出典: `activesupport-8.0.5.1/lib/active_support.rb` の `to_time_preserves_timezone=`、`railties-8.0.5.1/lib/rails/application/configuration.rb:119`・`:341`。Rails ガイド v8.0 の「Rails アプリケーションを設定する」の 3.14.18「config.active_support.to_time_preserves_timezone」
-- コミット: RS・RP・OP（`update Rails to 8.0.5.1`）
+- 扱い: 追随。rails-lock のコミットで 3 アプリの `config/application.rb` に理由のコメント付きで足し、`load_defaults 8.0` で消す（PLAN.md の Step 6 の決めたことの 2）。当初は rails-defaults で `new_framework_defaults_8_0.rb` に移す計画だったが、移すと test が起動時に止まった。`active_support.set_configs` は config/initializers より前に走り、その時点の `:offset` で警告を出す。defaults のファイルの値が効かない不具合（rails/rails#54015）は #54017（8-0-stable、2024-12）で after_initialize に入れ直す形で直ったが、その前の警告は残っている。「config/application.rb で設定する」とガイドに書く #54449 はマージされずに閉じた（2026-06-09）。そのため application.rb に置いたままにし、defaults のファイルの同じ項目は、理由のコメントを付けてコメントのまま残した（rails-defaults のグループ 1。人間が判断）
+- 出典: `activesupport-8.0.5.1/lib/active_support.rb` の `to_time_preserves_timezone=`、`activesupport-8.0.5.1/lib/active_support/railtie.rb:99-103`・`:125-130`、`railties-8.0.5.1/lib/rails/application/configuration.rb:119`・`:341`、rails/rails#54015・#54017・#54449。Rails ガイド v8.0 の「Rails アプリケーションを設定する」の 3.14.18「config.active_support.to_time_preserves_timezone」
+- コミット: RS・RP・OP（`update Rails to 8.0.5.1`、`keep to_time_preserves_timezone in config/application.rb`）
 
 ### DEF-8.0-02: Rails 8.0.5.1 の initializer が、起動の途中で `ActionController::Live`・`ActionDispatch::Response` を読み込む
 

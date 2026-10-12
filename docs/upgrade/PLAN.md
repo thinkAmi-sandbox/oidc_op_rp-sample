@@ -979,7 +979,7 @@ Step 5 が epic に入ってから（[#34](https://github.com/thinkAmi-sandbox/o
 - [x] rails-lock: Rails 8.0.5.1（3 アプリ。uri 0.13.3 を一時固定、RS・OP は cgi が lock から消える。`application.rb` に `to_time_preserves_timezone = :zone`、`brakeman.ignore` に `pending_eol_rails`。Rails 8.0.5.1 自身の起動の途中の読み込みを、`scripts/check-load-hooks` で 1 件だけ Step 7 まで許す。DEF-8.0-01〜08）
 - [x] gems: web-console 4.3.0（RP・OP。DEF-8.0-09・10）
 - [x] rails-app-update（DEF-8.0-11〜24。Solid 系の `plugin :solid_queue`、`bin/rubocop`・`bin/brakeman`、406 のページとアイコンは採用しない。`to_time_preserves_timezone` は手で戻した）
-- [ ] rails-defaults（`new_framework_defaults_8_0.rb`。`to_time_preserves_timezone` は `application.rb` から移す）
+- [ ] rails-defaults（`new_framework_defaults_8_0.rb`。グループ 1 `to_time_preserves_timezone`（移せないので `application.rb` に残し、コメントを直す）→ 2 `strict_freshness` → 3 `Regexp.timeout`）
 - [ ] rails-load-defaults（`load_defaults 8.0`、RuboCop の `TargetRailsVersion` 8.0）
 - [ ] verify（手動確認は、写しを取ってから 1 回。CI は push の後）
 - [ ] pr
@@ -987,7 +987,7 @@ Step 5 が epic に入ってから（[#34](https://github.com/thinkAmi-sandbox/o
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:
 
 1. lock: uri は Ruby 3.3.12 の default gem と同じ 0.13.3 に一時固定する（`--pin uri=0.13.3`）。RS・OP で cgi 0.4.2 が lock から消えるのは受け入れ、Gemfile に足さない（default gem の同じ版が読まれ、警告は出ない）。上限が外れる connection_pool 2.5.5・minitest 5.14.4・rack 2.2.24 は動かさない
-2. to_time: rails-lock のコミットで、3 アプリの `config/application.rb` に `config.active_support.to_time_preserves_timezone = :zone` を理由のコメント付きで足す（`load_defaults 7.2` の `:offset` のままだと、8.0 は起動時に非推奨の警告を出し、test の `deprecation = :raise` で落ちる）。rails-defaults で `new_framework_defaults_8_0.rb` の同じ項目に移し、`load_defaults 8.0` で消す
+2. to_time: rails-lock のコミットで、3 アプリの `config/application.rb` に `config.active_support.to_time_preserves_timezone = :zone` を理由のコメント付きで足す（`load_defaults 7.2` の `:offset` のままだと、8.0 は起動時に非推奨の警告を出し、test の `deprecation = :raise` で落ちる）。rails-defaults で `new_framework_defaults_8_0.rb` の同じ項目に移し、`load_defaults 8.0` で消す → rails-defaults で、移すと test が起動時に止まると分かった（config/initializers より前の `active_support.set_configs` が古い値で警告を出す。rails/rails#54015・#54449）。`application.rb` に置いたまま `load_defaults 8.0` で消す（人間が判断。DEF-8.0-01）
 3. brakeman: rails-lock のコミットで、3 アプリの `config/brakeman.ignore` に Medium の `pending_eol_rails`（code 122）の項目を足す。Step 7 で外す。Rails 8.0 のセキュリティ保守は 2026-11-07 で終わるので、Step 7（8.1）はそれまでに epic に入れるのが望ましい（11-07 を過ぎると High の `eol_rails` になり、今ある項目で無視される）
 4. web-console 4.3.0: rails-lock の直後に、gems の作業として RP → OP の順に上げる（`bundle lock --update web-console --conservative`。Gemfile の `'>= 4.1.0'` は変えない）
 5. rubocop 1.92.0・webmock 3.27.0〜3.29.0 は Step 6 では上げない。公開から 2 週間たっていない（10-24・10-25）。Step 7 の research で、その時点の最新版でもう一度確かめる（Step 7 の時期がまだ決まっていないため）

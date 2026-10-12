@@ -2909,6 +2909,7 @@ Step 全体（見直しの流れ）:
 | 変更 | 理由 |
 |---|---|
 | Rails 8.0.5.1 自身の起動の途中の読み込み（initializer `action_controller.live_streaming_excluded_keys` が `ActionController::Live`・`ActionDispatch::Response` を読み込む）を、検査で 1 件だけ Step 7 まで許すことにした。`scripts/check-load-hooks` を足し、check-apps と CI から呼ぶ（`9a53b51`） | rails-lock で、3 アプリの「起動の途中の読み込み」が test・`CI=1`・development で失敗した（research では見つけていなかった）。Rails の不具合（rails/rails#58145）で、8-0-stable の修正（#58276）は 8.0.5.1 に入っていない。自前のパッチは保守ができなくなるのでとらず（人間が判断）、未リリースの 8-0-stable・修正の入らない 8.0.4.1 もとらず、許す範囲を検出の hook と版・行で 1 件に絞った。隠れる分は、各作業の前後の compare-config の「読み込み済みの部品」で補う（DEF-8.0-02。人間が判断） |
+| `to_time_preserves_timezone` は、rails-defaults で `new_framework_defaults_8_0.rb` に移さず、`config/application.rb` に置いたまま `load_defaults 8.0` で消すことにした（論点 2 では移すとしていた）。rails-defaults のグループ 1 は、application.rb と defaults のファイルのコメントを直すだけにした | 移すと 3 アプリの test が起動時に止まった。initializer `active_support.set_configs` は config/initializers より前に走り、その時点の `:offset` で非推奨の警告を出す（`activesupport-8.0.5.1/lib/active_support/railtie.rb:125-130`）。defaults のファイルの値が効かない不具合（rails/rails#54015）は #54017 で直ったが、警告は残っている。「application.rb で設定する」とガイドに書く #54449 はマージされずに閉じた。test の `:raise` を緩める案、2 か所に書く案はとらない（人間が判断。DEF-8.0-01） |
 
 ### gem ごとの対応
 
