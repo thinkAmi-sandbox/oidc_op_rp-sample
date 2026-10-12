@@ -908,11 +908,11 @@ Step 4 が epic に入ってから、`/rails-upgrade research` で調べた。�
 
 Step 4-b が epic に入った後、Step 5 の前に、Step 4-b で `/rails-upgrade` を使って気になったこと（人間の指摘）を直す。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-12）。アプリのコードと lock は変えない。決めたことは 13 章の 7。経緯は LOG.md の「スキルの見直し」。
 
-- [ ] 作業の切り替えを関門にしない（SKILL.md・resume.md・CLAUDE.md）
-- [ ] 確認のまとめ方（templates.md・research.md）
-- [ ] 人間が貼るものの出し方（templates.md・pr.md）
-- [ ] verify
-- [ ] pr
+- [x] 作業の切り替えを関門にしない（SKILL.md・resume.md・CLAUDE.md）
+- [x] 確認のまとめ方（templates.md・research.md）
+- [x] 人間が貼るものの出し方（templates.md・pr.md）
+- [x] verify（結果は LOG.md の「スキルの見直し」の「確認結果」。本当に試すのは Step 5 の始め）
+- [x] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:
 
