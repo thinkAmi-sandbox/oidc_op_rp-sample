@@ -180,7 +180,7 @@ Rails を 7.1.6 → 7.2.4 にしたとき（`load_defaults` は 7.1 のまま）
 - なぜ: 開発中に、どのテンプレートが描いたかを分かりやすくするため、新しいアプリの development で既定にした（rails/rails#50436）
 - 3 アプリへの影響: 画面に描かれる文字は同じで、HTML のコメントが増えるだけ。E2E（development で動く）は通った。DOCTYPE の前のコメントは、HTML の仕様では標準モードの判定を変えない（WHATWG HTML の「The "initial" insertion mode」）。test・本番では無効
 - 扱い: 追随
-- 出典: rails/rails#50436、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の `config.action_view.annotate_rendered_view_with_filenames` の項
+- 出典: rails/rails#50436、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.11.16「config.action_view.annotate_rendered_view_with_filenames」
 - コミット: RS・RP・OP（`apply the Rails 7.2 app:update templates`）
 
 ### DEF-7.2-13: メーラーの `default_url_options` を development・test に書く
