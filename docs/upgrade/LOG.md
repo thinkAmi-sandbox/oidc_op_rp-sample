@@ -2727,6 +2727,13 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 - グループ 2 で確かめるために E2E 用の DB に `db:migrate` を流すと、RP・OP の `db/schema.rb` が書き出された（OP は見出しの `Schema[7.1]` → `Schema[7.2]`、RP は Rails 6.1 の形 → 7.2 の形）。この設定の変化ではないので戻した。次に RP・OP でマイグレーションを流すと同じ差分が出る（DEF-7.2-25 の補足）
 - 3 グループとも、検査と E2E の件数は前と同じで、応答と E2E のスナップショットの差分はない。警告と development だけのヘッダーは、グループ 3 の前後で同じ。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
 
+### `load_defaults 7.2`
+
+- 3 アプリを `config.load_defaults 7.2` にし、`new_framework_defaults_7_2.rb` を消した（ステージしない `rm`。Step 3 の気づきの 20）。rails-defaults で一時的に足した設定はほかにない。前（YJIT の後の書き出し）と比べて、3 アプリの test・development の設定の値と起動の途中に読み込み済みの部品は同じ（DEF-7.2-27）
+- 雛形にない initializer は `backtrace_silencers.rb` だけ（ほかは 7.2 の雛形にあるものか、アプリの独自のもの）。7.2 の railties が `BACKTRACE` を扱うので消した。RS の test で、ファイルの有無と `BACKTRACE` の有無の 4 通りで、絞り込んだ結果が同じことを確かめた（DEF-7.2-28）
+- 解説（DEF-7.2-27・28）に人間の返事を得てから、記録（`3bea7b2`）、RS `8fb6c4a`・RP `305e0e6`・OP `ef7d27c` の順にコミットした。検査と E2E は通り、スナップショットの差分はない
+- RuboCop の `TargetRailsVersion` を 7.2 にした（`8b857f5`）。3 アプリとも新しい指摘はない。`RuboCop::ConfigStore` で読む値が 7.2 になることを確かめた。rubocop-rails 2.38.0 に 7.2 を条件にする cop はない（8.0 を条件にする `Rails/StrongParametersExpect` はある）
+
 ### 前後の比較
 
 sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。

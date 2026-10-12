@@ -717,7 +717,7 @@ Step 2-b が epic に入ってから確かめ直し、作業計画を出して�
     - OmniAuth のミドルウェアは起動時に 1 回だけ作られるので、リロードの対象にできない
   - 完了条件: `bin/rails zeitwerk:check`、RP の minitest、E2E のログイン
   - うまくいかない場合は案 A（`autoload_lib(ignore: %w[assets tasks omniauth])` ＋ `require`）に切り替え、LOG.md に理由を残す
-- `backtrace_silencers.rb` は 3 アプリとも残す。`BACKTRACE` 環境変数を railties が扱うのは 7.2 からなので、Step 5 で見直す
+- `backtrace_silencers.rb` は 3 アプリとも残す。`BACKTRACE` 環境変数を railties が扱うのは 7.2 からなので、Step 5 で見直す（Step 5 で消した。DEF-7.2-28）
 - `new_framework_defaults_7_1.rb` のグループと順は、rails-defaults の関門で決める。記録は `docs/upgrade/defaults/rails-7.1.md`（`DEF-7.1-<連番>`）
 - 手動確認は verify で 1 回にする。途中で前の Cookie やセッションに影響する変化が見つかったら、止まって時期を相談し直す
 - 着手後に決めたこと（人間が判断）
@@ -931,7 +931,7 @@ Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` 
 - [x] rails-lock: Rails 7.2.4（3 アプリ。tzinfo 2.0.6・useragent 0.16.11 が増え、mutex_m を Gemfile に明示する。無視リストから Rails の 10 件を消す。connection_pool の一時固定の理由がなくなる。DEF-7.2-03〜10）
 - [x] rails-app-update（DEF-7.2-11〜21。RP の `autoload_lib_once` と 3 アプリの puma の port は戻し、道具の一覧に足した）
 - [x] rails-defaults（`new_framework_defaults_7_2.rb`。グループ 1 使っていない機能 → 2 マイグレーション → 3 YJIT。DEF-7.2-22〜26）
-- [ ] rails-load-defaults（`load_defaults 7.2`、RuboCop の `TargetRailsVersion` 7.2、`backtrace_silencers.rb` の見直し）
+- [x] rails-load-defaults（`load_defaults 7.2`、RuboCop の `TargetRailsVersion` 7.2、`backtrace_silencers.rb` を消した。DEF-7.2-27・28）
 - [ ] verify（手動確認。直前に 3 アプリの development DB を写す）
 - [ ] pr
 
