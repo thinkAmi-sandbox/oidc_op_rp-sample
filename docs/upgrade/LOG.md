@@ -2767,6 +2767,39 @@ sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のも�
   - `RUBYOPT=-W:deprecated` の警告と development だけのヘッダー（本文の長さは伏せている）: 前後で同じ。development の HTML のビューの注釈は、`Rack::MockRequest` で OP のログイン画面（6 個）と RP のトップ（4 個）を数えた
   - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
 
+### 手動確認
+
+verify で、`load_defaults 7.2` と `TargetRailsVersion` の後（`1ee85ff`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma の起動の出力に Rails 7.2.4・Puma 8.0.2・`ruby 3.3.12 … +YJIT`、threads 3 が出た。
+
+- 直前に、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体と `-wal`（OP・RP）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 5）
+- ログイン（RP の my_op）: 人間が「Re Login」を押した。OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`（DEF-7.2-03 を development でも確かめた）
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。RS が受け取った introspect は `active: true`（キーの順は `iat, exp`、`exp - iat = 600`）→ `active: false` が 2 回。Step 4 と同じ
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css` と OP の同意画面の `/stylesheets/doorkeeper/application.css` と、プレビューが起動時に開いた RS・OP のトップ（Rails の歓迎ページ）の `/icon.png`。`/icon.png` は 7.2 の歓迎ページがアイコンを読むためで、`public/icon.png` は採用しないままにした（人間が判断。DEF-7.2-21 の補足）。元からあるエラーの一覧を TIPS.md の「手動確認用の環境」に書いた（Step 4 の気づきの 7）
+- 手動確認用の環境: 手動確認で、OP の development DB は `oauth_access_grants` が 25 → 27 件、`oauth_access_tokens` が 62 → 67 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3）、RP は `sessions` 12 件・`op_users` 1 件のまま。どちらも `integrity_check` は ok で、WAL のまま。サーバーを止めた後、OP・RP の `-wal`・`-shm` がなくなり、中身は本体に移っていた（sqlite3 2.x の閉じ方の変化。DEF-7.2-29）。人間に確かめ、守るファイルから OP・RP の `-wal` を外して 12 にし、手動確認の後の 12 ファイルのハッシュを新しい基準にした（変わったのは OP・RP の DB の本体だけ。RS の DB・署名鍵・`.env`・3 アプリの `tmp/development_secret.txt`・`tmp/local_secret.txt` は変わっていない）。TIPS.md と設定（`.claude/rails-upgrade-project.md`）を直した。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| `app:update` で、RP の `autoload_lib_once` と 3 アプリの puma の port が雛形に上書きされ、`scripts/restore-app-config` で戻らなかった | 差分を読んで見つけ、止まって人間に確かめて戻した。道具の一覧に足した（`b048482`。上の「`app:update` で採用したもの・戻したもの」） |
+| グループ 2 を確かめるために E2E 用の DB で `db:migrate` を流すと、RP・OP の `db/schema.rb` が書き出された | この設定の変化ではないので戻した（DEF-7.2-25 の補足） |
+| 手動確認の後、OP・RP の `-wal` がなくなり、`-shm` のない WAL の DB の写しを `sqlite3 -readonly` で開けなかった | sqlite3 1.7.3 と 2.9.6 で、準備済みの文を残して終えるスクリプトを比べ、sqlite3 2.x の閉じ方の変化が原因と確かめた（DEF-7.2-29）。写しは `immutable=1` で開いて数えた。守るファイルを 12 にした（人間が判断） |
+| `ruby -e` に日本語を書くと `invalid multibyte char`、zsh の `read` で特別な変数 `path` に値を入れると PATH が壊れる | スクリプトをファイルにした。変数の名前を変えた（使い捨てのコマンドだけ） |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`1ee85ff`）で 36 の検査がすべて通った。各コミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この Step を通して出なかった。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で作り直している
+- RuboCop（`TargetRailsVersion: 7.2`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。解消済みの ID の検査も通る）・brakeman: すべて通った（`check-apps` の項目）。brakeman は 3 アプリとも `Security Warnings: 0`・`Ignored Warnings: 1`（EOLRails。Rails 7.2.4 でも同じ fingerprint）
+- lock: epic（`38603d2`）からの動きは、Rails の構成 gem（7.2.4）、sqlite3 2.9.6、tzinfo 2.0.6、増えた useragent 0.16.11、RP の annotate を外したこと、OP の annotate → annotaterb 4.25.0、`DEPENDENCIES` の rails・sqlite3・mutex_m（と annotate の行）だけ。default gem に合わせた版と、一時固定の reline 0.6.0・connection_pool 2.5.5（7.2.4 で固定の理由がなくなった）・faraday-net_http 3.0.2（RS・RP）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（YJIT の有効の後。irb 1.13.1・reline 0.6.0。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。YJIT が CI の Ruby で使えるかも、そのときに CI のログで見る（DEF-7.2-26）
+- 手動確認用の環境: 上の「手動確認」。HEAD で、12 ファイルのハッシュが手動確認の後の基準と同じ
+
 ### スキルについて気づいたこと
 
 Step 3〜4-b と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。この Step は、スキルの見直し（#33）の流れを初めて試す Step でもある。
@@ -2802,3 +2835,8 @@ rails-app-update:
 
 13. `scripts/restore-app-config` の一覧になかった独自設定が 2 つ（RP の `autoload_lib_once`、3 アプリの puma の port）、雛形に上書きされた。どちらも 7.1 では雛形が変わらなかったので、一覧に足す機会がなかった。手順 3 の「雛形にない独自設定が消えた」に当たり、差分を読んで見つけた。道具の一覧に足すのは手順 2 にあるが、HEAD との差分で独自設定（日本語のコメントや、雛形と違う値）が消えた箇所を機械的に拾う手順はない
 14. 解説の材料として、development の HTML を `Rack::MockRequest` で読むときに、zsh の特別な変数 `path`（PATH と結びついている）に `read` で値を入れてしまい、後のコマンドが見つからなくなった（scratchpad の使い捨てのコマンド。TIPS.md の zsh の注意に足す候補）
+
+verify:
+
+15. Step 3 の気づきの 22・23 が、形を変えてまた起きた。手動確認用の DB の形は、Rails だけでなく DB のドライバーの gem（sqlite3 2.x の閉じ方）でも変わる。今回は作業計画で写しを取ると決めていたので、元に戻す選択肢は残っていたが、`-wal` が消えることは見込めず、手動確認の後に止まって確かめた。守るファイルの一覧が gem の振る舞いに依存している
+16. 手動確認の操作を頼む前にブラウザペインが見えているかを確かめる手順（manual-check の手順 3）は、ペインが隠れていて、人間に開いてもらう往復が 1 回増えた。人間は開いた後、確かめの返事を待たずに 2 つの流れを済ませた

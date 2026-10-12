@@ -36,10 +36,11 @@
 | DEF-7.2-26 | YJIT を有効にする | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 | DEF-7.2-27 | `load_defaults 7.2` にし、`new_framework_defaults_7_2.rb` を消す | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-7.2-28 | `config/initializers/backtrace_silencers.rb` を消す | Rails の既定値（雛形にない initializer） | 3 アプリ | 追随（消す） |
+| DEF-7.2-29 | サーバーを止めると、SQLite の `-wal` が本体に移って消える | 周辺 gem の既定値（sqlite3 2.9.6） | 3 アプリ（手動確認用の DB） | 追随 |
 
 ## 周辺 gem（Step 5）
 
-Step 5 で、Rails 7.2.4 の前に annotate 3.2.0 を annotaterb 4.25.0 に置き換えたときの、gem の雛形への追随。置き換える理由と範囲は [PLAN.md](../PLAN.md) の Step 5 と [LOG.md](../LOG.md) の Step 5。RP は annotate を使っていなかったので、annotaterb に置き換えずに外した（雛形への追随ではないので、ここには項目を立てない。LOG.md の Step 5 の「作業計画からの変更点」）。
+Step 5 で、Rails 7.2.4 の前に annotate 3.2.0 を annotaterb 4.25.0 に置き換えたときの、gem の雛形への追随と、sqlite3 を 2.9.6 に上げたことで verify の手動確認で分かった、gem の既定の振る舞いの変化（DEF-7.2-29）。置き換える理由と範囲は [PLAN.md](../PLAN.md) の Step 5 と [LOG.md](../LOG.md) の Step 5。RP は annotate を使っていなかったので、annotaterb に置き換えずに外した（雛形への追随ではないので、ここには項目を立てない。LOG.md の Step 5 の「作業計画からの変更点」）。
 
 ### DEF-7.2-01: OP の注釈の rake を、annotaterb の雛形にする
 
@@ -63,6 +64,16 @@ Step 5 で、Rails 7.2.4 の前に annotate 3.2.0 を annotaterb 4.25.0 に置�
 - 扱い: 追随（2 つの値は旧 rake のまま）
 - 出典: `annotaterb-4.25.0/lib/generators/annotate_rb/config/config_generator.rb`・`annotaterb-4.25.0/lib/annotate_rb/options.rb`、annotaterb の MIGRATION_GUIDE.md（v4.25.0）。Rails ガイドに該当の節はない（gem の雛形）
 - コミット: OP（`replace annotate with annotaterb`）
+
+### DEF-7.2-29: サーバーを止めると、SQLite の `-wal` が本体に移って消える
+
+- 種類: 周辺 gem の既定値（sqlite3 1.7.3 → 2.9.6）/ 対象: 3 アプリ（手動確認用の development DB。E2E 用の DB も同じ）
+- 何が変わるか: WAL の DB（DEF-7.1-48）を開いたサーバーやコマンドを正しく終えると、最後の接続が閉じるときに `-wal` の中身が本体に移り、`-wal`・`-shm` が消える。sqlite3 1.7.3 では、サーバーを止めても `-wal` が残り、書き込んだ行がその中にあった。verify の手動確認の後、OP・RP の `db/development.sqlite3-wal` がなくなり、本体だけになった（どちらも WAL のまま。ヘッダーの 18・19 バイト目が 2）
+- なぜ: sqlite3 2.1.0 から、`Database#close` と後片付けが `sqlite3_close_v2` を使い、準備済みの文が残っていても、文が片付いた時点で接続を閉じる（sqlite3-ruby #557）。1.7.3 の後片付け（`deallocate`）は `sqlite3_close` で、準備済みの文が残っていると閉じられない。Rails は準備済みの文をキャッシュするので、1.7.3 では接続が閉じられず、SQLite が `-wal` を片付けなかった。Rails を通さずに、準備済みの文を残して終えるスクリプトで、1.7.3 は `-wal`・`-shm` が残り、2.9.6 は本体だけになることを確かめた（準備済みの文を残さなければ、1.7.3 でも消える）
+- 3 アプリへの影響: データは本体にあり、手動確認の後の件数（OP `oauth_access_grants` 27・`oauth_access_tokens` 67、RP `sessions` 12・`op_users` 1）と `integrity_check` は正しい。手動確認用の環境の守るファイルから、OP・RP の `-wal` を外して 12 にした（人間が判断。TIPS.md の「手動確認用の環境」）。`-wal` も `-shm` もない WAL の DB は `sqlite3 -readonly` で開けないので、写しを `file:<写し>?immutable=1` で開いて数える
+- 扱い: 追随
+- 出典: sqlite3-ruby の CHANGELOG（`sqlite3-2.9.6-arm64-darwin/CHANGELOG.md` の 2.1.0 の「Use `sqlite3_close_v2` to close databases in a deferred manner if there are unclosed prepared statements.」、#557）、`sqlite3-1.7.3-arm64-darwin/ext/sqlite3/database.c` の `deallocate`、SQLite の「Write-Ahead Logging」（https://www.sqlite.org/wal.html。最後の接続が閉じるときにチェックポイントして WAL を消す）。Rails ガイドに該当の節はない
+- コミット: RS・RP・OP（`update sqlite3 to 2.9.6`。verify で分かった）
 
 ## Rails 7.2.4 の lock（rails-lock）
 
@@ -256,6 +267,7 @@ Rails を 7.1.6 → 7.2.4 にしたとき（`load_defaults` は 7.1 のまま）
 - なぜ: 406 のページは、`allow_browser` で古いブラウザを止めたときに返す（rails/rails#51545）。アイコンは、新しいアプリのレイアウトと PWA が使う（#50526）
 - 3 アプリへの影響: RP・OP は `allow_browser` を使わず、レイアウトもアイコンを参照しない
 - 扱い: 採用しない（使っていない機能のファイル。境目 5。作られたファイルを消した）
+- 補足（verify の手動確認で分かった）: 7.2.4 の Rails の歓迎ページ（`railties-7.2.4/lib/rails/templates/rails/welcome/index.html.erb`）は `/icon.png` をアイコンとして読むので、ルートのルーティングがない RS・OP のトップを development で開くと、`ActionController::RoutingError (No route matches [GET] "/icon.png")` が出る（RS は API なので、もともと `app:update` が `icon.png` を作らない）。歓迎ページは development でルートを開いたときだけで、OIDC の流れ・RP の画面・テスト・E2E には出ない。採用しないまま、TIPS.md の「手動確認用の環境」の元からあるエラーの一覧に足した（人間が判断）
 - 出典: rails/rails#51545・#50526
 - コミット: なし
 

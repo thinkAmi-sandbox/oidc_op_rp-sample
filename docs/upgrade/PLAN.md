@@ -932,7 +932,7 @@ Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` 
 - [x] rails-app-update（DEF-7.2-11〜21。RP の `autoload_lib_once` と 3 アプリの puma の port は戻し、道具の一覧に足した）
 - [x] rails-defaults（`new_framework_defaults_7_2.rb`。グループ 1 使っていない機能 → 2 マイグレーション → 3 YJIT。DEF-7.2-22〜26）
 - [x] rails-load-defaults（`load_defaults 7.2`、RuboCop の `TargetRailsVersion` 7.2、`backtrace_silencers.rb` を消した。DEF-7.2-27・28）
-- [ ] verify（手動確認。直前に 3 アプリの development DB を写す）
+- [x] verify（手動確認は、写しを取ってから 1 回。sqlite3 2.x で `-wal` が消え、守るファイルを 12 にした。DEF-7.2-29。CI は push の後）
 - [ ] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:
