@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# 起動の途中の読み込み（a-nti_manner_kick_course）を、アプリのディレクトリで `bin/rails runner 1` に流して確かめる。
+# scripts/check-apps と CI（.github/workflows/ci.yml）の「起動の途中の読み込み」から呼ぶ。RAILS_ENV などは呼ぶ側で渡す。
+#
+# 使い方（アプリのディレクトリで）:
+#   RAILS_ENV=test ../scripts/check-load-hooks
+#
+# 検出がなければ終了コード 0、あれば 1。ただし、下の KNOWN に当たる検出は、知っているものとして終了コード 0 にする。
+# gem は最初の 1 件で止まるので、許した検出の後ろにある検出は見えない。許している間は、各作業の前後で
+# scripts/compare-config の「読み込み済みの部品」を比べて補う。
+#
+# KNOWN（Step 7 で Rails 8.1 に上げたら消す。docs/upgrade/PLAN.md の Step 6、LOG.md の Step 6）:
+#   Rails 8.0.5.1 の initializer `action_controller.live_streaming_excluded_keys` が、起動の途中で ActionController::Live を
+#   読み込み、ActionDispatch::Response の load hook が config/initializers より先に走る（rails/rails#58145）。
+#   8-0-stable では直った（#58276）が、8.0.5.1 には入っていない。8.1.4 は直っている
+
+set -u
+
+KNOWN_HOOK='ActiveSupport.on_load(:action_dispatch_response)'
+KNOWN_LINE='actionpack-8.0.5.1/lib/action_controller/railtie.rb:35:'
+
+output="$(ANTI_MANNER=1 ANTI_MANNER_DEBUG=1 bin/rails runner 1 2>&1)"
+status=$?
+
+if [ "$status" -eq 0 ]; then
+  echo "$output"
+  exit 0
+fi
+
+if grep -qF "$KNOWN_HOOK" <<<"$output" && grep -qF "$KNOWN_LINE" <<<"$output"; then
+  echo "許している検出（Rails 8.0.5.1 の action_controller.live_streaming_excluded_keys。rails/rails#58145）だけが出た"
+  echo "この検出の後ろにある検出は見えない。scripts/compare-config の「読み込み済みの部品」で補う"
+  exit 0
+fi
+
+echo "$output"
+exit 1
