@@ -2649,7 +2649,8 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 ## Step 5: Rails 7.2（2026-10-12）
 
 - ブランチ / PR: `upgrade/step5-rails72` / （PR 作成後に記入）
-- バージョン: Ruby 3.3.12（変更なし）/ Rails 7.1.6 → 7.2.4
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 7.1.6 → 7.2.4。その前に sqlite3 1.7.3 → 2.9.6、OP の annotate 3.2.0 → annotaterb 4.25.0（RP は annotate を外した）
+- 追随した Rails と gem の既定値・雛形は、[defaults/rails-7.2.md](defaults/rails-7.2.md) に記録した（DEF-7.2-01〜29）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空になった（Rails の 10 件、sqlite3 の 2 件が解消）
 - スキルの見直し（[#33](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/33)）の後、`/rails-upgrade` を引数なしで始めた最初の Step。resume から research へ止まらずに入り、research は Plan モードを使わずに行った
 
 ### 作業計画で決めたこと
@@ -2733,6 +2734,16 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 - 雛形にない initializer は `backtrace_silencers.rb` だけ（ほかは 7.2 の雛形にあるものか、アプリの独自のもの）。7.2 の railties が `BACKTRACE` を扱うので消した。RS の test で、ファイルの有無と `BACKTRACE` の有無の 4 通りで、絞り込んだ結果が同じことを確かめた（DEF-7.2-28）
 - 解説（DEF-7.2-27・28）に人間の返事を得てから、記録（`3bea7b2`）、RS `8fb6c4a`・RP `305e0e6`・OP `ef7d27c` の順にコミットした。検査と E2E は通り、スナップショットの差分はない
 - RuboCop の `TargetRailsVersion` を 7.2 にした（`8b857f5`）。3 アプリとも新しい指摘はない。`RuboCop::ConfigStore` で読む値が 7.2 になることを確かめた。rubocop-rails 2.38.0 に 7.2 を条件にする cop はない（8.0 を条件にする `Rails/StrongParametersExpect` はある）
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| （出ていない）Rails 7.2 で activesupport が mutex_m に依存しなくなり、lock から消えると、minitest 5.14.4 の `require "mutex_m"` で Ruby 3.3 の bundled_gems の警告が出る（research で再現した） | 3 アプリの Gemfile の test グループに mutex_m を明示した（作業計画の論点 2）。この Step を通して、`RUBYOPT=-W:deprecated` を付けたテストと eager load の `warning:` は 0 件、DEPRECATION は前からある OP の `auth_time_from_resource_owner`（IMP-011）だけ |
+
+### 意図的な仕様変更
+
+なし。応答のスナップショット・E2E・verify の手動確認で、業務的な挙動の変化は見つからなかった。`app:update` が puma の port を雛形の 3000 にしたのは、URL が変わる（業務的な挙動）ので戻した（DEF-7.2-18）。応答とファイルの変化はすべて既定値・雛形への追随として解説し、人間の返事を得た（[defaults/rails-7.2.md](defaults/rails-7.2.md) の DEF-7.2-01〜29）
 
 ### 前後の比較
 
@@ -2840,3 +2851,8 @@ verify:
 
 15. Step 3 の気づきの 22・23 が、形を変えてまた起きた。手動確認用の DB の形は、Rails だけでなく DB のドライバーの gem（sqlite3 2.x の閉じ方）でも変わる。今回は作業計画で写しを取ると決めていたので、元に戻す選択肢は残っていたが、`-wal` が消えることは見込めず、手動確認の後に止まって確かめた。守るファイルの一覧が gem の振る舞いに依存している
 16. 手動確認の操作を頼む前にブラウザペインが見えているかを確かめる手順（manual-check の手順 3）は、ペインが隠れていて、人間に開いてもらう往復が 1 回増えた。人間は開いた後、確かめの返事を待たずに 2 つの流れを済ませた
+
+Step 全体（見直しの流れ）:
+
+17. research の後も、作業の境目（gems → rails-lock → rails-app-update → rails-defaults → rails-load-defaults → verify → pr）では止まらず、「◯◯ が終わった。次は △△ に入る」と示して続けられた。人間の返事は、関門だけだった（research の論点 5 つと掘り下げ 1 回、annotaterb の解説と RP の annotate の掘り下げ、rails-lock・rails-app-update の解説、rails-defaults のグループの順と 3 グループの解説、rails-load-defaults の解説、手動確認の依頼（ペインを開く・操作）、`-wal` と `/icon.png` の論点）。関門の後の質問にも、前の論点のまとめを載せた
+18. 理解の関門の解説は、項目ごとの型（種類・何が変わるか・なぜ・影響・提案・出典）で示し、返事の後に defaults/ に記録してから設定のコミットをする流れは、DEF の番号を先に決めてコメントやコミットメッセージから指すのに合っていた。一方で、解説の前に番号を決めてファイルのコメントに書いた（puma の port の DEF-7.2-18）ので、項目を足し引きすると番号がずれる心配があった
