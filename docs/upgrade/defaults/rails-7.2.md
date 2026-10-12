@@ -33,6 +33,7 @@
 | DEF-7.2-23 | Active Storage が WebP を画像として扱う | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 | DEF-7.2-24 | PostgreSQL のアダプターが、手で書いたクエリの日付を Date にする | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 | DEF-7.2-25 | マイグレーションのファイル名のタイムスタンプを検証する | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
+| DEF-7.2-26 | YJIT を有効にする | Rails の既定値（`load_defaults 7.2`） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 5）
 
@@ -300,3 +301,13 @@ Rails を 7.1.6 → 7.2.4 にしたとき（`load_defaults` は 7.1 のまま）
 - 出典: rails/rails#50400、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.8.14「config.active_record.validate_migration_timestamps」
 - コミット: RS・RP・OP（`validate migration timestamps`）
 - 補足: 確かめるために流した `db:migrate` が schema.rb を書き出し、OP は見出しが `Schema[7.1]` → `Schema[7.2]` に、RP は Rails 6.1 の形 → 7.2 の形（`Schema[7.2]`、datetime の `precision: 6` を省く、空行）に書き換わった。この設定の変化ではない（DEF-7.1-51 と同じ書き出しの仕組み）ので戻した。次に RP・OP でマイグレーションを流すと、同じ差分が出る
+
+### DEF-7.2-26: YJIT を有効にする
+
+- 種類: Rails の既定値（`load_defaults 7.2`。グループ 3）/ 対象: RS・RP・OP（development・test。E2E と手動確認のサーバーも development）
+- 何が変わるか: `config.yjit = true`。Rails の起動の最後（`Rails::Application::Finisher` の `enable_yjit`）で `RubyVM::YJIT.enable` が呼ばれる（Ruby 3.3 からの、実行の途中で有効にする方法）。`RubyVM::YJIT.enable` がない Ruby では何もしない（`railties-7.2.4/lib/rails/application/finisher.rb`）。設定の値の比較: `config.yjit` と `RubyVM::YJIT.enabled?` が false → true（3 アプリ・test と development）
+- なぜ: Ruby 3.3 の YJIT は Rails アプリで大きな性能の改善があるので、既定で有効にした（rails/rails#49947・#51894）。メモリの限られた環境では false にする（雛形のコメント）
+- 3 アプリへの影響: 手元の Ruby 3.3.12 は YJIT 付きでビルドされている（`RbConfig::CONFIG["YJIT_SUPPORT"]` が yes）。検査と E2E の件数、スナップショット、警告、development だけのヘッダーは前後で同じで、`scripts/check-console` で `rails c` も動いた。実行の速さとメモリの使い方だけが変わる。CI（setup-ruby のビルド済みの Ruby）で YJIT が使えるかは、push の後に確かめる（使えなければ Rails が飛ばす）
+- 扱い: 追随
+- 出典: rails/rails#49947・#51894、`railties-7.2.4/lib/rails/application/finisher.rb`、Rails ガイド v7.2 の「Rails アプリケーションを設定する」の 3.2.62「config.yjit」
+- コミット: RS・RP・OP（`enable YJIT`）
