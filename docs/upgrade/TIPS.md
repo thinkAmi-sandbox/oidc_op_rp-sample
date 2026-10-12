@@ -71,7 +71,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
   - 出力先の lock をアプリに持ち込み、アプリの Gemfile の rails を変えて `bundle lock` すれば、過去の一時固定と同じ結果になる（タグ `rails-6.1-prepared` の worktree で、Step 1 の 3 アプリの lock と同じになることを確かめた）
 - gem の依存と Ruby の要件は、`https://rubygems.org/api/v2/rubygems/<gem>/versions/<版>.json` で確かめられる。`.gem` のサイズは `https://rubygems.org/downloads/<gem>-<版>.gem` への HEAD リクエストの `content-length`
 - Gemfile に gem を足す・動かすときは Bundler/OrderedGems に気をつける。RuboCop はコメントを区切りとして扱い（`TreatCommentsAsGroupSeparators`）、自動修正はコメントと gem の対応を崩すことがある（LOG.md の Step 0-e「Gemfile」）
-- 理由付きの `rubocop:disable` が残っている（RS `apples_controller.rb`、RP `introspections_controller.rb`・`my_op.rb`、OP の annotate の rake）。そのコードを書き換えたら、disable が要らなくなっていないか確かめる（`Lint/RedundantCopDisableDirective`）
+- 理由付きの `rubocop:disable` が残っている（RS `apples_controller.rb`、RP `introspections_controller.rb`・`my_op.rb`。OP の annotate の rake の disable は、Step 5 で annotaterb の雛形にしてなくなった）。そのコードを書き換えたら、disable が要らなくなっていないか確かめる（`Lint/RedundantCopDisableDirective`）
 
 ## Ruby を上げる（Step 2）
 

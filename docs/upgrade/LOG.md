@@ -2683,6 +2683,8 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 | gem | バージョン | 対応 |
 |---|---|---|
 | sqlite3 | 1.7.3 → 2.9.6 | 3 アプリ。Gemfile を `~> 1.4` → `~> 2.9`。RS は `bundle update sqlite3 --conservative`（`Fetching` は sqlite3 2.9.6 の arm64-darwin 版だけ）。RP・OP は `bundle lock --update sqlite3 --conservative` で lock を書き、RS で照合した `.gem` をキャッシュにコピーして `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。lock で動いたのは sqlite3 の 3 行だけ（Linux は `x86_64-linux-gnu` 版。`PLATFORMS` は変わらない）。`scripts/verify-gem-checksums` で 3 アプリとも rubygems.org の SHA-256 と一致した。無視リストから CVE-2026-54619・GHSA-mwm8-39rw-8826 を消した（`47ee48d`・`c400e4a`・`9bc8265`） |
+| annotate → annotaterb | 3.2.0 → 4.25.0（OP） | Gemfile の `annotate` を `annotaterb` にして `bundle lock`、RP で照合した `.gem` をキャッシュにコピーして `--local` で入れた。`bin/rails g annotate_rb:install`（E2E 用の DB を指した）で `lib/tasks/annotate_rb.rake`・`.annotaterb.yml` を作り、旧 rake を消した。`.annotaterb.yml` の 2 つの値を旧 rake の値にし、rake は RuboCop に合わせて書き方を直した（DEF-7.2-01・02）。lock で動いたのは annotate・annotaterb の行だけ（`c05d34f`） |
+| annotate | 3.2.0 → （なし）（RP） | Gemfile から外した（上の「作業計画からの変更点」）。lock で消えたのは annotate の行だけ（rake は railties の依存で残る）。annotaterb 4.25.0 の `.gem` は、RP で `bundle install` したときに落とし（`Fetching` は annotaterb だけ）、`scripts/verify-gem-checksums` で rubygems.org の SHA-256 と一致した（`7a7aeaa`） |
 
 ### 前後の比較
 
@@ -2696,6 +2698,13 @@ sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のも�
   - E2E 用の DB から書き出した schema.rb（RP・OP）: 前後で同じ。RP の commit 済みの schema.rb は Rails 6.1 の形のままで、書き出すと Rails 7.1 の形になる（前からの状態。OP は Step 3-b で書き出し直した）
   - 雛形と既定値の追随はない。業務的な挙動の変化もない
   - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+- annotaterb（OP）・annotate を外す（RP）。前は sqlite3 の後の書き出し（その後アプリは変わっていない）
+  - 旧 rake を消す前に annotaterb を流すと、旧 rake の `require 'annotate'` で `LoadError` になった。旧 rake を消してから流した
+  - OP の注釈（E2E 用の DB）: 雛形の既定値のままでも「Model files unchanged」。2 つの値を引き継いで `annotaterb models --force` で書き直させても、`app/models/user.rb`・`test/fixtures/users.yml` の差分はない。`db:migrate --trace` の後に hook が `Annotating models` を流し、差分はない（schema.rb も同じ）
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 前後で同じ（RP・OP の development でも、起動の途中に読み込み済みの部品は同じ）
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）
+  - `scripts/check-apps`（各アプリのコミットの前の `commit-per-app`）: RP 33・OP 69 runs、0 failures（`CI=1` も同じ）、E2E 10 passed。スナップショットの差分はない。RuboCop は、雛形の rake を直す前は 3 つの指摘（`Style/FrozenStringLiteralComment`・`Style/StringLiterals`）、直した後は指摘なし
+  - 業務的な挙動の変化はない。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
 
 ### スキルについて気づいたこと
 
@@ -2716,3 +2725,8 @@ research:
 5. Step 3 の気づきの 12（resolve-lock の「消えた gem」に出ない）が、mutex_m でまた起きた。解決した lock を、Gemfile を書き換えたコピーに持ち込んで `bundle lock` するところまで試して見つけ、消えた gem を読むもの（minitest 5.14.4）を探して警告を再現した。resolve-lock の最後に `bundle lock` を流して差分を出せば、research の時点で見える
 6. 計画の前提（PLAN.md の 7 章の「Rails 7.1 までは sqlite3 1.x のみ」）が誤っていて、順番が変わった。research の手順 3（周辺 gem の振り分け）は 7 章の時期を前提にしていて、時期の根拠を確かめ直す手順がない。今回はサブエージェントの報告から気づき、gem のソースで確かめた
 7. ダウンロードの数え方（Step 4-b の気づきの 2）は、TIPS.md の手順のとおり、解決した lock の gem のうち `vendor/bundle` にないものを数え、手元と CI の置き場所も確かめた。数える道具がないので、scratchpad のスクリプトで行った
+
+gems:
+
+8. gems の手順は「gem を上げる」を想定していて、別の gem に置き換えること（annotate → annotaterb）は書いていない。置き換えでは、古い gem を読むファイル（旧 rake の `require 'annotate'`）を先に消さないと新しい gem の道具が動かず、gem を外したかどうかの比べ方（lock から消える gem、Bundler.require で読まれなくなるもの）も、その場で決めた
+9. 計画で決めた範囲（論点 3 の「RP は gem だけ置き換える」）を、理解の関門の質問で人間が見直した（RP では annotate がそもそも不要）。research で gem の使われ方を確かめたが、「置き換える」を前提に範囲を決め、外す案を出さなかった。research の手順 3（周辺 gem の振り分け）に、使っていない gem を外す選択肢がない

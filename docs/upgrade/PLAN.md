@@ -183,7 +183,7 @@ PR を 0-d-1（静的解析と脆弱性チェック）と 0-d-2（minitest）に
 - 着手時の調査で決めたこと（人間が承認。理由は LOG.md の Step 0-e）
   - Rails/Output: `puts` のまま残し、`rubocop:disable` で囲む。logger にすると出力先が変わるため。logger への変更は epic を main に取り込んだ後の改善として扱う（IMPROVEMENTS.md の IMP-003）
   - Metrics（RS・RP のメソッド、OP の annotate の rake）: メソッドを分けず、`rubocop:disable` を付ける。既定の上限は新しいコードに効いたまま
-  - Rails/RakeEnvironment（OP の annotate の rake）: `:environment` は足さず、`rubocop:disable` を付ける。Step 5 で見直す
+  - Rails/RakeEnvironment（OP の annotate の rake）: `:environment` は足さず、`rubocop:disable` を付ける。Step 5 で見直す（Step 5 で、annotaterb の雛形の rake に `task` のブロックがなく、要らなくなった。DEF-7.2-01）
   - Style/Documentation: 直下の `.rubocop.yml` で無効にする
   - Rails/HttpStatus・Style/FrozenStringLiteralComment・Style/ClassAndModuleChildren: 自動修正で直す
   - Bundler/OrderedGems・Bundler/DuplicatedGroup: 並べ替え、annotate を 1 つ目の `group :development` に移す。lock と依存の一覧が変わらないことを確かめた
@@ -927,7 +927,7 @@ Step 4-b が epic に入った後、Step 5 の前に、Step 4-b で `/rails-upgr
 Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` の research で調べた（Plan モードは使っていない）。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-12）。Ruby 3.3.12 のまま Rails を 7.1.6 から 7.2.4 に上げる。その前に、今の Rails で上げられる sqlite3 2.9.6 と annotaterb を上げる。経緯と作業の記録は LOG.md の Step 5。
 
 - [x] gems: sqlite3 2.9.6（3 アプリ。Gemfile `~> 1.4` → `~> 2.9`。bundler-audit の無視リストから sqlite3 の 2 件を消す）
-- [ ] gems: annotate → annotaterb 4.25.0（OP。`annotate_rb:install` の雛形、`.annotaterb.yml` に旧 rake の 2 つの値、旧 rake の削除。DEF-7.2-01・02）。RP は annotate を外す（着手後に決めた）
+- [x] gems: annotate → annotaterb 4.25.0（OP。`annotate_rb:install` の雛形、`.annotaterb.yml` に旧 rake の 2 つの値、旧 rake の削除。DEF-7.2-01・02）。RP は annotate を外す（着手後に決めた）
 - [ ] rails-lock: Rails 7.2.4（3 アプリ。tzinfo 2.0.6・useragent 0.16.11 が増え、mutex_m を Gemfile に明示する。無視リストから Rails の 10 件を消す。connection_pool の一時固定の理由がなくなる）
 - [ ] rails-app-update
 - [ ] rails-defaults（`new_framework_defaults_7_2.rb`）
