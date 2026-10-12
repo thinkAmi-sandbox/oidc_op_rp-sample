@@ -16,6 +16,8 @@
 | DEF-8.0-06 | 7.2 で非推奨になった 2 つの設定が消える | Rails の既定値 | 3 アプリ | 追随（何もしない） |
 | DEF-8.0-07 | `ActiveRecord::QueryLogs.tags_formatter` の値の形が変わる | Rails の内部の整理 | 3 アプリ | 追随 |
 | DEF-8.0-08 | パラメーターの解析を Rails が自前で行い、Rack 2 との互換の設定が増える | Rails の既定値 | 3 アプリ | 追随 |
+| DEF-8.0-09 | development で web-console のコンソールを常に許す IP に、IPv4 を IPv6 の形で表したループバックが増える | 周辺 gem の既定値（web-console 4.3.0） | RP・OP（development） | 追随 |
+| DEF-8.0-10 | web-console のコンソールの閉じるボタンの文字が `x` → `×` になる | 周辺 gem の雛形（web-console 4.3.0） | RP・OP（development） | 追随 |
 
 ## Rails 8.0.5.1 の lock（rails-lock）
 
@@ -102,3 +104,27 @@ Rails を 7.2.4 → 8.0.5.1 にしたとき（`load_defaults` は 7.2 のまま�
 - コミット: RS・RP・OP（`update Rails to 8.0.5.1`）
 
 補足: 書き出しに `config.action_dispatch.strict_freshness = false` が増える。8.0 で足された設定で、`load_defaults 8.0` で true になるので、rails-defaults で扱う
+
+## 周辺 gem（Step 6）
+
+web-console 4.2.1 → 4.3.0（RP・OP。railties・actionview `>= 8.0` なので Rails 8.0.5.1 の直後。作業計画の論点 4）で起きた変化。v4.2.1...v4.3.0 の `lib` の差分は、下の 2 つのほかに、Rails 8.1 より後で使う `WebConsole::Request#first_non_proxy` の追加（8.0.5.1 は従来の `filter_proxies` を使う）と、`source_location.rb` の Ruby 2.6 未満の分岐の削除だけ。railtie とミドルウェアの位置、`ActionDispatch::Request` の早い読み込み（IMP-009）は同じ。`scripts/compare-config` の設定の値と読み込み済みの部品（3 アプリの test・development）、`RUBYOPT=-W:deprecated` の警告、brakeman、development だけのヘッダーは、上げる前と同じ。generator の雛形はない。
+
+### DEF-8.0-09: development で web-console のコンソールを常に許す IP に、IPv4 を IPv6 の形で表したループバックが増える
+
+- 種類: 周辺 gem の既定値（web-console 4.3.0）/ 対象: RP・OP の development
+- 何が変わるか: `WebConsole::Permissions::ALWAYS_PERMITTED_NETWORKS` が `127.0.0.0/8 ::1` → `127.0.0.0/8 ::1 ::ffff:127.0.0.0/104` になる
+- なぜ: 二重スタックの環境では、localhost からの要求の送り元が `::ffff:127.0.0.1` の形で届くことがある。そのときも、`config.web_console.permissions` を足さずに例外画面のコンソールが出るようにした
+- 3 アプリへの影響: development の例外画面のコンソールだけ。許すのはループバックだけで、外からの要求は許さない。3 アプリは `web_console.permissions` を設定していない。test・E2E・業務の画面には出ない
+- 扱い: 追随
+- 出典: rails/web-console#342、`web-console-4.3.0/CHANGELOG.markdown` の 4.3.0 の節、`web-console-4.3.0/lib/web_console/permissions.rb:8`。Rails ガイドに該当の節はない
+- コミット: RP・OP（`update web-console to 4.3.0`）
+
+### DEF-8.0-10: web-console のコンソールの閉じるボタンの文字が `x` → `×` になる
+
+- 種類: 周辺 gem の雛形（web-console 4.3.0 のテンプレート）/ 対象: RP・OP の development
+- 何が変わるか: `_inner_console_markup.html.erb` の閉じるボタンが `x` → `&times;` になる
+- なぜ: 見た目の整理。CHANGELOG に項目はなく、v4.2.1...v4.3.0 の比較で見つけた
+- 3 アプリへの影響: development の例外画面のコンソールの見た目だけで、アプリの画面ではない
+- 扱い: 追随
+- 出典: `web-console-4.3.0/lib/web_console/templates/_inner_console_markup.html.erb`（`web-console-4.2.1/` と比べた）。Rails ガイドに該当の節はない
+- コミット: RP・OP（`update web-console to 4.3.0`）
