@@ -2684,6 +2684,10 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 |---|---|---|
 | sqlite3 | 1.7.3 → 2.9.6 | 3 アプリ。Gemfile を `~> 1.4` → `~> 2.9`。RS は `bundle update sqlite3 --conservative`（`Fetching` は sqlite3 2.9.6 の arm64-darwin 版だけ）。RP・OP は `bundle lock --update sqlite3 --conservative` で lock を書き、RS で照合した `.gem` をキャッシュにコピーして `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。lock で動いたのは sqlite3 の 3 行だけ（Linux は `x86_64-linux-gnu` 版。`PLATFORMS` は変わらない）。`scripts/verify-gem-checksums` で 3 アプリとも rubygems.org の SHA-256 と一致した。無視リストから CVE-2026-54619・GHSA-mwm8-39rw-8826 を消した（`47ee48d`・`c400e4a`・`9bc8265`） |
 | annotate → annotaterb | 3.2.0 → 4.25.0（OP） | Gemfile の `annotate` を `annotaterb` にして `bundle lock`、RP で照合した `.gem` をキャッシュにコピーして `--local` で入れた。`bin/rails g annotate_rb:install`（E2E 用の DB を指した）で `lib/tasks/annotate_rb.rake`・`.annotaterb.yml` を作り、旧 rake を消した。`.annotaterb.yml` の 2 つの値を旧 rake の値にし、rake は RuboCop に合わせて書き方を直した（DEF-7.2-01・02）。lock で動いたのは annotate・annotaterb の行だけ（`c05d34f`） |
+| Rails | 7.1.6 → 7.2.4 | 3 アプリ（rails-lock）。7.1.6 は 7.1 系の最新なので、先に上げるパッチはなかった。`scripts/resolve-lock --gem 'rails=~> 7.2.4' --rails --unpin tzinfo` で解決した lock を持ち込み、Gemfile の rails を `~> 7.2.4` にし、test グループに mutex_m を理由のコメント付きで足して `bundle lock`。動いたのは Rails の構成 gem と tzinfo 2.0.4 → 2.0.6。増えたのは useragent 0.16.11 と `DEPENDENCIES` の mutex_m（lock の 0.2.0 のまま）。RS の `bundle install` で落としたのは 15 個（Rails の構成 gem 13・tzinfo・useragent）だけで、すべて rubygems.org の SHA-256 と一致した。RP・OP は照合した `.gem` をキャッシュにコピーして `--local` で入れた（`Installing` の 15 行だけ）。3 アプリとも lock の gem はすべて `vendor/bundle` にある。無視リストから Rails の 10 件を消し、3 アプリとも `ignore: []` になった。7.2.4 で初めて起動したときに、`Rails.application.secret_key_base` が `tmp/local_secret.txt` と同じことを確かめた（E2E 用の DB）。DEF-7.2-03〜10（`04e8c71`・`4f6e7e6`・`f4e67fc`） |
+| tzinfo / useragent | 2.0.4 / （なし） → 2.0.6 / 0.16.11 | activesupport 7.2 の `tzinfo >= 2.0.5`、actionpack 7.2 の `useragent ~> 0.16`（Rails 7.2.4 と同じコミット） |
+| mutex_m | 0.2.0（変更なし） | activesupport 7.2 の依存から外れ、3 アプリの Gemfile の test グループに明示した（論点 2。Rails 7.2.4 と同じコミット）。警告の比較で、bundled_gems の警告は出ていない |
+| connection_pool | 2.5.5（変更なし） | activesupport 7.2.4 が `>= 2.2.5, < 3` なので、一時固定の理由がなくなった。lock は動いていない |
 | annotate | 3.2.0 → （なし）（RP） | Gemfile から外した（上の「作業計画からの変更点」）。lock で消えたのは annotate の行だけ（rake は railties の依存で残る）。annotaterb 4.25.0 の `.gem` は、RP で `bundle install` したときに落とし（`Fetching` は annotaterb だけ）、`scripts/verify-gem-checksums` で rubygems.org の SHA-256 と一致した（`7a7aeaa`） |
 
 ### 前後の比較
@@ -2705,6 +2709,14 @@ sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のも�
   - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）
   - `scripts/check-apps`（各アプリのコミットの前の `commit-per-app`）: RP 33・OP 69 runs、0 failures（`CI=1` も同じ）、E2E 10 passed。スナップショットの差分はない。RuboCop は、雛形の rake を直す前は 3 つの指摘（`Style/FrozenStringLiteralComment`・`Style/StringLiterals`）、直した後は指摘なし
   - 業務的な挙動の変化はない。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+- Rails 7.2.4（rails-lock）。前は annotaterb の後の書き出しと、lock を変える前に取った development だけのヘッダー（2 回取って同じ）・brakeman の JSON・OP のテストのログの行数
+  - `scripts/check-apps`: 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 26 種類の違いがあり、すべて 6 つ（またはテストの 3 つ）の書き出しに共通。DEF-7.2-05〜10 に振り分けた
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）。mutex_m の bundled_gems の警告は出ない
+  - development だけのヘッダー（E2E 用の DB で Puma に通した。RS の `/apples/show`、RP のトップ、OP の discovery・ログイン画面。日付・ID・数値と `x-miniprofiler-ids` は伏せた）: RP のトップの Server-Timing に `start_transaction.active_record` が増えただけ（DEF-7.2-04）
+  - brakeman: 警告 0、エラー 0、使われない無視の項目 0、チェックの数は同じ（79）。無視した EOLRails は同じ fingerprint で当たり、メッセージが「Rails 7.2.4 ended on 2026-08-09」になった
+  - OP のテストのログ: 「Redirected to」行の `code=` が、72 行すべて `[FILTERED]` になった（DEF-7.2-03）。RP のテストのログの「Redirected to」行は変わらない
+  - 手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
 
 ### スキルについて気づいたこと
 
@@ -2730,3 +2742,9 @@ gems:
 
 8. gems の手順は「gem を上げる」を想定していて、別の gem に置き換えること（annotate → annotaterb）は書いていない。置き換えでは、古い gem を読むファイル（旧 rake の `require 'annotate'`）を先に消さないと新しい gem の道具が動かず、gem を外したかどうかの比べ方（lock から消える gem、Bundler.require で読まれなくなるもの）も、その場で決めた
 9. 計画で決めた範囲（論点 3 の「RP は gem だけ置き換える」）を、理解の関門の質問で人間が見直した（RP では annotate がそもそも不要）。research で gem の使われ方を確かめたが、「置き換える」を前提に範囲を決め、外す案を出さなかった。research の手順 3（周辺 gem の振り分け）に、使っていない gem を外す選択肢がない
+
+rails-lock:
+
+10. Step 3 の気づきの 15 のとおり、development だけのヘッダーの前を rails-lock の始め（lock を変える前）に取り、コミットの前に比べられた。ただし書き出しの道具がなく、Puma に通して毎回変わる値を伏せるスクリプトを scratchpad で作った。`x-miniprofiler-ids` は前の要求の ID が積み上がるので、1 回目の書き出しで 2 回分が食い違い、伏せる対象に足した（Step 3 の記録にある Content-Length の件と同じ原因）
+11. `scripts/compare-config diff` の差分は 570 行あり、3 アプリ × 2 環境で同じ違いが繰り返されていた。同じ行をまとめると 26 種類だった。Rails のマイナーを上げると、`load_defaults` を変えなくても設定の値が変わる（非推奨の設定が外れる、クラスに設定が増える）ので、まとめて数える手順か道具があるとよい
+12. 解説の項目の出典で、日本語版のガイドの本文を探すのに `ruby -e` へ日本語を書き、Step 4 の「遭遇した問題」と同じく `invalid multibyte char` になった。スクリプトをファイルにして読んだ
