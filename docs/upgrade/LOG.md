@@ -2884,6 +2884,7 @@ Step 全体（見直しの流れ）:
 
 - ブランチ / PR: `upgrade/step6-rails80` / （PR 作成後に記入）
 - バージョン: Ruby 3.3.12（変更なし）/ Rails 7.2.4 → 8.0.5.1
+- 追随した Rails と gem の既定値・雛形は、[defaults/rails-8.0.md](defaults/rails-8.0.md) に記録した
 
 ### 作業計画で決めたこと
 
@@ -2907,6 +2908,44 @@ Step 全体（見直しの流れ）:
 
 | 変更 | 理由 |
 |---|---|
+| Rails 8.0.5.1 自身の起動の途中の読み込み（initializer `action_controller.live_streaming_excluded_keys` が `ActionController::Live`・`ActionDispatch::Response` を読み込む）を、検査で 1 件だけ Step 7 まで許すことにした。`scripts/check-load-hooks` を足し、check-apps と CI から呼ぶ（`9a53b51`） | rails-lock で、3 アプリの「起動の途中の読み込み」が test・`CI=1`・development で失敗した（research では見つけていなかった）。Rails の不具合（rails/rails#58145）で、8-0-stable の修正（#58276）は 8.0.5.1 に入っていない。自前のパッチは保守ができなくなるのでとらず（人間が判断）、未リリースの 8-0-stable・修正の入らない 8.0.4.1 もとらず、許す範囲を検出の hook と版・行で 1 件に絞った。隠れる分は、各作業の前後の compare-config の「読み込み済みの部品」で補う（DEF-8.0-02。人間が判断） |
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| Rails | 7.2.4 → 8.0.5.1 | 3 アプリ（rails-lock）。7.2.4 は 7.2 系の最新なので、先に上げるパッチはなかった。`scripts/resolve-lock --gem 'rails=~> 8.0.5' --rails --pin uri=0.13.3` で解決した lock を持ち込み、Gemfile の rails を `~> 8.0.5` にして `bundle lock --local`（research で試した結果と同じ lock になった）。動いたのは Rails の構成 gem 13 個だけ。RS の `bundle install` で落としたのは 14 個（Rails の構成 gem 13・uri）だけで、`scripts/verify-gem-checksums` ですべて rubygems.org の SHA-256 と一致した。RP・OP は照合した `.gem` をキャッシュにコピーして `--local` で入れた（`Installing` の 14 行だけ。照合も一致）。3 アプリの `config/application.rb` に `to_time_preserves_timezone = :zone` を理由のコメント付きで足した（作業計画の論点 2。DEF-8.0-01）。3 アプリの `config/brakeman.ignore` に、Medium の `pending_eol_rails` の項目を足した（論点 3。fingerprint は brakeman の出力で `98b26f60…db42`、計算と一致）。DEF-8.0-01〜08（`5af2f8e`・`f0813df`・`8815d79`） |
+| uri | （なし）→ 0.13.3 | activesupport 8.0 の `uri >= 0.13.1`。Ruby 3.3.12 の default gem と同じ版に一時固定した（論点 1。Rails 8.0.5.1 と同じコミット） |
+| cgi | 0.4.2 → （なし）（RS・OP） | actionpack・actionview・railties 8.0 が依存から外し、RS・OP の lock から消えた（論点 1。受け入れた）。RP は activerecord-session_store の依存で 0.4.2 のまま |
+| connection_pool・minitest・rack | 2.5.5・5.14.4・2.2.24（変更なし） | 8.0 で上限が外れたが、lock は動いていない（論点 1） |
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| Rails 8.0 は `to_time_preserves_timezone` が `:zone` でないと非推奨の警告を出し、`load_defaults 7.2` の `:offset` のままでは、test の `deprecation = :raise` で起動時に止まった（initializer `active_support.set_configs`、`activesupport-8.0.5.1/lib/active_support/railtie.rb:128`） | `config/application.rb` で `:zone` を先に取り込んだ（DEF-8.0-01）。その後、`RUBYOPT=-W:deprecated` を付けたテストと eager load の `warning:` は 0 件、DEPRECATION は前からある OP の `auth_time_from_resource_owner`（IMP-011）だけ |
+
+### 前後の比較
+
+lock を変える前（`5359cc2` の後）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた。
+
+- Rails 8.0.5.1（rails-lock）
+  - `scripts/check-apps`: 前は 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。後は、3 アプリの「起動の途中の読み込み」の 9 項目が失敗した（DEF-8.0-02。上の「作業計画からの変更点」）。`scripts/check-load-hooks` にした後は 36 の検査がすべて通り、件数は同じ。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 違いは DEF-8.0-01〜08 に振り分けた（`to_time_preserves_timezone`、読み込み済みの部品の `action_dispatch_response` とルーティングの遅れ、`enqueue_after_transaction_commit`、消えた 2 つの設定、`QueryLogs.tags_formatter`、パラメーターの解析の 2 つの設定）。ほかに `strict_freshness = false` が増えた（rails-defaults で扱う）
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）
+  - development だけのヘッダー（E2E 用の DB で Puma に通した。RS の `/apples/show`、RP のトップ、OP の discovery・ログイン画面。日付・ID・数値・`x-miniprofiler-ids` などは伏せた）: 前後で同じ
+  - brakeman: 無視の項目を足す前は、3 アプリとも Medium の `pending_eol_rails`（「Support for Rails 8.0.5.1 ends on 2026-11-07」）で終了コード 3。足した後は警告 0、無視 1、チェックの数は同じ（79）。今ある High の EOLRails の項目は、11-07 まで当たらない
+  - SQLite のトランザクション: RP・OP の test.log で、アプリの書き込みが `BEGIN immediate TRANSACTION`、transactional fixtures が `BEGIN deferred TRANSACTION` になった（DEF-8.0-04）
+  - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| 3 アプリの「起動の途中の読み込み」が失敗した（`on_load(:action_dispatch_response)`。疑わしい行は `railties-8.0.5.1/lib/rails/initializable.rb:32`） | `ANTI_MANNER_DEBUG` のスタックトレースで、Rails 8.0.5.1 の initializer `action_controller.live_streaming_excluded_keys` が原因と分かった。8-0-stable の修正を一時的に `vendor/bundle` に当てて、ほかの検出がないことを確かめ（当てたファイルは戻した）、検査で 1 件だけ許した（上の「作業計画からの変更点」、DEF-8.0-02） |
+| `to_time` の非推奨の警告が、research の見立て（after_initialize）より前の initializer `active_support.set_configs` で出た | 対処は見立てどおり（DEF-8.0-01）。記録の出典を実際の位置に直した |
+| bundle-audit の `--gemfile-lock` の使い方を誤り、無視リストなしの検査が 0 件に見えた（research） | 古い lock で advisory が出ることを確かめてから、ディレクトリを渡す形で流し直した |
+| `ruby -e` に日本語を書くと `invalid multibyte char`（research で PLAN.md を直すとき） | スクリプトをファイルにした（Step 4・5 と同じ） |
 
 ### 手動確認用の環境
 
@@ -2929,3 +2968,10 @@ research:
 6. CI の YJIT は、CI のログからは分からず（`ruby -v` は Rails の前の表示）、ruby-builder のビルドのログ（configure の `YJIT support: yes`）で確かめた。実行時に有効かを CI で見るには、CI に表示を足す必要がある
 7. 2 週間の決まりで送った gem（rubocop・webmock）は、「次の Step の research で確かめる」と決めると、Step の間隔が短いとまた送りになる。日付に結び付ける案を出したが、人間は Step 7 の時期が決まっていないので、Step に結び付けたままにした（論点 5）
 8. Step 5 の気づきの 12 と同じく、PLAN.md を直すスクリプトを `ruby -e` に日本語で書いて `invalid multibyte char` になった。スクリプトをファイルにした
+
+rails-lock:
+
+9. research は lock の解決と advisory まで試したが、新しい Rails でアプリを起動する検査（起動の途中の読み込み）は流さなかったので、Rails 8.0.5.1 自身の読み込み（DEF-8.0-02）を rails-lock で初めて見つけ、作業計画にない判断（検査の扱い）が要った。research で、解決した lock を入れた worktree か `vendor/bundle` のコピーで `scripts/check-apps --no-e2e` まで流せば、計画の段階で見える（ダウンロードを先に承認してもらう必要がある）
+10. 「その系の最新パッチ」を選んでも、それがセキュリティ修正だけの版（8.0.5.1）だと、stable で直った不具合（#58276）が入っていない。research の版の選び方に、最新パッチと stable の差（`compare/v<版>...<系>-stable`）を見る手順がない
+11. サブエージェントの見立て（`to_time` の警告は after_initialize で出る）は、結論は合っていたが位置が違った（initializer `active_support.set_configs`）。実際に流して確かめるまで、出典の位置は見立てとして扱う必要がある
+12. 検出の gem は最初の 1 件で止まるので、検査で 1 件を許すと、その後ろが見えない。許すと決めたときに、隠れる分を補う比べ方（compare-config の読み込み済みの部品）を一緒に決める必要があった。スキルの「検査の失敗の原因が分からない」以外に、原因が分かっていて直せないときの扱い（①〜④）が、gem の未対応の場合しか書かれていない

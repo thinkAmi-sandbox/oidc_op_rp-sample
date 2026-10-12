@@ -25,7 +25,7 @@
 | 応答のスナップショット（Step 1-b-2） | minitest に含まれる。作り直すときは `UPDATE_SNAPSHOTS=1 mise exec -- bin/rails test`（ファイルを指定して絞れる）の後に `git status --short -- test/snapshots` と `git diff -- test/snapshots`（新しいファイルは `git diff` に出ない） | 差分がない。差分が出たら下の「応答のスナップショット」 |
 | Zeitwerk | `mise exec -- bin/rails zeitwerk:check` | `All is good!` |
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
-| 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」 |
+| 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」。Step 6 から Step 7 までは、check-apps と CI は `scripts/check-load-hooks`（アプリのディレクトリで `RAILS_ENV=test mise exec -- ../scripts/check-load-hooks`）で流し、Rails 8.0.5.1 自身の 1 件（DEF-8.0-02）だけを許す。許した検出の後ろは見えないので、`scripts/compare-config` の「読み込み済みの部品」を前後で比べる |
 | bundler-audit | `mise exec -- bundle exec bundle-audit check` | `No vulnerabilities found`（無視リスト込み） |
 | brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`、`Ignored Warnings: 1`（EOLRails。Step 4 で EOLRuby の項目を消した） |
 | E2E | `e2e/` で `mise exec -- npm test` | 約 10 秒で 10 passed。手動確認用のサーバーが動いていると起動に失敗する |

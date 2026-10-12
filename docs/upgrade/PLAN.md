@@ -976,7 +976,7 @@ Step 4-b とスキルの見直しが epic に入ってから、`/rails-upgrade` 
 
 Step 5 が epic に入ってから（[#34](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/34)）、`/rails-upgrade` の research で調べた。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-12）。Ruby 3.3.12 のまま Rails を 7.2.4 から 8.0.5.1 に上げ、その直後に web-console 4.3.0 を上げる。経緯と作業の記録は LOG.md の Step 6。
 
-- [ ] rails-lock: Rails 8.0.5.1（3 アプリ。uri 0.13.3 を一時固定、RS・OP は cgi が lock から消える。`application.rb` に `to_time_preserves_timezone = :zone`、`brakeman.ignore` に `pending_eol_rails`）
+- [x] rails-lock: Rails 8.0.5.1（3 アプリ。uri 0.13.3 を一時固定、RS・OP は cgi が lock から消える。`application.rb` に `to_time_preserves_timezone = :zone`、`brakeman.ignore` に `pending_eol_rails`。Rails 8.0.5.1 自身の起動の途中の読み込みを、`scripts/check-load-hooks` で 1 件だけ Step 7 まで許す。DEF-8.0-01〜08）
 - [ ] gems: web-console 4.3.0（RP・OP）
 - [ ] rails-app-update（Solid 系の `plugin :solid_queue` などは採用しない）
 - [ ] rails-defaults（`new_framework_defaults_8_0.rb`。`to_time_preserves_timezone` は `application.rb` から移す）
@@ -992,6 +992,10 @@ Step 5 が epic に入ってから（[#34](https://github.com/thinkAmi-sandbox/o
 4. web-console 4.3.0: rails-lock の直後に、gems の作業として RP → OP の順に上げる（`bundle lock --update web-console --conservative`。Gemfile の `'>= 4.1.0'` は変えない）
 5. rubocop 1.92.0・webmock 3.27.0〜3.29.0 は Step 6 では上げない。公開から 2 週間たっていない（10-24・10-25）。Step 7 の research で、その時点の最新版でもう一度確かめる（Step 7 の時期がまだ決まっていないため）
 6. 手動確認は verify で 1 回（`load_defaults 8.0` と `TargetRailsVersion` の後）。RP の my_op のログインと introspection 用 RP の流れ、OP の「Redirected to」行の `code=`、サーバーの出力のエラー（TIPS.md の元からあるエラーの一覧と比べる）を見る。直前に、3 アプリの development DB を `tmp/manual_check_backup/` に写す。Step 5 の写しは、research の出口で消した（人間が確かめた）
+
+rails-lock で決めたこと（着手後。人間が判断した）:
+
+7. Rails 8.0.5.1 の initializer `action_controller.live_streaming_excluded_keys` が、起動の途中で `ActionController::Live`・`ActionDispatch::Response` を読み込み、a-nti_manner_kick_course が 3 アプリで検出する（rails/rails#58145。8-0-stable の修正 #58276 は 8.0.5.1 に入っていない）。自前のパッチは保守ができなくなるのでとらず、`scripts/check-load-hooks` で、この 1 件（`on_load(:action_dispatch_response)` と `actionpack-8.0.5.1/lib/action_controller/railtie.rb:35:`）だけを許し、check-apps と CI から呼ぶ。Step 7 で許す条件を外す。隠れる分は、Step 6 の各作業の前後で compare-config の「読み込み済みの部品」を比べて補う。Step 6 の間は、config/initializers で `default_headers`・`default_charset` を変えない（DEF-8.0-02）
 
 - 上げないもの: rubocop・webmock（上の 5）、間接の gem（上の 1）、7.2 系のパッチ（7.2.4 が最新）
 - 採用しないもの: `app:update` が出す Solid 系（`config/puma.rb` の `plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]`）。Kamal・Solid の設定ファイルと `bin/thrust` は `app:update` では作られない
