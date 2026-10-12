@@ -2541,3 +2541,17 @@ simplecov を上げる前（`769ad12`。3 アプリとも default gem から読�
 |---|---|
 | RS の `bundle update simplecov --conservative` で、simplecov のほかに、lock にある default gem と同じ版の gem 16 個を rubygems.org から落とし、`vendor/bundle` に入れた（6 個は C 拡張をビルドした）。lock は simplecov の 1 行しか動かず、research の `--print` では見えなかった | 止まって人間に報告し、原因を調べた。Bundler 2.5.12 の rubygems/rubygems#7673 で、Bundler は lock にある default gem を普通の gem として扱い、入れるようになった（`bundler-2.5.22` の `lib/bundler/source/rubygems.rb` の `specs` は、default gem の spec を、rubygems.org などにないときだけ足す。`lib/bundler/rubygems_integration.rb` の `installed_specs` は default gem を除く）。Bundler 2.4.19 は、default gem の spec で rubygems.org の spec を上書きしていた（`:override_dupes`）。落とした 17 個の `.gem` は、すべて rubygems.org の SHA-256 と一致した |
 | Step 4 の後、手元と CI で、default gem と同じ版の gem を読む場所がずれていた | CI のログで確かめた。Step 4 の PR の CI（`BUNDLED WITH` 2.5.22）は、各ジョブで 16 個（OP は ostruct を足して 17 個）を入れていた。Step 2 の CI（Bundler 2.4.19。キャッシュなしで 484 個を入れた）は、これらを入れていない。Step 4 は「CI は同じ版の default gem を使う」と考えて RS の 3 つを外し、`--local` で入れたので、手元だけ default gem から読んでいた（Bundler 2.4 までは正しかった前提）。人間の判断で、3 アプリとも `vendor/bundle` に入れて CI に揃えた。TIPS.md の「Ruby を上げる」と「gem の更新」を直した |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。手動確認は、作業計画で決めたとおり行わない。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`010827a`）で 36 の検査がすべて通った。各アプリのコミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分はない。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で作り直している
+- RuboCop・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）。bundler-audit は 3 アプリとも `No vulnerabilities found`。brakeman は 3 アプリとも `Security Warnings: 0`・`Ignored Warnings: 1`（EOLRails）
+- lock: epic（`18f983f`）からの動きは、3 アプリとも simplecov の 1 行だけ。Gemfile は epic と同じ。lock に入れた default gem の版と、一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.13.1・reline 0.6.0・io-console 0.7.1。どれも `vendor/bundle` から読む。Tab の補完と複数行の入力ができ、終了の状態は 0）。`bin/rails s`: E2E の起動（`e2e/scripts/start-server.sh` が `bin/rails server` を起動する）で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。lock の変化は simplecov だけなので、CI の入れ方は Step 4 と同じ見込み
+- 手動確認用の環境: HEAD で、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時の基準と同じ
