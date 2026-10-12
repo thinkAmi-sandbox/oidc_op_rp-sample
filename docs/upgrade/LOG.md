@@ -2351,7 +2351,7 @@ gems:
 
 ## Step 4: Ruby 3.3（2026-10-12）
 
-- ブランチ / PR: `upgrade/step4-ruby33` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step4-ruby33` / [#31](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/31)
 - バージョン: Ruby 3.2.11 → 3.3.12 / Rails 7.1.6（変更なし）。Bundler 2.4.19 → 2.5.22（`BUNDLED WITH`）。lock の default gem を 3.3.12 の版に合わせ直した。erb の CVE-2026-41316 は default gem の erb 4.0.3.1 で解消した
 - Ruby だけを上げる Step。既定値への追随（A）と業務的な挙動の変化（B）は、どちらも起きなかった（下の「前後の比較」）
 
@@ -2375,6 +2375,8 @@ gems:
 | 変更 | 理由 |
 |---|---|
 | RS で、前の版のキャッシュからコピーした `.gem` のうち、3.3.12 の default gem と同じ名前・版の 3 つ（benchmark 0.3.0・tsort 0.2.0・ruby2_keywords 0.0.5）を、`vendor/bundle/ruby/3.3.0` から消して入れ直した。RP・OP では、コピーするときに外した（OP は ruby2_keywords の `.gem` がなかったので 2 つ） | RS を入れた後、この 3 つが default gem ではなく `vendor/bundle` から読まれていた。Bundler は、キャッシュに `.gem` があると、同じ版の default gem があっても入れてそちらを読む。benchmark・tsort は 3.2.11 では本物の gem として入れていて、ruby2_keywords は Step 2 で意図せず落とした `.gem` が残っていた。版は同じで Ruby だけの gem なので挙動は変わらない見込みだが、CI（setup-ruby が新しく入れる）は同じ版の default gem を使い、手元と読む場所がずれるので、止まって人間に確かめた（人間が判断）。消したのは gitignore の対象の手元のファイルだけで、`3.2.0/cache` に元の `.gem` が残る。TIPS.md の「Ruby を上げる」に書いた |
+
+- 追記（Step 4-b）: 「CI（setup-ruby が新しく入れる）は同じ版の default gem を使う」は、Bundler 2.4 までの振る舞いで、`BUNDLED WITH` 2.5.22 にした Step 4 からは誤りだった。Bundler 2.5.12 以上（rubygems/rubygems#7673）は、lock にある default gem と同じ版の gem も `vendor/bundle` に入れ、CI は Step 4 の PR から、これらを `vendor/bundle` から読んでいた。手元だけ default gem から読むずれを、Step 4-b で 3 アプリとも `vendor/bundle` に入れて直した（下の Step 4-b の「遭遇した問題」）
 
 ### 手動確認用の環境
 
@@ -2469,7 +2471,7 @@ research:
 
 ruby:
 
-4. ruby.md の手順 4 は、gem の入れ直しで「意図しないダウンロードが起きない」ことを見るが、前の版のキャッシュに新しい Ruby の default gem と同じ版の `.gem` があると、ダウンロードなしで入って default gem の代わりに読まれる。default gem から読まれるかは TIPS.md にしかなく、RS のコミットの前の確かめで気づいた（TIPS.md の「Ruby を上げる」に足した）
+4. ruby.md の手順 4 は、gem の入れ直しで「意図しないダウンロードが起きない」ことを見るが、前の版のキャッシュに新しい Ruby の default gem と同じ版の `.gem` があると、ダウンロードなしで入って default gem の代わりに読まれる。default gem から読まれるかは TIPS.md にしかなく、RS のコミットの前の確かめで気づいた（TIPS.md の「Ruby を上げる」に足した）。追記（Step 4-b）: default gem の代わりに `vendor/bundle` から読まれること自体は、Bundler 2.5 では CI と同じ状態で、問題ではなかった（上の「作業計画からの変更点」の追記）
 5. `scripts/compare-config` の書き出しは、その版にない設定を読んだときの例外のメッセージも含むので、Ruby を上げると、アプリの設定が同じでも例外の文言（`NoMethodError`）の差分が出る。前後の比較の手順に、道具の出力の差分とアプリの差分を分ける目安がない
 
 6. TIPS.md に足した、キャッシュのコピーで default gem と同じ版の `.gem` を外す手順は、今回は scratchpad の使い捨てのスクリプトで行った。`scripts/verify-gem-checksums` と同じく道具にすれば、Ruby を上げるたびに手で作らずに済む（コードレビューの指摘。直さずに、ここに控えた）
@@ -2477,3 +2479,113 @@ ruby:
 manual-check:
 
 7. 手動確認でサーバーの出力を読むとき、元からあるエラー（RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`）の一覧が設定にも TIPS.md にもなく、新しいものかを判断するのに過去の記録とビューを探した（OP の分は、これまで記録していなかった）
+
+## Step 4-b: simplecov 1.3.2（2026-10-12）
+
+- ブランチ / PR: `upgrade/step4b-simplecov13` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12・Rails 7.1.6（変更なし）。3 アプリの simplecov 1.2.0 → 1.3.2
+- 追随した gem の既定値は、[defaults/rails-7.1.md](defaults/rails-7.1.md) の「周辺 gem（Step 4-b）」に記録した（DEF-7.1-52）。業務的な挙動の変化（B）は起きなかった
+- lock にある default gem と同じ版の gem（16 個。OP は ostruct を足して 17 個）を、3 アプリとも `vendor/bundle` に入れた。Step 4 の後、手元は default gem から、CI は `vendor/bundle` から読んでいて、ずれていた（下の「遭遇した問題」）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade research` で、Plan モードで調べた（サブエージェントは使わなかった。CHANGELOG とソースの差分は GitHub のタグ、版・依存・サイズは rubygems.org の API、lock の解決は `bundle lock --update simplecov --conservative --print`）。作業計画を出し、論点を 1 つずつ人間と確かめてから承認を得た。調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 4-b」に書いた。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 版 | 1.3.2。公開から 2 週間の決まりの例外とする | 着手の日（10-12）は公開から 12 日目。脆弱性があれば既に報告されている時期と考えられ、advisory も出ていない。AI は、2 週間たった 1.3.1 にし、1.3.2 は Step 5 の最初に上げる案を出した（1.3.1 からの違いは、`parallelize` を使わない 3 アプリには効かない修正だけ）が、人間が 1.3.2 を選んだ。brakeman 8.1.0（Step 3。10 日目）に続く 2 例目 |
+| 追随の記録 | DEF-7.1-52 の 1 項目（ファイルのないグループを外す、`rails` プロファイルのグループの並び順）。defaults/rails-7.1.md に「周辺 gem（Step 4-b）」の節を足す | どちらもグループの出し方の変化で、前例の DEF-7.0-50 も 1 項目にまとめた。Prism を読み込まなくなること（1.3.1）は既定値の変化ではないので、DEF-7.1-52 の影響とこの節に書く（人間が判断） |
+| 手動確認 | 行わない。手動確認用の環境の 14 ファイルのハッシュを、作業の開始時と verify で比べる | simplecov は test グループで `require: false` で、development のサーバーでは読まれない。lock で動くのは simplecov だけ（人間が判断） |
+| rubocop 1.92.0・webmock 3.27.0〜3.29.0 | この Step では扱わない。Step 5 の research の最初に確かめる | 公開から 1〜2 日で、2 週間たっていない（人間が判断） |
+
+- ダウンロード: simplecov 1.3.2 の `.gem`（218,624 B）を、3 アプリで 1 回ずつ。作業計画で示し、承認を得た
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、14 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 4-b の基準にする）。件数は、本体と `-wal` を scratchpad にコピーして数え、Step 4 の手動確認の後と同じだった（OP `oauth_access_grants` 25・`oauth_access_tokens` 62、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。OP の `tmp/manual_check_backup/` はない。最初のコミット（Step 4 の PR へのリンク）の後も、14 ファイルのハッシュは同じ
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| lock にある default gem と同じ版の gem（json・bigdecimal・logger・base64・cgi・drb・mutex_m・io-console・irb・rdoc・psych・stringio・benchmark・securerandom・tsort・ruby2_keywords の 16 個。OP は ostruct 0.6.0 も）を、3 アプリとも `vendor/bundle` に入れた | RS の `bundle update` で、計画にないダウンロードとして起きた（下の「遭遇した問題」）。止まって原因を調べ、CI も同じものを入れて読んでいると分かった。手元を CI に揃える案と、Step 4 の状態（default gem から読む）に戻す案を示し、人間が CI に揃える案を選んだ |
+| RP・OP は、`bundle update` の代わりに、`bundle lock --update simplecov --conservative` で lock だけを書き、RS で照合済みの `.gem` 17 個をキャッシュにコピーして、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache mise exec -- bundle install --local --no-cache` で入れた。OP の ostruct 0.6.0 だけは `gem fetch` で落とした（11,776 B） | 同じものを 3 回落とさないため（人間が判断）。計画のダウンロードは simplecov の 3 回だったが、実際は RS の 17 個と OP の ostruct の 1 個 |
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| simplecov | 1.2.0 → 1.3.2 | 3 アプリ。RS は `bundle update simplecov --conservative`、RP・OP は上の入れ方。lock で動いたのは、3 アプリとも simplecov の 1 行だけ。DEF-7.1-52 |
+| json ほか 16 個（OP は ostruct を足して 17 個） | 変更なし（lock の版のまま） | 読む場所が、default gem から `vendor/bundle` に変わった（3 アプリ。手元だけ。CI は Step 4 から `vendor/bundle`）。版は同じ |
+
+- 照合: `scripts/verify-gem-checksums` で、3 アプリのキャッシュの `.gem` がすべて rubygems.org の SHA-256 と一致した（RS 142・RP 156・OP 199 個。落とした simplecov 1.3.2・16 個・ostruct 0.6.0 を含む）
+- 読む場所: `bundle exec ruby -e` で、3 アプリとも lock の gem がすべて `vendor/bundle` から読まれ、default gem から読まれる gem は 0 個（RS 107・RP 117・OP 109 個）
+- epic と比べて lock で動いたのは simplecov の行だけ。lock に入れた default gem の版、一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）、Gemfile は動いていない
+- advisory: simplecov の advisory はない（research）。bundler-audit の無視リストは変わらない
+
+### 意図的な仕様変更
+
+なし。gem の既定値への追随は DEF-7.1-52（カバレッジのレポートのグループの出し方。人間が追随と判断した）
+
+### 前後の比較
+
+simplecov を上げる前（`769ad12`。3 アプリとも default gem から読む状態）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。
+
+- `scripts/check-apps`: 前後とも 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない。各アプリのコミットの前（`commit-per-app`）も同じ
+- `scripts/compare-config dump`（3 アプリ、test・development）: 前を 2 回取って同じことを確かめた。前後で同じ
+- `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後とも、`warning:` の行は 0 件。DEPRECATION は前後とも OP のテストの `auth_time_from_resource_owner`（IMP-011）だけ
+- カバレッジの出力（`coverage/`）: `coverage.json` の合計・ファイルごとの値（RS 7・RP 15・OP 8 ファイル）・エラーの欄、`.last_run.json`、テストの最後に出る結果の行（`Line coverage: 33 / 33 (100.00%)` など）、`coverage/` のファイルの一覧は前後で同じ。違ったのは、`coverage.json` と `.history.json` のグループ（空のグループが外れ、アルファベット順になった。DEF-7.1-52）と、`meta` の `simplecov_version`・`timestamp` だけ
+- prism: テストの実行の終わりに `$LOADED_FEATURES` を見ると、前は 3 アプリとも prism 1.9.0 が読まれ、後は読まれない（1.3.1 から、Prism を branch・method のカバレッジで要るときだけ読む）
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RS の `bundle update simplecov --conservative` で、simplecov のほかに、lock にある default gem と同じ版の gem 16 個を rubygems.org から落とし、`vendor/bundle` に入れた（6 個は C 拡張をビルドした）。lock は simplecov の 1 行しか動かず、research の `--print` では見えなかった | 止まって人間に報告し、原因を調べた。Bundler 2.5.12 の rubygems/rubygems#7673 で、Bundler は lock にある default gem を普通の gem として扱い、入れるようになった（`bundler-2.5.22` の `lib/bundler/source/rubygems.rb` の `specs` は、default gem の spec を、rubygems.org などにないときだけ足す。`lib/bundler/rubygems_integration.rb` の `installed_specs` は default gem を除く）。Bundler 2.4.19 は、default gem の spec で rubygems.org の spec を上書きしていた（`:override_dupes`）。落とした 17 個の `.gem` は、すべて rubygems.org の SHA-256 と一致した |
+| Step 4 の後、手元と CI で、default gem と同じ版の gem を読む場所がずれていた | CI のログで確かめた。Step 4 の PR の CI（`BUNDLED WITH` 2.5.22）は、各ジョブで 16 個（OP は ostruct を足して 17 個）を入れていた。Step 2 の CI（Bundler 2.4.19。キャッシュなしで 484 個を入れた）は、これらを入れていない。Step 4 は「CI は同じ版の default gem を使う」と考えて RS の 3 つを外し、`--local` で入れたので、手元だけ default gem から読んでいた（Bundler 2.4 までは正しかった前提）。人間の判断で、3 アプリとも `vendor/bundle` に入れて CI に揃えた。TIPS.md の「Ruby を上げる」と「gem の更新」を直した |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。手動確認は、作業計画で決めたとおり行わない。
+
+- `scripts/check-apps`（3 アプリと E2E）: HEAD（`010827a`）で 36 の検査がすべて通った。各アプリのコミットの前には、そのアプリと E2E で流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分はない。E2E の起動で、E2E 用の DB を `db:drop` → `db:setup`（RS は `db:create`）で作り直している
+- RuboCop・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストに解消済みの ID がないかも）・brakeman: すべて通った（`check-apps` の項目）。bundler-audit は 3 アプリとも `No vulnerabilities found`。brakeman は 3 アプリとも `Security Warnings: 0`・`Ignored Warnings: 1`（EOLRails）
+- lock: epic（`18f983f`）からの動きは、3 アプリとも simplecov の 1 行だけ。Gemfile は epic と同じ。lock に入れた default gem の版と、一時固定の reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.13.1・reline 0.6.0・io-console 0.7.1。どれも `vendor/bundle` から読む。Tab の補完と複数行の入力ができ、終了の状態は 0）。`bin/rails s`: E2E の起動（`e2e/scripts/start-server.sh` が `bin/rails server` を起動する）で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。lock の変化は simplecov だけなので、CI の入れ方は Step 4 と同じ見込み
+- 手動確認用の環境: HEAD で、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時の基準と同じ
+
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| Step 4 の記録（「作業計画からの変更点」と、スキルについて気づいたことの 4）に、「CI は同じ版の default gem を使う」という前提が、追記なしで残っている | 直した。前例の「追記（Step 1-b-3-2）」の形で、Step 4 の 2 か所に追記（Step 4-b）を足し、この節の「遭遇した問題」を指した。元の文は当時の記録として残した（人間が判断） |
+| PLAN.md の 8 章の 4（Ruby を上げるときの手順）が、Bundler 2.5 で default gem と同じ版の gem も `vendor/bundle` に入れることに触れていない | 直した。手元も CI に揃えて入れること、そのための `.gem` を research でダウンロードの確認に入れることを書き、TIPS.md を指した（人間が判断） |
+| PLAN.md の 7 章の simplecov の行で、1.3.2 に「（済）」がない | 直した（人間が判断） |
+| PLAN.md の Step 4-b の節の「ダウンロード: 3 アプリで 1 回ずつ」が、実際と違う | 直した。計画の文は残し、実際に落としたもの（RS 17 個・OP の ostruct 1 個・RP 0 個）と、この節の「作業計画からの変更点」を書き足した（人間が判断） |
+| TIPS.md の「CI は毎回これらを入れて読む」は、キャッシュが当たった実行では入れ直さないので不正確 | 直した。キャッシュの有無で分けて書き、CI のログで確かめるときはキャッシュなしで入れた実行を見る、とした（人間が判断） |
+
+直した後（文書だけの変更）も、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、件数は同じ。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時の基準と同じ
+
+### スキルについて気づいたこと
+
+Step 3・3-b・4 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+research:
+
+1. Step 3 の 4（計画で決めた時期と、公開から 2 週間の決まりが食い違ったときの扱い）が、また起きた。計画の時期（4-b）に、最新の 1.3.2 は 12 日目だった。brakeman 8.1.0（10 日目）に続き、人間が例外とした。2 回続いたので、例外の目安（何日目から、何を確かめれば例外にできるか）を書く場所があるとよい
+2. research の手順 4（lock を書かずに解決の結果を試す。`--print`）は、lock の変化しか見えない。Bundler 2.5 が、lock にある default gem と同じ版の gem を `vendor/bundle` に入れること（rubygems/rubygems#7673）は lock に出ないので、ダウンロードの確認が実際より少なかった（計画は simplecov の 3 回、実際は RS の 17 個と OP の 1 個）。lock の gem のうち `vendor/bundle` にないものを数える手順が要る（TIPS.md の「gem の更新」に書いた）
+
+gems:
+
+3. gems の手順 4 は「lock で動いた gem を確かめる」だけで、`bundle update` の出力の `Fetching` の行を見る手順がない。今回は、出力を読んで lock にない入れ直しに気づいた
+4. gems の手順 6（前後の比較）が指す設定の「前後の比較」に、テストだけで使う道具の出力（カバレッジ）の項目がない。Step 2-b と同じく、比べるもの（`coverage.json`・`.last_run.json`・結果の行・prism の読み込み）をその場で決めた
+
+前後の比較・verify:
+
+5. 手元と CI で、gem を読む場所（default gem か `vendor/bundle` か）が揃っているかを見る手順がない。Step 4 で生まれたずれ（CI は Bundler 2.5 で `vendor/bundle` から読み、手元は `--local` で入れて default gem から読んでいた）に、Step 4 の verify もコードレビューも気づかなかった。CI のログの `Installing` の行と、手元の `Gem.loaded_specs` を比べると分かる
+6. Step 4 の「CI は同じ版の default gem を使う」は、Bundler 2.4 の振る舞いからの推測で、CI のログで確かめていなかった。CI の振る舞いを前提にする判断は、CI のログで確かめる、という決まりがない

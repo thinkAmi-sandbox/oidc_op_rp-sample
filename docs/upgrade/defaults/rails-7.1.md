@@ -3,6 +3,7 @@
 - 版: Rails 7.0.10 → 7.1.6（Ruby 3.2.11）
 - Step: 3（ブランチ `upgrade/step3-rails71`）/ PR: [#29](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/29)
 - Step: 3-b（周辺 gem。ブランチ `upgrade/step3b-doorkeeper-oidc20`）/ PR: [#30](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/30)
+- Step: 4-b（周辺 gem。Ruby 3.3.12。ブランチ `upgrade/step4b-simplecov13`）/ PR: （PR 作成後に記入）
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
@@ -60,6 +61,7 @@
 | DEF-7.1-49 | OP の initializer に、gem の雛形のコメントが 2 つ増える | 周辺 gem の雛形（doorkeeper-openid_connect 2.0.0） | OP | 追随 |
 | DEF-7.1-50 | OP のロケールに、`post_logout_redirect_uris` の属性名とエラー文言が増える | 周辺 gem の雛形（doorkeeper-openid_connect 2.0.0） | OP | 追随 |
 | DEF-7.1-51 | OP の schema.rb が、Rails 7.0 からの書き出しの形になる | Rails の既定値（schema.rb の書き出し） | OP | 追随 |
+| DEF-7.1-52 | simplecov 1.3 で、カバレッジのレポートのグループの出し方が変わる | 周辺 gem の既定値（simplecov 1.3.2） | 3 アプリ | 追随 |
 
 ## 周辺 gem（Step 3）
 
@@ -625,3 +627,20 @@ Step 3-b で、doorkeeper-openid_connect を 1.10.5 → 2.0.0 に上げたとき
 - 扱い: 追随（マイグレーションとは理由が違うので、`bin/rails db:schema:dump` で書き出しの形だけを変えるコミットにする。マイグレーションのコミットの schema.rb の差分は、列の行と版の日付だけになる）
 - 出典: `activerecord-7.0.10/CHANGELOG.md`（「Dump the database schema containing the current Rails version」「Set precision 6 by default for `datetime` columns」）、rails/rails#42297・#44286・#44358、`activerecord-7.1.6/lib/active_record/schema_dumper.rb` の `header`、`activerecord-7.1.6/lib/active_record/connection_adapters/abstract/schema_dumper.rb` の `schema_precision`、Rails ガイド v7.0 の「Rails アップグレードガイド」の 2.15「Active RecordのスキーマダンプにRailsのバージョンが含まれるようになった」
 - コミット: OP（`dump schema.rb in the rails 7.1 format`）
+
+## 周辺 gem（Step 4-b）
+
+Step 4-b で、simplecov を 1.2.0 → 1.3.2 に上げたときに起きた、gem の既定値の変化。上げた理由と版の選び方は [PLAN.md](../PLAN.md) の Step 4-b。
+
+### DEF-7.1-52: simplecov 1.3 で、カバレッジのレポートのグループの出し方が変わる
+
+- 種類: 周辺 gem の既定値（simplecov 1.2.0 → 1.3.2。テストの道具）/ 対象: RS・RP・OP
+- 何が変わるか: `rails` プロファイルのグループの出し方が、HTML のレポートのタブ・`coverage/coverage.json`・`coverage/.history.json` で変わる
+  - ファイルのないグループを出さない。RS は Helpers・Views・Libraries、RP は Views、OP は Views・Libraries が出なくなる（前は、ファイル 0 で 100% と出ていた）
+  - グループをアルファベット順に出す（Controllers, Channels, Models, Mailers, Helpers, Views, Jobs, Libraries → Channels, Controllers, Helpers, Jobs, Libraries, Mailers, Models, Views）
+  - 残ったグループの中身、合計、ファイルごとの値（RS 7・RP 15・OP 8 ファイル。どれも 100%）、エラーの欄、`.last_run.json`、テストの最後に出る結果の行は前後で同じ
+- なぜ: 1.3.0 で、Rails の雛形にあってアプリにないディレクトリ（Channels・Mailers・Views など）のグループが、100% としてレポートを埋めないように、空のグループを外すようにした（simplecov-ruby/simplecov#1293。`lib/simplecov/result_processing.rb` の `grouped`）。あわせて、`rails` プロファイルのグループを、足された順からアルファベット順の宣言に並べ直した（`lib/simplecov/profiles/rails.rb`）
+- 3 アプリへの影響: アプリの挙動は変わらない。`coverage/` は gitignore の対象。CI（`.github/workflows/ci.yml`）と `scripts/check-apps` はカバレッジの出力を読まない。最低カバレッジ（グループごとを含む）を設定していないので、`bin/rails test` の終了コードは変わらない。あわせて、1.3.1 から Prism を `require 'simplecov'` の時点では読まず、branch・method のカバレッジで要るときだけ読む。3 アプリは行だけを取るので、テストの実行で lock の prism 1.9.0（rubocop の依存）が読まれなくなった（既定値の変化ではないので、別の項目にしない）。テストの件数・起動の途中の読み込みの検査・`compare-config` の書き出しは前後で同じ
+- 扱い: 追随（グループを自分で宣言して、前の形に戻すことはしない）
+- 出典: simplecov の CHANGELOG（1.3.0 の Upgrade notes・Enhancements、1.3.1 の Bugfixes）、simplecov-ruby/simplecov#1293、`simplecov-1.3.2/lib/simplecov/profiles/rails.rb`・`simplecov-1.3.2/lib/simplecov/result_processing.rb`・`simplecov-1.3.2/lib/simplecov/static_coverage_extractor.rb`（v1.2.0 との比較）。Rails ガイドに該当の節はない（v7.1 の「Rails テスティングガイド」にも simplecov の説明はない）
+- コミット: RS・RP・OP（`update simplecov to 1.3.2`）
