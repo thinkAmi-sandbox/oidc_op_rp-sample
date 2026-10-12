@@ -2896,3 +2896,36 @@ Step 全体（見直しの流れ）:
 | 3 brakeman の pending EOL | rails-lock のコミットで、3 アプリの `config/brakeman.ignore` に Medium の `pending_eol_rails`（code 122）の項目を足す（fingerprint は brakeman の実際の出力で確かめる。note に Rails 8.0 の保守が 11-07 までで、Step 7 で 8.1 に上げることを書く）。Step 7 で使われない項目として外す。Step 7 は 11-07 までに epic に入れるのが望ましいことを、PLAN.md の Step 6 の節に書く | brakeman 8.1.0 の Rails 8.0 の EOL は 2026-11-07（`check_eol_rails.rb:28`）。EOL の 30 日前から Medium、60 日前から Low の code 122 を出し、EOL 以降は High の code 120（`eol_check.rb` の `check_eol_version`）。10-12 は 30 日以内なので、8.0.5.1 にした時点で Medium が出て、既定の確信度で check-apps と CI の brakeman が失敗する。fingerprint は「警告コード + code + location + file + confidence」の SHA-256 で、Rails の版は入らない（`warning.rb`）。今の項目（`120nilGemfile.lock0` → `d849…101c`）は計算と一致し、Medium の 122（`98b26f60…db42`）には当たらない。11-07 以降は今の項目で無視される。失敗を受け入れたまま進める案は検査の決まりに反し、確信度を変える案はほかの警告も見えなくなるのでとらない（人間が判断） |
 | 4 web-console 4.3.0 | rails-lock の直後に、gems の作業として RP → OP の順に上げる（`bundle lock --update web-console --conservative`）。Gemfile の `'>= 4.1.0'` は変えない。許す IP の変化は、gem の既定値の変化として理解の関門で解説する | 4.3.0 は railties・actionview `>= 8.0` で、Rails 8.0.5.1 の後でないと入らない（4.2.1 も 8.0 を許す）。7 章の振り分けの 2（新しい Rails を必要とする gem は、Rails と同時か直後）に当たり、Step 3 の rack-mini-profiler 5.0.0 と同じ置き方。変化は development の例外画面のコンソールだけ（常に許す IP に `::ffff:127.0.0.0/104`、閉じるボタンの文字、8.1 より後で使う `first_non_proxy`。railtie・ミドルウェアの位置・IMP-009 の早い読み込みは同じ）。activemodel の依存が外れ、bindex は同じ版なので、落とすのは web-console 4.3.0 だけ（人間が判断） |
 | 5 rubocop・webmock | Step 6 では上げない。次の Step（7）の research で、その時点の最新版と、公開から 2 週間たっているかを、もう一度確かめる（Step 5 と同じ決め方） | 10-12 の時点で、rubocop 1.92.0（10-10）・webmock 3.27.0・3.28.0（10-10）・3.29.0（10-11）は 2 週間たっていない（10-24・10-25）。Step 5 の時点から新しい版は出ていない。1.92.0 は `Lint/UselessAssignment` の新しい指摘（#14666）がありうる。webmock の 3.28.0 の破壊的な変更（`to_rack`）と Unreleased（RSpec の `have_been_requested.with`、#1128）は 3 アプリに当たらない。AI は、日付に結び付けた別のサブステップ（10-25 の後）を案にした（Step 7 の research が 10-24 より前に始まると、また送りになるため）。人間は、Step 7 の時期がまだ決まっていないので、次の Step の research で確かめる案にした。2 週間の決まりの例外にする案は、開発・テスト用の道具で advisory もなく急がないのでとらない（人間が判断） |
+| 6 手動確認の時期 | verify で 1 回（`load_defaults 8.0` と `TargetRailsVersion` 8.0 の後）。RP の my_op のログインと introspection 用 RP の流れ、OP の「Redirected to」行の `code=`、サーバーの出力のエラー（TIPS.md の元からあるエラーの一覧と比べる）を見る。直前に、12 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの `development.sqlite3`（今は `-wal` がない）を `tmp/manual_check_backup/` に写す。Step 5 の写しは、research の出口で消す | Rails 8.0 で SQLite のトランザクションが `BEGIN immediate TRANSACTION` になり、`timeout` の扱いと接続の引数（`default_transaction_mode`）が変わる。web-console 4.3.0 は development だけで動く。DB のファイルの形は変わらない見込みだが、Step 3（7.1 で WAL）・Step 5（sqlite3 2.x で `-wal` が消えた）では、手動確認の後に初めて形の変化が分かったので、元に戻す選択肢を残す。Step 5 の写しは、#34 が epic に入ったので消してよい（TIPS.md の「手動確認用の環境」）。この論点への返事で、作業計画（ダウンロードの確認を含む）の承認と、Step 5 の写しを消すことの承認も得た（人間が判断） |
+
+- 上げないもの: rubocop・webmock（論点 5）、connection_pool・minitest・rack（論点 1）、7.2 系のパッチ（7.2.4 が最新）
+- 採用しないもの: `app:update` の Solid 系（`config/puma.rb` の `plugin :solid_queue`）。Kamal・Solid の設定ファイルと `bin/thrust` は `app:update` では作られない
+- ダウンロード: Rails の構成 gem 8.0.5.1 の 13 個・uri 0.13.3・web-console 4.3.0（計 1,936,384 B）。各 `.gem` は 1 回だけ落とし、照合してほかのアプリのキャッシュにコピーする。作業計画で示し、論点 6 への返事で承認を得た
+- 調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 6: Rails 8.0」に書いた。7 章の web-console・rubocop・webmock・connection_pool・rack・cgi の行を直し、uri の行を足した。8 章の 4 と TIPS.md の「gem の更新」の default gem の一覧に uri を足した
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、3 アプリのサーバーが止まっていることを確かめ、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 6 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 5 の手動確認の後と同じだった（OP `oauth_access_grants` 27・`oauth_access_tokens` 67、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok）。最初のコミット（Step 5 の PR へのリンク）の後も、12 ファイルのハッシュは同じ。research の出口で、Step 5 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（OP・RP は本体と `-wal`、RS は本体）を、人間に確かめて消した。消した後も 12 ファイルのハッシュは同じ
+
+### スキルについて気づいたこと
+
+Step 3〜5 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+resume:
+
+1. ローカルの `epic/rails-8.1-upgrade` が origin より 49 コミット古く、#34 の取り込みが入っていなかった（Step 5 の気づきの 3 と同じ）。resume の手順 2 に、切る前に epic を origin に合わせる手順がない。今回は人間の指示にあったので、fetch して早送りしてから切った
+2. 手動確認用の環境の 12 ファイルを、空白で区切った文字列の変数で `shasum` に渡すと、zsh は単語に分けずに 1 つの名前として渡し、失敗した（配列にして直した。Step 3 の気づきの 2 と同じ zsh の性質）
+
+research:
+
+3. resolve-lock の「消えた gem」に出ずに lock から消える gem が、また出た（RS・OP の cgi 0.4.2）。Step 3 の method_source、Step 5 の mutex_m に続いて 3 回目。Step 5 の気づきの 5 のとおり、持ち込んだ後の `bundle lock` まで試して見つけた
+4. bundle-audit の `--gemfile-lock` に別のディレクトリの lock を渡す使い方を誤り、無視リストなしの検査で 0 件に見えた。advisory の残る古い lock で出ることを確かめてから、ディレクトリを渡す形に直した。「出ない」ことを確かめる検査は、出るはずの入力で先に確かめる必要がある
+5. scratchpad では、mise がディレクトリの `.ruby-version` を読まない（`mise.toml` の trust がない）。`mise exec ruby@3.3.12 --` で版を渡した
+6. CI の YJIT は、CI のログからは分からず（`ruby -v` は Rails の前の表示）、ruby-builder のビルドのログ（configure の `YJIT support: yes`）で確かめた。実行時に有効かを CI で見るには、CI に表示を足す必要がある
+7. 2 週間の決まりで送った gem（rubocop・webmock）は、「次の Step の research で確かめる」と決めると、Step の間隔が短いとまた送りになる。日付に結び付ける案を出したが、人間は Step 7 の時期が決まっていないので、Step に結び付けたままにした（論点 5）
+8. Step 5 の気づきの 12 と同じく、PLAN.md を直すスクリプトを `ruby -e` に日本語で書いて `invalid multibyte char` になった。スクリプトをファイルにした
