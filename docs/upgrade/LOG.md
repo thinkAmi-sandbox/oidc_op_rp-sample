@@ -2714,6 +2714,19 @@ Step 4-b の PR が epic に入った後、人間が、Step 4-b でスキルを�
 
 - コミット: RS `55348ca`・RP `bb57416`・OP `e1c65b4`
 
+### `new_framework_defaults_7_2.rb` を有効にした順番
+
+グループと順番は人間が決めた。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べ、すべての設定が新しい値になったことを確かめた（起動の途中の読み込みで効かない設定はなかった）。設定しないと書き出しに出ない 4 つの値（`config.yjit`・`RubyVM::YJIT.enabled?`・`ActiveJob::Base.enqueue_after_transaction_commit`・`ActiveRecord.validate_migration_timestamps`）は、前の書き出しを取る前に `scripts/lib/dump_config.rb` に足した（`70d77d1`。Step 3 の気づきの 18 のとおり、最初に確かめた）。解説への返事の後に、アプリごとにコミットした。項目ごとの解説は [defaults/rails-7.2.md](defaults/rails-7.2.md) の「`load_defaults 7.2`」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 使っていない機能 | `active_job.enqueue_after_transaction_commit`、`active_storage.web_image_content_types`、`active_record.postgresql_adapter_decode_dates` | 値だけが変わる（DEF-7.2-22〜24。`b14e242`・`edbf4c1`・`977dee7`） |
+| 2 | マイグレーション | `active_record.validate_migration_timestamps` | 先の日付のマイグレーションはない。E2E 用の DB で `db:migrate:status`・`db:migrate` が通った（DEF-7.2-25。`65e903b`・`6943a9e`・`646888f`） |
+| 3 | YJIT | `yjit` | development・test で YJIT が有効になる。結果は同じ（DEF-7.2-26。`fd35cb6`・`c274ef7`・`65f7ead`） |
+
+- グループ 2 で確かめるために E2E 用の DB に `db:migrate` を流すと、RP・OP の `db/schema.rb` が書き出された（OP は見出しの `Schema[7.1]` → `Schema[7.2]`、RP は Rails 6.1 の形 → 7.2 の形）。この設定の変化ではないので戻した。次に RP・OP でマイグレーションを流すと同じ差分が出る（DEF-7.2-25 の補足）
+- 3 グループとも、検査と E2E の件数は前と同じで、応答と E2E のスナップショットの差分はない。警告と development だけのヘッダーは、グループ 3 の前後で同じ。手動確認用の環境の 14 ファイルのハッシュは、作業の開始時と同じ
+
 ### 前後の比較
 
 sqlite3 を上げる前（計画のコミット `9409e95` の後）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。
