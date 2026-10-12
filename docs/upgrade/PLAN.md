@@ -872,7 +872,7 @@ Step 4 が epic に入ってから、`/rails-upgrade research` で調べた。�
 - [x] gems: simplecov 1.2.0 → 1.3.2（OP）
 - [x] gems: lock にある default gem と同じ版の gem を、3 アプリとも `vendor/bundle` に入れる（CI に揃える。LOG.md の Step 4-b の「作業計画からの変更点」。人間が判断）
 - [x] verify（手動確認は行わない。手動確認用の環境の 14 ファイルのハッシュを、作業の開始時の基準と比べた。結果は LOG.md の Step 4-b の「確認結果」。CI は push の後）
-- [ ] pr
+- [x] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:
 

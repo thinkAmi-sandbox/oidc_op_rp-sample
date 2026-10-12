@@ -2555,3 +2555,22 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。手動確認は�
 - 公開物の安全チェック: 各コミットの hooks で通った
 - CI: push の後に確かめる（push は人間が行う）。lock の変化は simplecov だけなので、CI の入れ方は Step 4 と同じ見込み
 - 手動確認用の環境: HEAD で、3 アプリのサーバーが止まっていて、14 ファイルのハッシュが作業の開始時の基準と同じ
+
+### スキルについて気づいたこと
+
+Step 3・3-b・4 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+research:
+
+1. Step 3 の 4（計画で決めた時期と、公開から 2 週間の決まりが食い違ったときの扱い）が、また起きた。計画の時期（4-b）に、最新の 1.3.2 は 12 日目だった。brakeman 8.1.0（10 日目）に続き、人間が例外とした。2 回続いたので、例外の目安（何日目から、何を確かめれば例外にできるか）を書く場所があるとよい
+2. research の手順 4（lock を書かずに解決の結果を試す。`--print`）は、lock の変化しか見えない。Bundler 2.5 が、lock にある default gem と同じ版の gem を `vendor/bundle` に入れること（rubygems/rubygems#7673）は lock に出ないので、ダウンロードの確認が実際より少なかった（計画は simplecov の 3 回、実際は RS の 17 個と OP の 1 個）。lock の gem のうち `vendor/bundle` にないものを数える手順が要る（TIPS.md の「gem の更新」に書いた）
+
+gems:
+
+3. gems の手順 4 は「lock で動いた gem を確かめる」だけで、`bundle update` の出力の `Fetching` の行を見る手順がない。今回は、出力を読んで lock にない入れ直しに気づいた
+4. gems の手順 6（前後の比較）が指す設定の「前後の比較」に、テストだけで使う道具の出力（カバレッジ）の項目がない。Step 2-b と同じく、比べるもの（`coverage.json`・`.last_run.json`・結果の行・prism の読み込み）をその場で決めた
+
+前後の比較・verify:
+
+5. 手元と CI で、gem を読む場所（default gem か `vendor/bundle` か）が揃っているかを見る手順がない。Step 4 で生まれたずれ（CI は Bundler 2.5 で `vendor/bundle` から読み、手元は `--local` で入れて default gem から読んでいた）に、Step 4 の verify もコードレビューも気づかなかった。CI のログの `Installing` の行と、手元の `Gem.loaded_specs` を比べると分かる
+6. Step 4 の「CI は同じ版の default gem を使う」は、Bundler 2.4 の振る舞いからの推測で、CI のログで確かめていなかった。CI の振る舞いを前提にする判断は、CI のログで確かめる、という決まりがない
