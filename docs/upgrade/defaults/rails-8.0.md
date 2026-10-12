@@ -32,6 +32,7 @@
 | DEF-8.0-22 | public のエラーページの作り直しと `400.html` の追加 | Rails の雛形 | RP・OP | 追随 |
 | DEF-8.0-23 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
 | DEF-8.0-24 | production.rb | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.0-25 | `Regexp.timeout` が 1 秒になる | Rails の既定値（8.0） | 3 アプリ | 追随 |
 
 ## Rails 8.0.5.1 の lock（rails-lock）
 
@@ -281,3 +282,17 @@ web-console 4.2.1 → 4.3.0（RP・OP。railties・actionview `>= 8.0` なので
 - 扱い: 追随
 - 出典: rails/rails#52999 など（`railties/lib/rails/generators/rails/app/templates/config/environments/production.rb.tt` の履歴）。Rails ガイドに該当の節はない
 - コミット: RS・RP・OP（`apply the Rails 8.0 app:update templates`）
+
+## `load_defaults 8.0`（`new_framework_defaults_8_0.rb`）
+
+`new_framework_defaults_8_0.rb` の 3 項目を、rails-defaults で 3 つのグループ（1 `to_time_preserves_timezone`、2 `strict_freshness`、3 `Regexp.timeout`）に分けて扱った（順は人間が決めた）。`to_time_preserves_timezone` は defaults のファイルに移すと test が起動時に止まるので、`config/application.rb` に置いたままにした（DEF-8.0-01）。`strict_freshness` は defaults のファイルからは値が入らない（ActionDispatch の railtie の initializer `action_dispatch.configure` が config/initializers より前に値を入れる）ので、理由のコメントを付けてコメントのまま残し、`load_defaults 8.0` で確かめる。各グループの前後で、`scripts/compare-config` の 3 アプリの test・development の値を比べた。
+
+### DEF-8.0-25: `Regexp.timeout` が 1 秒になる
+
+- 種類: Rails の既定値（`load_defaults 8.0` の項目）/ 対象: RS・RP・OP
+- 何が変わるか: `Regexp.timeout` が `nil`（制限なし）→ `1.0` になる（3 アプリの test・development で確かめた）。プロセスのすべての正規表現（gem を含む）が、1 回のマッチに 1 秒を超えると `Regexp::TimeoutError` になる（Ruby 3.2 からの機能）
+- なぜ: 正規表現の ReDoS を、アプリ全体で既定で防ぐため。`load_defaults 8.0` は `Regexp.timeout ||= 1` で、既に設定してあれば上書きしない。defaults のファイルは `Regexp.timeout = 1` と直接入れる文なので、config/initializers からでも効く
+- 3 アプリへの影響: app・config・lib に正規表現はない。check-apps（36 の検査、件数は同じ）・E2E・スナップショット・`RUBYOPT=-W:deprecated` の警告・brakeman・development だけのヘッダーは同じで、ログに `Regexp::TimeoutError` はない。業務の入力（OAuth・OIDC のパラメーター、トークン）で 1 秒に届く正規表現はない見込み
+- 扱い: 追随（rails-defaults のグループ 3 で defaults のファイルで有効にした。`load_defaults 8.0` でファイルごと消える）
+- 出典: rails/rails#53490・#53582、`railties-8.0.5.1/CHANGELOG.md` の「Set `Regexp.timeout` to `1`s by default to improve security over Regexp Denial-of-Service attacks.」、`railties-8.0.5.1/lib/rails/application/configuration.rb:348`。Rails ガイド v8.0 の「Rails アプリケーションを設定する」の 3.18.3「Regexp.timeout」
+- コミット: RS・RP・OP（`enable the Rails 8.0 Regexp.timeout default`）
