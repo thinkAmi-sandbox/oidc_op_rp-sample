@@ -194,7 +194,13 @@ extras = {
   'ActionView の sanitizer' => lambda {
     [ActionView::Base.full_sanitizer.class, ActionView::Base.link_sanitizer.class,
      ActionView::Base.safe_list_sanitizer.class]
-  }
+  },
+  # Rails 7.2 の new_framework_defaults_7_2.rb の設定で、設定しないと上の config.<名前> の節に出ないもの（Step 5）。
+  # postgresql_adapter_decode_dates は、pg がなくアダプターを読めないので、設定の値だけで見る
+  'config.yjit' => -> { Rails.application.config.yjit },
+  'RubyVM::YJIT.enabled?' => -> { defined?(RubyVM::YJIT) ? RubyVM::YJIT.enabled? : 'RubyVM::YJIT がない' },
+  'ActiveJob::Base.enqueue_after_transaction_commit' => -> { ActiveJob::Base.enqueue_after_transaction_commit },
+  'ActiveRecord.validate_migration_timestamps' => -> { ActiveRecord.validate_migration_timestamps }
 }
 extras.each { |label, block| lines << "#{label} = #{read.call(&block)}" }
 
