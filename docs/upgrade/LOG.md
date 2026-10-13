@@ -3094,7 +3094,7 @@ verify:
 
 ## Step 7: Rails 8.1（2026-10-12）
 
-- ブランチ / PR: `upgrade/step7-rails81` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step7-rails81` / [#36](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/36)
 - バージョン: Ruby 3.3.12（変更なし）/ Rails 8.0.5.1 → 8.1.4
 - 追随した Rails と gem の既定値・雛形・依存は、[defaults/rails-8.1.md](defaults/rails-8.1.md) に記録した（DEF-8.1-01〜29）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はなくなった
 - Rails 8.1 では、RP の omniauth-rails_csrf_protection 2.0.1 が起動の途中で `ActionController::Base` を読み込む（上流の #33）。検査で 1 件だけ許し、IMP-009 で見張る（DEF-8.1-07）
