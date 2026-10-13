@@ -3162,6 +3162,20 @@ verify:
 - 前後で、`scripts/check-apps` の 36 の検査がすべて通り（件数は同じ）、応答と E2E のスナップショットの差分はない。`scripts/compare-config dump` で変わったのは development の `verbose_redirect_logs`（false → true）だけ。development だけのヘッダーも同じ。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
 - 記録 `0d508a9`、コミット: RS `1c0ce7f`・RP `58ea88c`・OP `3f17437`
 
+### `new_framework_defaults_8_1.rb` を有効にした順番
+
+グループと順番は人間が決めた。前の書き出しを取る前に、`scripts/lib/dump_config.rb` に、設定しないとクラスの値が書き出しに出ない 6 つの値を足した（`6dc71cc`。前の書き出しは 2 回取って同じ）。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べた。項目ごとの解説は [defaults/rails-8.1.md](defaults/rails-8.1.md) の「`load_defaults 8.1`」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 内部の処理だけ | `render_tracker = :ruby`、`raise_on_missing_required_finder_order_columns = true` | 値だけが変わった（nil → `:ruby`、false → true）。fragment cache は使わず、モデルにはすべて主キーがある（DEF-8.1-21・22。記録 `649040b`、RS `9d4a61c`・RP `946d74f`・OP `4b0c04e`） |
+| 2 | リダイレクト | `action_on_path_relative_redirect = :raise` | RS・OP は `:log` → `:raise`。`:log` のときも test.log に警告はなかった。RP は理由のコメント（DEF-8.1-07）を付けてコメントのまま（DEF-8.1-23。記録 `5ae62e0`、RS `b8056c0`・RP `4a8586c`・OP `bc210d5`） |
+| 3 | JSON の書き方 | `escape_json_responses = false`、`escape_js_separators_in_json = false` | RS・OP の Base・API の `escape_json_responses` が true → false。今のスナップショットに書き換えられた文字はない。RP の `escape_json_responses` と、3 アプリの `escape_js_separators_in_json` は、理由のコメントを付けてコメントのまま（DEF-8.1-24・25。記録 `883ecb8`、RS `82c4484`・RP `6ef3f50`・OP `7619b55`。記録の直し `5213a29`） |
+| 4 | hidden の autocomplete | `remove_hidden_field_autocomplete = true` | false → true。OP の応答のスナップショット 6 つで `autocomplete="off"` が消え（29 行）、解説の後に作り直して OP のコミットに入れた（DEF-8.1-26。記録 `711b9e3`、RS `fb1e098`・RP `61654b5`・OP `3b39b8a`） |
+
+- 4 グループとも、検査と E2E の件数は前と同じ（グループ 4 の OP のスナップショットを除き、応答と E2E のスナップショットの差分はない）。`-W:deprecated` の警告と development だけのヘッダーも同じ。読み込み済みの部品は同じ（RP の DEF-8.1-07 の検出の後ろに、新しい読み込みは増えていない）。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- defaults のファイルから効かなかった 3 つ（3 アプリの `escape_js_separators_in_json`、RP の action_controller の 2 項目）は、research の worktree で分かっていたとおりで、作業計画の論点 5 から変えていない
+
 ### 前後の比較
 
 lock を変える前（`e843a3f` の後。アプリは research の開始時から変わっていない）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた（compare-config は research の worktree の前に取ったものとも同じ）。

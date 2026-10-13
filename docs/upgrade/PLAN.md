@@ -1034,7 +1034,7 @@ Step 6 が epic に入ってから（[#35](https://github.com/thinkAmi-sandbox/o
 
 - [x] rails-lock: Rails 8.1.4（3 アプリ。action_text-trix 2.1.19 が増え、benchmark 0.3.0 が lock から消える。3 アプリの `config/brakeman.ignore` を消す。`scripts/check-load-hooks` の KNOWN を、Rails 8.0.5.1 の 1 件から RP の omniauth-rails_csrf_protection の 1 件に替える。入れ替えは、各コミットで検査が通る順に行った。DEF-8.1-01〜09）
 - [x] rails-app-update（Solid 系の `plugin :solid_queue` は採用しない。新しく作られる `config/ci.rb`・`bin/ci`・`bin/bundler-audit`・`config/bundler-audit.yml` と、production.rb の SSL の 2 行がコメントになることは、理解の関門で扱う → 4 つは採用せず、SSL は決まりどおり追随した。DEF-8.1-10〜20）
-- [ ] rails-defaults（`new_framework_defaults_8_1.rb`。`escape_js_separators_in_json` と、RP の action_controller の 2 項目は、理由のコメントを付けてコメントのまま残す。`remove_hidden_field_autocomplete` で OP の応答のスナップショットを作り直す。グループは作業の始めに決める）
+- [x] rails-defaults（`new_framework_defaults_8_1.rb`。`escape_js_separators_in_json` と、RP の action_controller の 2 項目は、理由のコメントを付けてコメントのまま残す。`remove_hidden_field_autocomplete` で OP の応答のスナップショットを作り直す。グループは作業の始めに決める → 1 内部の処理だけ → 2 リダイレクト → 3 JSON の書き方 → 4 hidden の autocomplete。DEF-8.1-21〜26）
 - [ ] rails-load-defaults（`load_defaults 8.1`、RuboCop の `TargetRailsVersion` 8.1。development・test の YJIT が切れることを解説する）
 - [ ] verify（手動確認は、写しを取ってから 1 回。起動の直後の `HEAD "/"`・`GET "/"` が両方 200 なら、TIPS.md の DEF-8.0-03 の項目を外す。CI は push の後）
 - [ ] pr
