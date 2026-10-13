@@ -17,6 +17,17 @@
 | DEF-8.1-07 | RP で、`ActionController::Base` が Bundler.require の途中で読み込まれる | Rails の既定値と周辺 gem（omniauth-rails_csrf_protection 2.0.1）の組み合わせ | RP | 追随（`scripts/check-load-hooks` でこの 1 件だけを許す） |
 | DEF-8.1-08 | SQLite の真偽値を `TRUE`・`FALSE` で書く | Rails の既定値 | OP | 追随 |
 | DEF-8.1-09 | actiontext が、Trix を action_text-trix から読む | Rails の依存 | 3 アプリ | 追随 |
+| DEF-8.1-10 | development で、リダイレクトを呼んだ場所をログに出す | Rails の雛形 | 3 アプリ（development） | 追随 |
+| DEF-8.1-11 | production.rb の SSL の 2 行がコメントになる | Rails の雛形 | 3 アプリ（production） | 追随（決まりどおり） |
+| DEF-8.1-12 | `config/puma.rb` のコメント | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.1-13 | `config/puma.rb` の `plugin :solid_queue` | Rails の雛形（新しい構成） | 3 アプリ | 採用しない |
+| DEF-8.1-14 | `content_security_policy.rb` に `content_security_policy_nonce_auto` のコメントが増える | Rails の雛形 | RP・OP | 追随 |
+| DEF-8.1-15 | `bin/setup` に `--reset` が増える | Rails の雛形 | 3 アプリ | 追随 |
+| DEF-8.1-16 | public のエラーページ（400・404・422・500） | Rails の雛形 | RP・OP | 追随 |
+| DEF-8.1-17 | `bin/rubocop`・`bin/brakeman` | Rails の雛形 | 3 アプリ | 採用しない |
+| DEF-8.1-18 | `bin/bundler-audit`・`config/bundler-audit.yml` | Rails の雛形 | 3 アプリ | 採用しない |
+| DEF-8.1-19 | `bin/ci`・`config/ci.rb` | Rails の雛形（新しい構成） | 3 アプリ | 採用しない |
+| DEF-8.1-20 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -111,3 +122,103 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 扱い: 追随
 - 出典: actiontext の CHANGELOG（8.1.0「The Trix dependency is now satisfied by a gem, `action_text-trix`」）、`actiontext-8.1.4/lib/action_text/engine.rb:11`、`action_text-trix-2.1.19/lib/action_text/trix/engine.rb`
 - コミット: Rails 8.1.4 の lock（RS・RP・OP）
+
+## `app:update` の雛形（rails-app-update）
+
+3 アプリで `yes a | bin/rails app:update`（DB は E2E 用）を流し、戻す前の差分を控えてから `scripts/restore-app-config` で独自設定を戻した（test の `deprecation = :raise`、puma の port、`filter_parameter_logging.rb` の `:code` とコメント、RP の `autoload_lib_once` と inflector、Active Storage のマイグレーション 3 本。戻せない項目はなかった。戻した設定の上の雛形のコメントは 8.0.5.1 から変わっていない）。`config/application.rb`（RS・OP）と `test.rb`・`filter_parameter_logging.rb` の雛形は 8.0.5.1 と同じで、戻した後の差分はない。前後で、`scripts/check-apps`（3 アプリと E2E）の 36 の検査がすべて通り、件数は同じ。応答と E2E のスナップショットの差分はない。development だけのヘッダーも同じ。設定の値で変わったのは、development の `verbose_redirect_logs` だけ。出典の雛形は `railties-8.1.4/lib/rails/generators/rails/app/templates/` の下、生成の条件は `railties-8.1.4/lib/rails/generators/rails/app/app_generator.rb:111-189`・`railties-8.1.4/lib/rails/commands/app/update_command.rb:63-84`（railsdiff/rails-new-output の v8.0.5.1...v8.1.4 とも一致）。
+
+### DEF-8.1-10: development で、リダイレクトを呼んだ場所をログに出す
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP（development）
+- 何が変わるか: development.rb に `config.action_dispatch.verbose_redirect_logs = true` が増え、ログの「Redirected to」の次の行に、リダイレクトを呼んだコードの場所が出る
+- なぜ: `verbose_query_logs`・`verbose_enqueue_logs` と同じく、開発中にリダイレクトの出どころを追いやすくするため（rails/rails#52297。DEF-8.1-03 の設定を雛形で有効にした）
+- 3 アプリへの影響: development のログだけ。compare-config の値の変化は、development の false → true だけ。OP の「Redirected to」行の `code=` の伏せ方は、verify の手動確認で見る
+- 扱い: 追随
+- 出典: actionpack の CHANGELOG（8.1.0「Add `action_dispatch.verbose_redirect_logs` setting」）、`development.rb.tt`
+- コミット: `app:update` の雛形（RS・RP・OP）
+
+### DEF-8.1-11: production.rb の SSL の 2 行がコメントになる
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP（production）
+- 何が変わるか: `config.assume_ssl = true`・`config.force_ssl = true` がコメントになる。ほかは、コメントの句点と `bin/rails credentials:edit` の書き方だけ
+- なぜ: 8.1.1 で、雛形が「Kamal を使わない（`skip_kamal`）ときだけ有効、Kamal を使うときはコメント」に分かれた。Kamal の既定の配備は SSL なしで動かすので、有効のままだとフォームの送信が Origin の不一致で失敗するため（rails/rails#56010）。`app:update` は `skip_kamal` を渡さないので、Kamal を使うアプリとして扱われる
+- 3 アプリへの影響: production だけ。動作を保証するのは development・test だけで、production.rb は雛形に追従するだけにする（CLAUDE.md）。production で動かすなら、HTTPS へのリダイレクト・HSTS・secure な Cookie がなくなる
+- 扱い: 追随（決まりどおり。`true` を残す案もあったが、人間が決まりどおりと判断した）
+- 出典: `production.rb.tt:31-43`、#56010
+- コミット: `app:update` の雛形（RS・RP・OP）
+
+### DEF-8.1-12: `config/puma.rb` のコメント
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: `WEB_CONCURRENCY` に `auto` を渡せるという説明が増える（port は道具で戻した）
+- 3 アプリへの影響: コメントだけ
+- 扱い: 追随
+- 出典: `puma.rb.tt`
+- コミット: `app:update` の雛形（RS・RP・OP）
+
+### DEF-8.1-13: `config/puma.rb` の `plugin :solid_queue`
+
+- 種類: Rails の雛形（新しい構成）/ 対象: RS・RP・OP
+- 何が変わるか: `plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]` とそのコメント（8.1 で句点が付いた）が入る
+- 3 アプリへの影響: Solid Queue は使わない
+- 扱い: 採用しない（DEF-8.0-19 と同じ。手で消した）
+- 出典: `puma.rb.tt`（`skip_solid?` が偽のとき）
+- コミット: なし
+
+### DEF-8.1-14: `content_security_policy.rb` に `content_security_policy_nonce_auto` のコメントが増える
+
+- 種類: Rails の雛形 / 対象: RP・OP
+- 何が変わるか: nonce を `javascript_tag`・`javascript_include_tag`・`stylesheet_link_tag` に自動で付ける設定の説明（コメント）が増える
+- 3 アプリへの影響: ファイルはすべてコメントで、CSP は有効にしていない（RS は API なので、このファイルがない）
+- 扱い: 追随
+- 出典: `content_security_policy.rb.tt`
+- コミット: `app:update` の雛形（RP・OP）
+
+### DEF-8.1-15: `bin/setup` に `--reset` が増える
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 何が変わるか: `bin/setup --reset` のときだけ、`db:prepare` の後に `db:reset` を流す
+- 3 アプリへの影響: 付けなければ今と同じ。付けると development の DB を作り直すので、手動確認用の DB が消える（DEF-8.0-20 と同じく、README の仕上げで手動確認用の環境と一緒に書く）
+- 扱い: 追随
+- 出典: `bin/setup.tt`
+- コミット: `app:update` の雛形（RS・RP・OP）
+
+### DEF-8.1-16: public のエラーページ（400・404・422・500）
+
+- 種類: Rails の雛形 / 対象: RP・OP
+- 何が変わるか: タイトルの `’` → `'`、`min-height` の `100vh` → `100dvh`、ダークモードの色（rails/rails#55671）、空行の整理
+- 3 アプリへの影響: production の例外画面だけで使う（development・test は詳しいエラー画面）。応答のスナップショットの差分はない
+- 扱い: 追随（DEF-8.0-22 と同じ）
+- 出典: `public/*.html`
+- コミット: `app:update` の雛形（RP・OP）
+
+### DEF-8.1-17: `bin/rubocop`・`bin/brakeman`
+
+- 種類: Rails の雛形 / 対象: RS・RP・OP
+- 3 アプリへの影響: 検査は `bundle exec` で `scripts/check-apps` と CI から流す
+- 扱い: 採用しない（DEF-7.2-20・DEF-8.0-21 と同じ）
+- コミット: なし
+
+### DEF-8.1-18: `bin/bundler-audit`・`config/bundler-audit.yml`
+
+- 種類: Rails の雛形（8.1 で新しい）/ 対象: RS・RP・OP
+- 何が変わるか: bundler-audit を `--config config/bundler-audit.yml` で流す binstub と、その設定ファイル（雛形は `ignore: - CVE-THAT-DOES-NOT-APPLY` という見本の行）ができる。Gemfile に bundler-audit があると作られる（`update_command.rb` の `skip_bundler_audit`）
+- 3 アプリへの影響: 3 アプリの無視リストは、bundler-audit の既定の場所（アプリ直下の `.bundler-audit.yml`）にあり、check-apps と CI は `bundle exec bundle-audit check` で流している。採用すると、無視リストが 2 か所になる
+- 扱い: 採用しない（設定は `.bundler-audit.yml` の 1 か所にしておく）
+- 出典: `bin/bundler-audit.tt`、`config/bundler-audit.yml.tt`、`app_generator.rb` の `config`・`config_when_updating`
+- コミット: なし
+
+### DEF-8.1-19: `bin/ci`・`config/ci.rb`
+
+- 種類: Rails の雛形（新しい構成。8.1 の `ActiveSupport::ContinuousIntegration`）/ 対象: RS・RP・OP
+- 何が変わるか: 手元で CI の手順（`bin/setup --skip-server`、`bin/rubocop`、`bin/bundler-audit`、`bin/brakeman`、`bin/rails test`、`db:seed:replant`）を順に流す仕組みができる
+- 3 アプリへの影響: このリポジトリでは、同じ役目を `scripts/check-apps`（3 アプリと E2E）と GitHub Actions が持つ。`config/ci.rb` は採用しない binstub（17・18）を呼び、最初の `bin/setup` は development の DB に `db:prepare` を流す
+- 扱い: 採用しない（CLAUDE.md の「`app:update` が提案する新しい構成は採用しない」）
+- 出典: `bin/ci.tt`、`config/ci.rb.tt`
+- コミット: なし
+
+### DEF-8.1-20: `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`
+
+- 種類: Rails の雛形 / 対象: RP・OP（RS は API なので作られない）
+- 扱い: 採用しない（DEF-7.2-21・DEF-8.0-23 と同じ）
+- コミット: なし
