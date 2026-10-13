@@ -57,6 +57,10 @@ Rails.configuration.active_record.raise_on_missing_required_finder_order_columns
 #
 # Applications that want to allow these redirects can set the config to `:log` (previous default)
 # to only log warnings, or `:notify` to send ActiveSupport notifications.
+#
+# RP では、ここで有効にしても ActionController::Base には効かない。omniauth-rails_csrf_protection 2.0.1 が、Bundler.require の
+# 途中で ActionController::Base を読み込み、action_controller の設定がその時点で写されるため。load_defaults 8.1 で入る
+# （docs/upgrade/defaults/rails-8.1.md の DEF-8.1-07、LOG.md の Step 7 の論点 5）
 #++
 # Rails.configuration.action_controller.action_on_path_relative_redirect = :raise
 
