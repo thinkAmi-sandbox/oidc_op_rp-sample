@@ -123,7 +123,7 @@ if [ "$run_rails" -eq 1 ]; then
       sh -c 'for other in ../rails_*/test/support/response_snapshot_helper.rb; do diff -u "$other" test/support/response_snapshot_helper.rb || exit 1; done'
     check "$app zeitwerk:check" "$app" mise exec -- bin/rails zeitwerk:check
     # ANTI_MANNER は起動を途中で終了コード 0 で終えるので、scripts/check-load-hooks がこの検査のコマンドにだけ付ける。
-    # 知っている検出（Rails 8.0.5.1 のもの）を許す条件は、そのスクリプトにある
+    # 知っている検出（RP の omniauth-rails_csrf_protection のもの）を許す条件は、そのスクリプトにある
     check "$app 起動の途中の読み込み（test）" "$app" \
       env RAILS_ENV=test mise exec -- "$ROOT/scripts/check-load-hooks"
     check "$app 起動の途中の読み込み（test、CI=1）" "$app" \

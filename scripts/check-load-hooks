@@ -10,11 +10,7 @@
 # scripts/compare-config の「読み込み済みの部品」を比べて補う。
 #
 # KNOWN（hook と行の組。どちらも出たときだけ許す）:
-#   1. Rails 8.0.5.1 の initializer `action_controller.live_streaming_excluded_keys` が、起動の途中で ActionController::Live を
-#      読み込み、ActionDispatch::Response の load hook が config/initializers より先に走る（rails/rails#58145）。
-#      8-0-stable では直った（#58276）が、8.0.5.1 には入っていない。8.1.4 は直っている。
-#      Step 7 で 3 アプリを Rails 8.1.4 に上げる間だけ残し、上げ終わったら消す（docs/upgrade/LOG.md の Step 6・7）
-#   2. omniauth-rails_csrf_protection 2.0.1（RP）は、Rails 8.1 では require の時点で ActionController::Base を読み込む。
+#   1. omniauth-rails_csrf_protection 2.0.1（RP）は、Rails 8.1 では require の時点で ActionController::Base を読み込む。
 #      Rails 8.1 用の分岐が、`config` を ActionController::Base.config にしてから RequestForgeryProtection を include し、
 #      その included ブロックが `config` を呼ぶため（cookpad/omniauth-rails_csrf_protection#33。open）。
 #      その間、RP の config/initializers に書いた action_controller の設定は ActionController::Base に届かない。
@@ -25,15 +21,12 @@
 set -u
 
 KNOWN_HOOKS=(
-  'ActiveSupport.on_load(:action_dispatch_response)'
   'ActiveSupport.on_load(:action_controller_base)'
 )
 KNOWN_LINES=(
-  'actionpack-8.0.5.1/lib/action_controller/railtie.rb:35:'
   'omniauth-rails_csrf_protection-2.0.1/lib/omniauth/rails_csrf_protection/token_verifier.rb:26:'
 )
 KNOWN_NAMES=(
-  'Rails 8.0.5.1 の action_controller.live_streaming_excluded_keys。rails/rails#58145'
   'omniauth-rails_csrf_protection 2.0.1 の Rails 8.1 用の分岐。cookpad/omniauth-rails_csrf_protection#33'
 )
 

@@ -73,7 +73,7 @@ jobs:
       # a-nti_manner_kick_course で確かめる。見つけると疑わしい行を出して終了コード 1 で止まる。
       # ほかの gem の initializer・config/initializers・ActionDispatch::Request は検出できない（docs/upgrade/PLAN.md の Step 1-b-1）。
       # ANTI_MANNER があると起動を途中で終了コード 0 で終えるので、ジョブ全体ではなく scripts/check-load-hooks がこのコマンドにだけ付ける。
-      # 知っている検出（Rails 8.0.5.1 のもの。Step 7 まで）を許す条件は、そのスクリプトにある
+      # 知っている検出（RP の omniauth-rails_csrf_protection のもの。直った版が出るまで）を許す条件は、そのスクリプトにある
       - name: 起動の途中の読み込み（test）
         if: ${{ !cancelled() && steps.ruby.outcome == 'success' }}
         env:
