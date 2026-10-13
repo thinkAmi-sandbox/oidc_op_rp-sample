@@ -27,6 +27,7 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 | IMP-009 | 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する | RP・OP | コードの整理 | 未着手 |
 | IMP-010 | OP のレイアウトに flash（ログイン失敗などのメッセージ）を出す | OP | 挙動の変更 | 未着手 |
 | IMP-011 | `max_age` の判定に `auth_time_from_session` を使う | OP | セキュリティの設定 | 未着手 |
+| IMP-012 | 使っていない Rails のフレームワーク（Active Storage など）を読み込まない | 3 アプリ | コードの整理 | 未着手 |
 
 ## IMP-001: PKCE を必須にし、S256 だけを受け付ける
 
@@ -145,3 +146,13 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: RP は `max_age` を送らない。ID トークンの項目も変わるので、アップグレード中は挙動を変えない
 - 確かめ方: `rails_open_id_provider/test/integration/response_snapshot_authorization_prompt_test.rb` の `max_age` のスナップショット、ID トークンのテスト（`authorization_code_flow_test.rb`）、E2E のログイン
 - 記録した Step: 1-b-3-2（Step 2-b で書き足した）
+
+## IMP-012: 使っていない Rails のフレームワーク（Active Storage など）を読み込まない
+
+- 対象: 3 アプリの `config/application.rb`（RS は `require "rails/all"`、RP・OP は `active_storage/engine`・`action_mailbox/engine`・`action_text/engine`・`action_cable/engine` などを require している）
+- 現状: 3 アプリは Active Storage・Action Text・Action Mailbox を使っていない（Action Cable・Active Job・Action Mailer も使っているかを確かめていない）が、起動時に読み込んでいる。Rails 8.1 では、Active Storage の engine が after_initialize で画像の変換の部品を読むようになり（rails/rails#55303）、image_processing gem がないので、起動のたびにログに WARN を 1 行出す（「Generating image variants require the image_processing gem.」。`activestorage-8.1.4/lib/active_storage/engine.rb:89-125`）。Action Text の Trix も、Rails 8.1 から action_text-trix gem として lock に入る（DEF-8.1-09）。使わない機能のマイグレーションや雛形も、`app:update` のたびに作られ、道具で消している（DEF-7.0-14）
+- 改善案: アプリが使うフレームワークを確かめ（devise が Action Mailer を使うか、Active Job を使うかなど）、使わないものを `config/application.rb` で require しないようにする（RS は `rails/all` をやめ、RP・OP と同じく 1 つずつ require する）。あわせて、`config/storage.yml`・`config/environments/*.rb` の `active_storage` などの設定、`app:update` で消している雛形、`scripts/restore-app-config` の一覧も見直す
+- 経緯: LOG.md の Step 7 の verify の手動確認（Rails 8.1.4 で起動の警告に気づいた。defaults/rails-8.1.md の DEF-8.1-29）
+- 見送った理由: 読み込むフレームワークを変えると、起動の途中の読み込み・設定の値・ミドルウェアが変わり、アップグレードの前後の比較に混ざる。警告はログの 1 行で、動きは変わらない
+- 確かめ方: `scripts/compare-config` の書き出し（設定の値と読み込み済みの部品）、`bin/rails middleware`、検査と E2E、起動のログに Active Storage の警告が出ないこと
+- 記録した Step: 7

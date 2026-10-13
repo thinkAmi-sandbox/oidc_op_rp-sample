@@ -36,6 +36,7 @@
 | DEF-8.1-26 | hidden の input に `autocomplete="off"` を付けなくなる | Rails の既定値（8.1） | 3 アプリ（スナップショットが変わるのは OP） | 追随（OP の応答のスナップショットを作り直した） |
 | DEF-8.1-27 | `load_defaults 8.1` にし、`new_framework_defaults_8_1.rb` を消す | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-8.1-28 | development・test で YJIT を切る | Rails の既定値（8.1） | 3 アプリ（development・test） | 追随 |
+| DEF-8.1-29 | 起動のたびに、Active Storage が image_processing gem がないことをログに出す | Rails の既定値 | 3 アプリ | 追随（受け入れる。改善の候補は IMP-012） |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -317,3 +318,15 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 扱い: 追随
 - 出典: `railties-8.1.4/lib/rails/application/configuration.rb:346-349`、`railties-8.1.4/lib/rails/application/finisher.rb:230-235`、ガイド「3.2.63 config.yjit」
 - コミット: `load_defaults 8.1`（RS・RP・OP）
+
+## verify で見つけたもの
+
+### DEF-8.1-29: 起動のたびに、Active Storage が image_processing gem がないことをログに出す
+
+- 種類: Rails の既定値 / 対象: RS・RP・OP（全環境のログ）
+- 何が変わるか: 起動のたびに、Rails のログ（development.log・test.log など）に WARN が 1 行出る。「Generating image variants require the image_processing gem. Please add `gem "image_processing", "~> 1.2"` to your Gemfile or set `config.active_storage.variant_processor = :disabled`.」
+- なぜ: 8.1 で、Active Storage の engine が after_initialize で画像の変換の部品（`ActiveStorage.variant_transformer`）を起動時に読むようになり、読めないときは警告を出す（rails/rails#55303。CHANGELOG は、警告を消すには `variant_processor = :disabled` にすると書く）。3 アプリの `variant_processor` は `load_defaults 7.0` の `:vips` で、image_processing gem がないので読めない。8.0.5.1 の engine は起動時に読まなかった
+- 3 アプリへの影響: ログの 1 行だけで、例外にはならない。3 アプリは Active Storage を使っていない（RS は `rails/all`、RP・OP は `active_storage/engine` を require しているので読み込まれる）。Rails 8.1.4 にした rails-lock の時点から出ていたが、前後の比較の警告の数え方（`warning:`・`DEPRECATION` の行）には当たらず、verify の手動確認のサーバーの出力で気づいた
+- 扱い: 追随（受け入れる。`variant_processor = :disabled` を足す案はとらず、使っていないフレームワークを読み込まないことを改善の候補にした。docs/IMPROVEMENTS.md の IMP-012。人間が判断）。TIPS.md の、手動確認のサーバーの出力の元からあるものの一覧に足した
+- 出典: `activestorage-8.1.4/lib/active_storage/engine.rb:89-125`、`activestorage-8.0.5.1/lib/active_storage/engine.rb:91-105`、activestorage の CHANGELOG（8.1.0「Allow analyzers and variant transformer to be fully configurable」）、`railties-8.1.4/lib/rails/application/configuration.rb:255`
+- コミット: なし（Rails 8.1.4 の lock から）
