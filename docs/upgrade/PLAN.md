@@ -1036,7 +1036,7 @@ Step 6 が epic に入ってから（[#35](https://github.com/thinkAmi-sandbox/o
 - [x] rails-app-update（Solid 系の `plugin :solid_queue` は採用しない。新しく作られる `config/ci.rb`・`bin/ci`・`bin/bundler-audit`・`config/bundler-audit.yml` と、production.rb の SSL の 2 行がコメントになることは、理解の関門で扱う → 4 つは採用せず、SSL は決まりどおり追随した。DEF-8.1-10〜20）
 - [x] rails-defaults（`new_framework_defaults_8_1.rb`。`escape_js_separators_in_json` と、RP の action_controller の 2 項目は、理由のコメントを付けてコメントのまま残す。`remove_hidden_field_autocomplete` で OP の応答のスナップショットを作り直す。グループは作業の始めに決める → 1 内部の処理だけ → 2 リダイレクト → 3 JSON の書き方 → 4 hidden の autocomplete。DEF-8.1-21〜26）
 - [x] rails-load-defaults（`load_defaults 8.1`、RuboCop の `TargetRailsVersion` 8.1。development・test の YJIT が切れることを解説した。DEF-8.1-27・28）
-- [ ] verify（手動確認は、写しを取ってから 1 回。起動の直後の `HEAD "/"`・`GET "/"` が両方 200 なら、TIPS.md の DEF-8.0-03 の項目を外す。CI は push の後）
+- [x] verify（手動確認は、写しを取ってから 1 回。起動の直後の `HEAD "/"`・`GET "/"` が両方 200 だったので、TIPS.md の DEF-8.0-03 の項目を外した。Active Storage の起動の WARN は受け入れた（DEF-8.1-29、IMP-012）。CI は push の後）
 - [ ] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:

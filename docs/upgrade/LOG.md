@@ -3096,6 +3096,8 @@ verify:
 
 - ブランチ / PR: `upgrade/step7-rails81` / （PR 作成後に記入）
 - バージョン: Ruby 3.3.12（変更なし）/ Rails 8.0.5.1 → 8.1.4
+- 追随した Rails と gem の既定値・雛形・依存は、[defaults/rails-8.1.md](defaults/rails-8.1.md) に記録した（DEF-8.1-01〜29）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はなくなった
+- Rails 8.1 では、RP の omniauth-rails_csrf_protection 2.0.1 が起動の途中で `ActionController::Base` を読み込む（上流の #33）。検査で 1 件だけ許し、IMP-009 で見張る（DEF-8.1-07）
 
 ### 作業計画で決めたこと
 
@@ -3183,6 +3185,17 @@ verify:
 - 解説（DEF-8.1-27・28）に人間の返事を得てから、記録（`c14e828`）、RS `650ecf1`・RP `38d8dc1`・OP `ada7df7` の順にコミットした。検査と E2E は通り、スナップショットの差分はない。`-W:deprecated` の警告と development だけのヘッダーも同じ
 - RuboCop の `TargetRailsVersion` を 8.1 にした（`ba14f44`）。3 アプリとも新しい指摘はない。`RuboCop::ConfigStore` で読む値が 8.1 になることを確かめた。rubocop-rails 2.38.0 に、Rails 8.1 を条件にする cop はない
 
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| Rails 8.1.4 で、新しい非推奨の警告は出なかった。`RUBYOPT=-W:deprecated` を付けたテストと eager load の `warning:` は、各作業の前後とも 0 件、DEPRECATION は前からある OP の `auth_time_from_resource_owner`（IMP-011）だけ。omniauth-rails_csrf_protection 2.0.1 の `ActiveSupport::Configurable` は、Rails 8.1 では読まない分岐を通る | なし |
+| 起動のたびに、Active Storage が image_processing gem がないことを Rails のログに WARN で出す（非推奨ではない） | 受け入れた（DEF-8.1-29）。使っていないフレームワークを読み込まないことを、改善の候補にした（IMP-012。人間が承認した） |
+
+### 意図的な仕様変更
+
+なし。応答のスナップショット・E2E・verify の手動確認で、業務的な挙動の変化は見つからなかった。応答とファイルの変化はすべて既定値・雛形・依存への追随として解説し、人間の返事を得た（[defaults/rails-8.1.md](defaults/rails-8.1.md) の DEF-8.1-01〜29）。OP の応答のスナップショットの変化は、hidden の input の `autocomplete="off"` が消えることだけ（DEF-8.1-26）
+
 ### 前後の比較
 
 lock を変える前（`e843a3f` の後。アプリは research の開始時から変わっていない）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた（compare-config は research の worktree の前に取ったものとも同じ）。
@@ -3196,6 +3209,17 @@ lock を変える前（`e843a3f` の後。アプリは research の開始時か�
   - SQLite: OP の test.log で、fixtures の INSERT の真偽値が `1` → `TRUE` になった（DEF-8.1-08）
   - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
 
+### 手動確認
+
+verify で、`load_defaults 8.1` と `TargetRailsVersion` 8.1 の後（`bee5797`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma 8.0.2・threads 3 で起動し、Ruby の版の表示に Step 6 にあった `+YJIT` は出なかった（DEF-8.1-28）。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 7）
+- 起動の直後: プレビューが同時に送った `HEAD "/"`・`GET "/"` は、3 アプリとも両方 200。Step 6 の RoutingError（DEF-8.0-03）は出なくなった（rails/rails#58225 が 8.1.4 に入っている）。TIPS.md の元からあるエラーの一覧から外した
+- ログイン（RP の my_op）: 人間が「Re Login」を押した（OP のセッションが残っていて、ログインと同意の画面は出なかった。Step 6 と同じ）。OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`。RP の「Redirected to」の次の行に `↳ app/controllers/sessions_controller.rb:10` などが出た（DEF-8.1-10。OP は doorkeeper の中のリダイレクトなので出ない）
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。OP は introspect を 3 回、revoke を 1 回受けた。Step 6 と同じ
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。起動のたびに、Active Storage の image_processing gem の WARN が出た（DEF-8.1-29。rails-lock の時点から出ていたが、前後の比較では数えていなかった。人間が受け入れ、IMP-012 を足した）
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 29 → 31 件、`oauth_access_tokens` が 72 → 77 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 13 → 14）、RP は `sessions` 12 件・`op_users` 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+
 ### 遭遇した問題
 
 | 問題 | 対応 |
@@ -3204,6 +3228,22 @@ lock を変える前（`e843a3f` の後。アプリは research の開始時か�
 | research の worktree の compare-config の書き出しにだけ、ActiveStorage などのモデルの関連付けの行がなかった | `vendor/bundle` をシンボリックリンクにした worktree のときだけの違いで、本体では 8.0.5.1・8.1.4 とも出る。worktree の書き出しは、本体の前後の比較には使わなかった |
 | 一時ファイルを消す `rm $WT/$d/...` が、Claude Code の安全チェックで止められた（変数が空だと根を指すため） | `"${WT:?}/${d:?}/..."` の形に直した |
 | サブエージェントの見立て（`render_tracker` は defaults のファイルから効かない）が、実行で外れた | worktree で値と initializer の並び順を確かめ、論点 5 の材料を直した（下の気づきの 8） |
+| DEF-8.1-24 の記録の `\u` の並びが、実際の文字（目に見えない U+2028・U+2029 を含む）になってコミットされた | Python で直した（`5213a29`・`123c837`。下の気づきの 13） |
+| 起動のたびの Active Storage の WARN（DEF-8.1-29）に、rails-lock の前後の比較では気づかず、verify の手動確認で気づいた | 警告の数え方は `warning:`・`DEPRECATION` の行で、Rails のログの WARN を見ていなかった。人間が受け入れ、IMP-012 を足した（下の気づきの 14） |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: `TargetRailsVersion` 8.1 と記録のコミットの後（`bee5797`）に、36 の検査がすべて通った。各コミットの前には、そのアプリと E2E で流した。起動の途中の読み込みは、RP の omniauth-rails_csrf_protection の 1 件だけを `scripts/check-load-hooks` で許している（DEF-8.1-07）。RS・OP は許す条件なしで通る
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットの差分は、グループ 4 の OP の 6 つ（`autocomplete="off"` が消える。DEF-8.1-26）だけ。E2E のスナップショットの差分は、この Step を通して出なかった
+- RuboCop（`TargetRailsVersion: 8.1`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空）・brakeman: すべて通った（`check-apps` の項目）。brakeman は 3 アプリとも `Security Warnings: 0`、無視の項目はない（`config/brakeman.ignore` を消した）
+- lock: epic（`bb51ff5`）からの動きは、Rails の構成 gem（8.1.4）、増えた action_text-trix 2.1.19、3 アプリから消えた benchmark 0.3.0、`DEPENDENCIES` の rails だけ。default gem に合わせた版と、一時固定の uri 0.13.3・reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.13.1・reline 0.6.0。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。`scripts/check-load-hooks` を呼ぶ CI の 2 つのステップが、RP で許した 1 件で通ることも、そのときに見る
+- 手動確認用の環境: 上の「手動確認」。HEAD で、12 ファイルのハッシュが手動確認の後の基準と同じ
 
 ### スキルについて気づいたこと
 
@@ -3233,3 +3273,8 @@ rails-app-update:
 rails-defaults:
 
 13. DEF-8.1-24 の記録で、`\u003c`・`\u2028` などの並びを heredoc で書いたところ、ツールに渡す段階で実際の文字（`<` と、目に見えない U+2028・U+2029）に変わり、そのままコミットした（TIPS.md の「コミット」の `\u` の性質が、コミットメッセージだけでなく、ファイルに書く文にも当たった）。後で気づき、Python で直した。`\u` を含む文を書くときは、ファイルでも Python で書き、U+2028・U+2029 が入っていないかを確かめる必要がある
+
+verify:
+
+14. 起動のたびの Active Storage の WARN（DEF-8.1-29）は、rails-lock から出ていたのに、前後の比較では見えなかった。設定の「前後の比較」の警告は、`RUBYOPT=-W:deprecated` の `warning:` と `DEPRECATION` の行を数えるだけで、Rails のログ（`log/*.log`）の WARN を見ていない。手動確認のサーバーの出力を読んで初めて気づいた。前後の比較に、test.log・development.log の WARN・ERROR の行（新しい種類のもの）を足すと、rails-lock の時点で見える
+15. 手動確認の前に、ブラウザペインが隠れていて、表示してもらう往復が要った（Step 5 の気づきの 16、Step 6 の気づきの 17 と同じ）。今回も依頼に表示の仕方と操作の順を一緒に書いたので、往復は 1 回で済んだ
