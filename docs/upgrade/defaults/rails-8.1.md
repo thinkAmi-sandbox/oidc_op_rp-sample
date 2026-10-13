@@ -31,6 +31,8 @@
 | DEF-8.1-21 | Action View のテンプレートの依存を、Ruby のパーサーで追う | Rails の既定値（8.1） | 3 アプリ | 追随 |
 | DEF-8.1-22 | 並べる列のないモデルで `first` などを呼ぶと例外にする | Rails の既定値（8.1） | 3 アプリ | 追随 |
 | DEF-8.1-23 | `/` で始まらない相対パスへのリダイレクトを例外にする | Rails の既定値（8.1） | 3 アプリ | 追随（RP は `load_defaults 8.1` で入る） |
+| DEF-8.1-24 | `render json:` で HTML の記号を書き換えなくなる | Rails の既定値（8.1） | 3 アプリ | 追随（RP は `load_defaults 8.1` で入る） |
+| DEF-8.1-25 | JSON で U+2028・U+2029 を書き換えなくなる | Rails の既定値（8.1） | 3 アプリ | 追随（defaults のファイルからは効かないので、`load_defaults 8.1` で入る） |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -259,3 +261,23 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 扱い: 追随（グループ 2）
 - 出典: `actionpack-8.1.4/lib/action_controller/metal/redirecting.rb:20,31,217,328-343`、`actionpack-8.1.4/lib/action_controller/railtie.rb:16`、ガイド「3.9.19 config.action_controller.action_on_path_relative_redirect」
 - コミット: グループ 2（RS・RP・OP。RP は理由のコメントだけ）
+
+### DEF-8.1-24: `render json:` で HTML の記号を書き換えなくなる
+
+- 種類: Rails の既定値（`load_defaults 8.1` の項目）/ 対象: RS・OP（RP は `load_defaults 8.1` で入る）
+- 何が変わるか: `escape_json_responses` が true → false（`ActionController::Base`・`API`）。`render json:` が、`<`・`>`・`&` を `<`・`>`・`&` に、U+2028・U+2029 を ` `・` ` に書き換えなくなる（callback 付きの JSONP と、文字列をそのまま渡したときは対象外）
+- なぜ: JSON の応答を HTML に埋め込むわけではないので、書き換えは要らず、省けば速くなるため（rails/rails#54643・#54840。true を明示して代入すると非推奨の警告）
+- 3 アプリへの影響: 3 アプリの JSON の応答（RS の API、OP の discovery・トークン・userinfo・JWKS など。OP は doorkeeper の `render json:`）は、`Content-Type: application/json` で返し、HTML に埋め込んでいない。今の応答のスナップショットに書き換えられた文字はなく、前後で差分もない。前後で、値の変化のほかに、書き出し・検査・`-W:deprecated` の警告・development だけのヘッダーは同じ。RP は、defaults のファイルで有効にしても `ActionController::Base` に届かない（DEF-8.1-07）ので、理由のコメントを付けてコメントのまま残した
+- 扱い: 追随（グループ 3）
+- 出典: `actionpack-8.1.4/lib/action_controller/metal/renderers.rb:31-44,171`、ガイド「3.9.24 config.action_controller.escape_json_responses」
+- コミット: グループ 3（RS・RP・OP）
+
+### DEF-8.1-25: JSON で U+2028・U+2029 を書き換えなくなる
+
+- 種類: Rails の既定値（`load_defaults 8.1` の項目）/ 対象: RS・RP・OP
+- 何が変わるか: `ActiveSupport.escape_js_separators_in_json` が true → false。`to_json` などが、LINE SEPARATOR（U+2028）・PARAGRAPH SEPARATOR（U+2029）を書き換えなくなる
+- なぜ: この 2 文字は、ECMAScript 2019 から JavaScript の文字列の中で使えるようになり、今のブラウザでは問題にならないため（rails/rails#55800）
+- 3 アプリへの影響: defaults のファイルで有効にしても、値は true のままだった（research の worktree で確かめた）。initializer `active_support.set_configs` が、config/initializers より前に `config.active_support` の値を写すため（8.0 の `to_time_preserves_timezone`（DEF-8.0-01）と同じ形）。`load_defaults 8.1` で入る。3 アプリの応答に、この 2 文字はない
+- 扱い: 追随。3 アプリとも、defaults のファイルで理由のコメントを付けてコメントのまま残し、`load_defaults 8.1` で値を確かめる（グループ 3。LOG.md の Step 7 の論点 5）
+- 出典: `activesupport-8.1.4/lib/active_support/railtie.rb:142-147`、`activesupport-8.1.4/lib/active_support/json/encoding.rb:11,93-98`、ガイド「3.14.23 config.active_support.escape_js_separators_in_json」
+- コミット: グループ 3（RS・RP・OP。理由のコメントだけ）
