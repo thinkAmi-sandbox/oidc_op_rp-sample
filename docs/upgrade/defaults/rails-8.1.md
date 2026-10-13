@@ -28,6 +28,8 @@
 | DEF-8.1-18 | `bin/bundler-audit`・`config/bundler-audit.yml` | Rails の雛形 | 3 アプリ | 採用しない |
 | DEF-8.1-19 | `bin/ci`・`config/ci.rb` | Rails の雛形（新しい構成） | 3 アプリ | 採用しない |
 | DEF-8.1-20 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
+| DEF-8.1-21 | Action View のテンプレートの依存を、Ruby のパーサーで追う | Rails の既定値（8.1） | 3 アプリ | 追随 |
+| DEF-8.1-22 | 並べる列のないモデルで `first` などを呼ぶと例外にする | Rails の既定値（8.1） | 3 アプリ | 追随 |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -222,3 +224,27 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 種類: Rails の雛形 / 対象: RP・OP（RS は API なので作られない）
 - 扱い: 採用しない（DEF-7.2-21・DEF-8.0-23 と同じ）
 - コミット: なし
+
+## `load_defaults 8.1`（`new_framework_defaults_8_1.rb`）
+
+`new_framework_defaults_8_1.rb` の 6 項目を、人間が決めたグループの順（1 内部の処理だけ → 2 リダイレクト → 3 JSON の書き方 → 4 hidden の autocomplete）に有効にした。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べた（前の書き出しを取る前に、クラスの値が書き出しに出ない値を `scripts/lib/dump_config.rb` に足した）。ガイドは「3.1.1 ターゲットバージョン8.1のデフォルト値」（https://railsguides.jp/v8.1/configuring.html ）。
+
+### DEF-8.1-21: Action View のテンプレートの依存を、Ruby のパーサーで追う
+
+- 種類: Rails の既定値（`load_defaults 8.1` の項目）/ 対象: RS・RP・OP
+- 何が変わるか: `ActionView.render_tracker` が nil → `:ruby`。erb のテンプレートの依存（どの部分テンプレートを描くか）を、正規表現（`ERBTracker`）ではなく Ruby のパーサー（`RubyTracker`）で読む
+- なぜ: 正規表現では見落としや誤りがあった依存の読み取りを、パーサーで正確にするため（rails/rails#55194）
+- 3 アプリへの影響: この依存は、fragment cache（`cache` ヘルパー）のキーの digest を作るときだけ使う。3 アプリのビューは `cache` を使わず、キャッシュも有効にしていない（test は `:null_store`）。前後で、値の変化のほかに、書き出し・検査・スナップショット・`-W:deprecated` の警告・development だけのヘッダーは同じ。defaults のファイルからも効く（initializer `action_view.set_render_tracker` が、アプリの `load_config_initializers` より後に走る。research の worktree で確かめた）
+- 扱い: 追随（グループ 1）
+- 出典: `actionview-8.1.4/lib/action_view.rb:95-108`、`actionview-8.1.4/lib/action_view/railtie.rb:105-107`、ガイド「3.11.23 config.action_view.render_tracker」
+- コミット: グループ 1（RS・RP・OP）
+
+### DEF-8.1-22: 並べる列のないモデルで `first` などを呼ぶと例外にする
+
+- 種類: Rails の既定値（`load_defaults 8.1` の項目）/ 対象: RS・RP・OP
+- 何が変わるか: `ActiveRecord.raise_on_missing_required_finder_order_columns` が false → true。`order` がなく、モデルにも並べる列（`implicit_order_column`・`query_constraints`・主キー）がないときに、`first`・`second`・`last` などが例外になる（false のときは非推奨の警告。この設定は 8.2 で消える）
+- なぜ: 並びの決まらない `first` は、DB によって違う行を返すため（rails/rails#54608）
+- 3 アプリへの影響: 3 アプリのモデルにはすべて主キーがあるので、主キーで並べる今の動きのまま。アプリのコードに `first`・`last` はなく（RP の `find_by` は並びを使わない）、テスト（`Doorkeeper::AccessGrant.last` など）と E2E も通った
+- 扱い: 追随（グループ 1）
+- 出典: `activerecord-8.1.4/lib/active_record/relation/finder_methods.rb:661-673`、`activerecord-8.1.4/lib/active_record/railtie.rb:210-221`、ガイド「3.8.89 config.active_record.raise_on_missing_required_finder_order_columns」
+- コミット: グループ 1（RS・RP・OP）
