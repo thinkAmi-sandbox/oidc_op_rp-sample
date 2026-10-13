@@ -3176,6 +3176,13 @@ verify:
 - 4 グループとも、検査と E2E の件数は前と同じ（グループ 4 の OP のスナップショットを除き、応答と E2E のスナップショットの差分はない）。`-W:deprecated` の警告と development だけのヘッダーも同じ。読み込み済みの部品は同じ（RP の DEF-8.1-07 の検出の後ろに、新しい読み込みは増えていない）。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
 - defaults のファイルから効かなかった 3 つ（3 アプリの `escape_js_separators_in_json`、RP の action_controller の 2 項目）は、research の worktree で分かっていたとおりで、作業計画の論点 5 から変えていない
 
+### `load_defaults 8.1`
+
+- 3 アプリを `config.load_defaults 8.1` にし、`new_framework_defaults_8_1.rb` を消した（ステージしない `rm`）。前（グループ 4 の後の書き出し）と比べて、値で変わったのは、defaults のファイルからは効かなかった 3 アプリの `escape_js_separators_in_json`（true → false）と RP の `escape_json_responses`・`action_on_path_relative_redirect`、development・test の `config.yjit`・`RubyVM::YJIT.enabled?`（true → false）だけ。読み込み済みの部品は同じ（DEF-8.1-27・28）
+- 雛形から消えた initializer はない（3 アプリの initializer は、8.1.4 の雛形にあるものか、アプリの独自のものだけ）
+- 解説（DEF-8.1-27・28）に人間の返事を得てから、記録（`c14e828`）、RS `650ecf1`・RP `38d8dc1`・OP `ada7df7` の順にコミットした。検査と E2E は通り、スナップショットの差分はない。`-W:deprecated` の警告と development だけのヘッダーも同じ
+- RuboCop の `TargetRailsVersion` を 8.1 にした（`ba14f44`）。3 アプリとも新しい指摘はない。`RuboCop::ConfigStore` で読む値が 8.1 になることを確かめた。rubocop-rails 2.38.0 に、Rails 8.1 を条件にする cop はない
+
 ### 前後の比較
 
 lock を変える前（`e843a3f` の後。アプリは research の開始時から変わっていない）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた（compare-config は research の worktree の前に取ったものとも同じ）。
