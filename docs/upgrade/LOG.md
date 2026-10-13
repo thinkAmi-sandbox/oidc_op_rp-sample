@@ -3125,6 +3125,40 @@ verify:
 - research の出口で、Step 6 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（本体だけ）を、人間に確かめて消した
 - puma を止め、写しを消し、worktree を外した後も、12 ファイルのハッシュは開始時と同じ
 
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| Rails | 8.0.5.1 → 8.1.4 | 3 アプリ（rails-lock）。8.0.5.1 は 8.0 系の最新なので、先に上げるパッチはなかった。research で `scripts/resolve-lock --gem 'rails=~> 8.1.4' --rails` で解決した lock を持ち込み、Gemfile の rails を `~> 8.1.4` にして `bundle lock --local`（research で試した結果と同じ lock になった）。動いたのは Rails の構成 gem 13 個だけ。gem は research の worktree で入れてあり（論点 1）、`bundle install --local` で `Installing` はなかった。`scripts/verify-gem-checksums <アプリ> --changed HEAD` で、3 アプリとも 14 個が rubygems.org の SHA-256 と一致した。3 アプリの `config/brakeman.ignore` を消した（論点 4）。DEF-8.1-01〜09（RS `72ec831`・RP `a721c44`・OP `0067bcf`） |
+| action_text-trix | （なし）→ 2.1.19 | actiontext 8.1.4 の依存（DEF-8.1-09） |
+| benchmark | 0.3.0 → （なし） | activesupport 8.1.4 が依存から外し、3 アプリの lock から消えた（論点 3。受け入れた） |
+| uri・json・connection_pool・minitest・rack | 0.13.3・2.7.2・2.5.5・5.14.4・2.2.24（変更なし） | 論点 3 |
+
+- `scripts/check-load-hooks` は、許す組の一覧にして、RP の omniauth-rails_csrf_protection の組を足し（`f88f27a`）、3 アプリを上げた後に Rails 8.0.5.1 の組を消した（`cb01977`。check-apps と CI のコメントも直した）。最初のコミットの時点のアプリは 8.0.5.1 なので、新しいスクリプトが 8.0.5.1 の検出も許すことを、HEAD の worktree で確かめてからコミットした。各アプリのコミットの前（`commit-per-app`）は、そのアプリの検査と E2E が通った
+- 解説（DEF-8.1-01〜09）に人間の返事を得てから、記録（`c86723f`）、上のコミットの順にした。IMP-009 の書き足し（`e843a3f`）は、その前に人間の承認を得た
+
+### 前後の比較
+
+lock を変える前（`e843a3f` の後。アプリは research の開始時から変わっていない）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた（compare-config は research の worktree の前に取ったものとも同じ）。
+
+- Rails 8.1.4（rails-lock）
+  - `scripts/check-apps`: 前は 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed。起動の途中の読み込みの 9 項目は DEF-8.0-02 の組で許していた）。後も 36 の検査がすべて通り、件数は同じ。応答のスナップショットと E2E のスナップショットの差分はない。起動の途中の読み込みは、RS・OP の 6 項目が許す条件なしで通り、RP の 3 項目が omniauth-rails_csrf_protection の組で許された
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 違いは DEF-8.1-01〜07 に振り分けた（`to_time_preserves_timezone` のキー、開いたリダイレクトの設定、リダイレクトと Active Record の新しい設定、Active Storage のキー、読み込み済みの部品）
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）
+  - development だけのヘッダー（E2E 用の DB で Puma に通した。RS の `/apples/show`、RP のトップ、OP の discovery・ログイン画面。日付・ID・数値・`x-miniprofiler-ids` などは伏せた）: 前後で同じ
+  - brakeman: 前は 3 アプリとも警告 0・無視 1。後は警告 0・無視 0（`config/brakeman.ignore` を消した）で、チェックの数は同じ（79）。research の worktree では、2 つの項目が「Obsolete Ignore Entries」に出ていた
+  - SQLite: OP の test.log で、fixtures の INSERT の真偽値が `1` → `TRUE` になった（DEF-8.1-08）
+  - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| research の worktree に RS の E2E 用の DB を `sqlite3 -readonly ... ".backup"` で写すと、0 バイトの写しになり `unable to open database file` が出た（`-wal`・`-shm` のない WAL の DB） | `-wal` がないのでデータは本体にあり、`cp` で写した（TIPS.md の「手動確認用の環境」と同じ性質） |
+| research の worktree の compare-config の書き出しにだけ、ActiveStorage などのモデルの関連付けの行がなかった | `vendor/bundle` をシンボリックリンクにした worktree のときだけの違いで、本体では 8.0.5.1・8.1.4 とも出る。worktree の書き出しは、本体の前後の比較には使わなかった |
+| 一時ファイルを消す `rm $WT/$d/...` が、Claude Code の安全チェックで止められた（変数が空だと根を指すため） | `"${WT:?}/${d:?}/..."` の形に直した |
+| サブエージェントの見立て（`render_tracker` は defaults のファイルから効かない）が、実行で外れた | worktree で値と initializer の並び順を確かめ、論点 5 の材料を直した（下の気づきの 8） |
+
 ### スキルについて気づいたこと
 
 Step 3〜6 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。

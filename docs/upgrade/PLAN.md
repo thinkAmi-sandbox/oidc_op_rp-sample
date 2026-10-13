@@ -1032,7 +1032,7 @@ rails-lock で決めたこと（着手後。人間が判断した）:
 
 Step 6 が epic に入ってから（[#35](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/35)）、`/rails-upgrade` の research で調べた。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-13）。Ruby 3.3.12 のまま Rails を 8.0.5.1 から 8.1.4 に上げる。今回の最終目標の Rails。research の途中で、scratchpad の git worktree に 8.1.4 の lock を置いてアプリを起動し、検査と設定の値の比較を流した（論点 1）。経緯と作業の記録は LOG.md の Step 7。
 
-- [ ] rails-lock: Rails 8.1.4（3 アプリ。action_text-trix 2.1.19 が増え、benchmark 0.3.0 が lock から消える。3 アプリの `config/brakeman.ignore` を消す。`scripts/check-load-hooks` の KNOWN を、Rails 8.0.5.1 の 1 件から RP の omniauth-rails_csrf_protection の 1 件に替える。入れ替えは、各コミットで検査が通る順に行う）
+- [x] rails-lock: Rails 8.1.4（3 アプリ。action_text-trix 2.1.19 が増え、benchmark 0.3.0 が lock から消える。3 アプリの `config/brakeman.ignore` を消す。`scripts/check-load-hooks` の KNOWN を、Rails 8.0.5.1 の 1 件から RP の omniauth-rails_csrf_protection の 1 件に替える。入れ替えは、各コミットで検査が通る順に行った。DEF-8.1-01〜09）
 - [ ] rails-app-update（Solid 系の `plugin :solid_queue` は採用しない。新しく作られる `config/ci.rb`・`bin/ci`・`bin/bundler-audit`・`config/bundler-audit.yml` と、production.rb の SSL の 2 行がコメントになることは、理解の関門で扱う）
 - [ ] rails-defaults（`new_framework_defaults_8_1.rb`。`escape_js_separators_in_json` と、RP の action_controller の 2 項目は、理由のコメントを付けてコメントのまま残す。`remove_hidden_field_autocomplete` で OP の応答のスナップショットを作り直す。グループは作業の始めに決める）
 - [ ] rails-load-defaults（`load_defaults 8.1`、RuboCop の `TargetRailsVersion` 8.1。development・test の YJIT が切れることを解説する）
@@ -1173,7 +1173,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
    - `new_framework_defaults_X_Y.rb` を 1 つずつ有効化してテスト → 全部有効になったら `load_defaults` を上げてファイルを削除
    - RuboCop の `TargetRailsVersion` を上げ、新しい指摘は別コミットで直す
 4. **Ruby を上げる場合**: Ruby を上げてコミット → `TargetRubyVersion` を上げて新しい指摘を直す（別コミット）
-   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb、Step 4 から irb の依存の rdoc・psych・stringio と、default gem と同じ版になった benchmark・securerandom・tsort、Step 6 から activesupport 8.0 の依存の uri）を、新しい Ruby の default gem の版に一時固定で合わせ直す。default gem の版では要件を満たせず、要件を満たす最小の版に固定した gem（reline。benchmark・securerandom・tsort は Step 4 で default gem と同じ版になり、合わせ直す側に移った）は、新しい Ruby の default gem の版で要件を満たせるようになるかを見る。Ruby を上げるコミットに入れ、`BUNDLED WITH` もその Ruby の Bundler の版にする（Step 2）。その Ruby で default gem でなくなったものは 7 章の表に従う。Bundler 2.5.12 以上は、lock にある default gem と同じ版の gem も `vendor/bundle` に入れ、CI もそこから読むので、手元も揃えて入れる（Step 4-b で決めた）。そのための `.gem`（前の版のキャッシュにないもの）は、research でダウンロードの確認に入れる。手順は TIPS.md の「Ruby を上げる」と「gem の更新」
+   - lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb、Step 4 から irb の依存の rdoc・psych・stringio と、default gem と同じ版になった benchmark・securerandom・tsort（benchmark は Step 7 で lock から消えた）、Step 6 から activesupport 8.0 の依存の uri）を、新しい Ruby の default gem の版に一時固定で合わせ直す。default gem の版では要件を満たせず、要件を満たす最小の版に固定した gem（reline。benchmark・securerandom・tsort は Step 4 で default gem と同じ版になり、合わせ直す側に移った）は、新しい Ruby の default gem の版で要件を満たせるようになるかを見る。Ruby を上げるコミットに入れ、`BUNDLED WITH` もその Ruby の Bundler の版にする（Step 2）。その Ruby で default gem でなくなったものは 7 章の表に従う。Bundler 2.5.12 以上は、lock にある default gem と同じ版の gem も `vendor/bundle` に入れ、CI もそこから読むので、手元も揃えて入れる（Step 4-b で決めた）。そのための `.gem`（前の版のキャッシュにないもの）は、research でダウンロードの確認に入れる。手順は TIPS.md の「Ruby を上げる」と「gem の更新」
 5. **確認**: 「10. 完了条件」
 6. **記録**: LOG.md を更新 → `/code-review` → PR（向き先は epic）
 
