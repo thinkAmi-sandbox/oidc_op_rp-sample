@@ -3095,7 +3095,7 @@ verify:
 ## Step 7: Rails 8.1（2026-10-12）
 
 - ブランチ / PR: `upgrade/step7-rails81` / （PR 作成後に記入）
-- バージョン: Ruby 3.3.12（変更なし）/ Rails 8.0.5.1 → 8.1.4（予定）
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 8.0.5.1 → 8.1.4
 
 ### 作業計画で決めたこと
 
@@ -3109,6 +3109,21 @@ verify:
 | 4 brakeman の無視の項目 | rails-lock の Rails 8.1.4 のコミットで、3 アプリの `config/brakeman.ignore` の 2 つの項目（Medium の `pending_eol_rails` `98b26f60…db42`、High の `eol_rails` `d8492437…101c`）を両方消し、項目がなくなるのでファイルごと消す。TIPS.md の brakeman の期待する結果（`Ignored Warnings: 1`）を直す | brakeman 8.1.0 の Rails 8.1 の EOL は 2027-10-10（`check_eol_rails.rb:29`）で、2027-08-11 までは EOL の警告が出ない（`eol_check.rb:18-25`）。worktree の 8.1.4 で、3 アプリとも `Security Warnings: 0`、2 つの項目は「Obsolete Ignore Entries」に出た。fingerprint に Rails の版は入らないので、残すと 8.1 の EOL の警告も黙って無視する（Step 4 の EOLRuby と同じ理由）。High の項目の note の「アップグレードの途中」は、Step 7 で当てはまらなくなる（人間が判断） |
 | 5 defaults の効かない項目と YJIT | `escape_js_separators_in_json` は、3 アプリの defaults のファイルで理由のコメントを付けてコメントのまま残し、`load_defaults 8.1` で値を確かめる（Step 6 の `strict_freshness` と同じ）。RP の `escape_json_responses`・`action_on_path_relative_redirect` も、RP の defaults のファイルでは同じ扱い（理由は論点 2 の gem）。RS・OP では defaults のファイルで有効にする。`remove_hidden_field_autocomplete` は、有効にするグループで追随の解説をしてから OP の応答のスナップショットを作り直し、同じコミットに入れる。`yjit` は雛形にないので、`load_defaults 8.1` のときに追随として解説し、Rails の既定値（development・test で false）に合わせる。グループの分け方と順番は rails-defaults の始めに決める | worktree の 8.1.4 で、各項目を defaults のファイルに置いたときと `load_defaults 8.1` にしたときの値を 3 アプリの test で確かめた。defaults のファイルから効かないのは、`escape_js_separators_in_json`（3 アプリ。initializer `active_support.set_configs` が config/initializers より前に写す。`activesupport/lib/active_support/railtie.rb:142-147`）と、RP の Base の action_controller の 2 項目（RS・OP と RP の API には効く）。`render_tracker` は、initializer `action_view.set_render_tracker` がアプリの `load_config_initializers` より後に走るので効く（サブエージェントの見立ての「効かない」は、実行で外れた）。`load_defaults 8.1` では 3 アプリとも全項目が入り、RP の Base にも入る。YJIT は 3 アプリの development・test で切れる（`configuration.rb:349`、#53746）。テストは、OP の応答のスナップショット 6 つ（差分は hidden の input の `autocomplete="off"` が消えることだけ）を除いて通った。アプリの `redirect_to` は RP の path ヘルパーだけで、OP のリダイレクト（devise・doorkeeper）は `/` で始まるパスか絶対 URL（人間が判断） |
 | 6 rubocop・webmock | Step 7 では上げない。Step 8 の research で、その時点の最新版と、公開から 2 週間たっているかを確かめる（案 B。Step 5・6 と同じ決め方） | 10-13 の時点で、rubocop 1.92.0（10-10）・webmock 3.27.0〜3.29.0（10-10・10-11）は 2 週間たっていない（10-24・10-25）。research の途中で webmock 3.30.0（10-12。2 週間は 10-26）が出た。rubocop 1.92.0 は新しい cop がなく、`Lint/UselessAssignment` の新しい指摘（#14666）などで違反が出うる。webmock の 3.28.0 の `to_rack`、3.30.0 の RSpec の `with`・`disable_net_connect!(allow:)`、master の Unreleased の HTTP メソッドの照合（#821）は、3 アプリのテストに当たらない見込み。AI は、10-26 以降に 2 週間たった最新の版で区切る別のサブステップ（案 A）を案にした（人間が判断） |
+| 7 手動確認と環境の片付け | 手動確認は verify で 1 回（`load_defaults 8.1` と `TargetRailsVersion` 8.1 の後）。RP の my_op のログインと introspection 用 RP の流れ、OP の「Redirected to」行の `code=`、サーバーの出力のエラーを見る。起動の直後の `HEAD "/"`・`GET "/"` が両方 200 なら、TIPS.md の元からあるエラーの一覧から DEF-8.0-03 を外す。直前に、12 ファイルのハッシュを確かめ、3 アプリの development DB を `tmp/manual_check_backup/` に写す。research の出口で、Step 6 の写しを消し、前のセッションの RS の puma（ポート 3992）を止め、research の worktree 2 つを外す | Rails の版を上げる。#58225 が直ったことは、要求を同時に送る手動確認でしか見えない（Step 6 の気づきの 16）。Rails 8.1.0 で SQLite の真偽値の書き方が変わるので、元に戻せるようにする。Step 6 の写しは、#35 が epic に入ったので消してよい（TIPS.md の「手動確認用の環境」）。この論点への返事で、作業計画の承認も得た（人間が判断） |
+
+- 上げないもの: rubocop・webmock（論点 6）、json・connection_pool・minitest・rack（論点 3）、8.0 系のパッチ（8.0.5.1 が最新）
+- 採用しないもの: `app:update` の Solid 系（`config/puma.rb` の `plugin :solid_queue`）。新しく作られる `config/ci.rb`・`bin/ci`・`bin/bundler-audit`・`config/bundler-audit.yml` は、rails-app-update の理解の関門で扱う
+- ダウンロード: 論点 1 で承認を得て、research の中で済ませた（14 個、計 1,967,616 B。RS の `bundle install` で落としたのは 14 個だけで、`scripts/verify-gem-checksums rs` ですべて rubygems.org の SHA-256 と一致した。RP・OP は照合した `.gem` をキャッシュにコピーし、`--local --no-cache` で入れた。`Installing` は 14 行だけで、lock は解決したものと同じ）
+- research の worktree: scratchpad に HEAD の git worktree を作り、3 アプリに解決した lock と Gemfile を置き、`vendor/bundle` を本体へのシンボリックリンクにした（mise は `MISE_TRUSTED_CONFIG_PATHS` で信頼させ、`mise trust` の設定は残していない。OP の署名鍵は worktree の中で使い捨てのものを作り、E2E 用の DB は本体から写した）。論点 2 の掘り下げのために、8.0.5.1 のままの worktree も作った。research の出口で 2 つとも外した
+- 調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 7: Rails 8.1」に書いた。7 章の devise・omniauth-rails_csrf_protection・rubocop・webmock・benchmark の行を直した
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 7 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 6 の手動確認の後と同じだった（OP `oauth_access_grants` 29・`oauth_access_tokens` 72（revoke 済み 13）、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま）。
+
+- 開始時に、前のセッション（Ruby 3.2 の頃の bundle）で起動した RS の puma（ポート 3992、10-11 から）が動いていた。RS の `development.log` に書き込んでいて、development DB は開いていなかった。research の出口で、人間に確かめて止めた（TERM）
+- research の出口で、Step 6 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（本体だけ）を、人間に確かめて消した
+- puma を止め、写しを消し、worktree を外した後も、12 ファイルのハッシュは開始時と同じ
 
 ### スキルについて気づいたこと
 
@@ -3126,3 +3141,7 @@ research:
 5. omniauth-rails_csrf_protection の Rails 8.1 の分岐による早い読み込みは、サブエージェントが gem のソースを読んで見つけた。research の手順 2 は「上げるものの事実」を調べるが、lock の gem が新しい Rails で別の分岐（`ActionPack.version` などの条件）を通るかを見る手順はない
 6. 論点 2 で、人間は 5 回掘り下げた（何が問題か・なぜ 8.1 で起きたか・omniauth の組み込みの対策で足りるか・rack-protection を上げれば足りるか・gem のままのほうがよいか）。templates.md の「質問」は「本題・根拠・見立て」の型で、影響の具体例（実際に流した結果）、原因の版の差、とらない案の理由を出す決まりがない。最初の示し方に、影響を実行で示した例と、原因の差分を入れておけば、往復が減った
 7. 論点 1 の試行（worktree）は、論点 2 の掘り下げでも使えた（8.0.5.1 と 8.1.4 で initializer の値が届くかを並べて試した）。比べるために、HEAD のままの worktree をもう 1 つ作った
+8. サブエージェントの見立て（`render_tracker` は defaults のファイルから効かない）が、worktree で流すと外れた（initializer の並び順で、アプリの `load_config_initializers` より後に走っていた）。Step 6 の気づきの 11 と同じく、initializer の時期は、ソースを読むだけでなく `Rails.application.initializers.tsort_each` の並び順か、実際の値で確かめる必要がある。research で起動して試せたので、計画の段階で直せた
+9. research の途中で日付が変わり、webmock 3.30.0（10-12）が出ていた。版の調べは research の始めに 1 回しているが、論点を決める直前にもう一度見る手順はない（論点 6 の直前に見直して気づいた）
+10. 論点 5 の示し方で、AI は「3 アプリの `redirect_to` は path ヘルパーと絶対 URL だけ」と、確かめずにサブエージェントの調べから書いた。記録の前に grep で確かめ、言い方を直した（アプリの `redirect_to` は RP の path ヘルパーだけ）
+11. 論点 7 で、research の出口の片付け（写しを消す・残っていたサーバーを止める・worktree を外す）を決めた。research.md の出口には、research で作ったもの（worktree など）を片付ける手順がない
