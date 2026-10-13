@@ -25,13 +25,17 @@
 #
 # Applications that want to keep the escaping behavior can set the config to `true`.
 #++
-# Rails.configuration.action_controller.escape_json_responses = false
+Rails.configuration.action_controller.escape_json_responses = false
 
 ###
 # Skips escaping LINE SEPARATOR (U+2028) and PARAGRAPH SEPARATOR (U+2029) in JSON.
 #
 # Historically these characters were not valid inside JavaScript literal strings but that changed in ECMAScript 2019.
 # As such it's no longer a concern in modern browsers: https://caniuse.com/mdn-javascript_builtins_json_json_superset.
+#
+# ここで有効にしても効かない。Active Support の railtie の initializer（active_support.set_configs）が、config/initializers より前に
+# ActiveSupport.escape_js_separators_in_json に値を入れるため。load_defaults 8.1 で入る
+# （docs/upgrade/PLAN.md の Step 7、LOG.md の Step 7 の論点 5）
 #++
 # Rails.configuration.active_support.escape_js_separators_in_json = false
 
