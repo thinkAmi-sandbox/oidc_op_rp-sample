@@ -205,7 +205,16 @@ extras = {
   'ActionDispatch::Http::Cache::Request.strict_freshness' => lambda {
     ActionDispatch::Http::Cache::Request.strict_freshness
   },
-  'Regexp.timeout' => -> { Regexp.timeout }
+  'Regexp.timeout' => -> { Regexp.timeout },
+  # Rails 8.1 の new_framework_defaults_8_1.rb の設定で、設定しないと上の config.<名前> の節にクラスの値が出ないもの（Step 7）
+  'ActionController::Base.escape_json_responses' => -> { ActionController::Base.escape_json_responses },
+  'ActionController::API.escape_json_responses' => -> { ActionController::API.escape_json_responses },
+  'ActiveSupport.escape_js_separators_in_json' => -> { ActiveSupport.escape_js_separators_in_json },
+  'ActiveRecord.raise_on_missing_required_finder_order_columns' => lambda {
+    ActiveRecord.raise_on_missing_required_finder_order_columns
+  },
+  'ActionView.render_tracker' => -> { ActionView.render_tracker },
+  'ActionView::Base.remove_hidden_field_autocomplete' => -> { ActionView::Base.remove_hidden_field_autocomplete }
 }
 extras.each { |label, block| lines << "#{label} = #{read.call(&block)}" }
 

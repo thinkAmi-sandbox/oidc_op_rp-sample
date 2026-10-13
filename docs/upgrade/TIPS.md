@@ -25,9 +25,9 @@
 | 応答のスナップショット（Step 1-b-2） | minitest に含まれる。作り直すときは `UPDATE_SNAPSHOTS=1 mise exec -- bin/rails test`（ファイルを指定して絞れる）の後に `git status --short -- test/snapshots` と `git diff -- test/snapshots`（新しいファイルは `git diff` に出ない） | 差分がない。差分が出たら下の「応答のスナップショット」 |
 | Zeitwerk | `mise exec -- bin/rails zeitwerk:check` | `All is good!` |
 | 起動 | `mise exec -- bin/rails runner 'puts Rails.version'` | |
-| 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」。Step 6 から Step 7 までは、check-apps と CI は `scripts/check-load-hooks`（アプリのディレクトリで `RAILS_ENV=test mise exec -- ../scripts/check-load-hooks`）で流し、Rails 8.0.5.1 自身の 1 件（DEF-8.0-02）だけを許す。許した検出の後ろは見えないので、`scripts/compare-config` の「読み込み済みの部品」を前後で比べる |
+| 起動の途中の読み込み | `ANTI_MANNER=1 RAILS_ENV=test mise exec -- bin/rails runner 1`。`CI=1` 付きと、development（`DATABASE_URL=sqlite3:db/e2e.sqlite3` を付けて手動確認用の DB に触らない）でも | `✅Congratulations!` で終了コード 0。検出できる範囲は下の「設定の値と応答の比較」。Step 6 から、check-apps と CI は `scripts/check-load-hooks`（アプリのディレクトリで `RAILS_ENV=test mise exec -- ../scripts/check-load-hooks`）で流す。許すのは、Step 7（Rails 8.1.4）から RP の omniauth-rails_csrf_protection の 1 件（DEF-8.1-07）だけ（Step 6 で許した Rails 8.0.5.1 自身の 1 件（DEF-8.0-02）は、Step 7 で外した）。許した検出の後ろは見えないので、`scripts/compare-config` の「読み込み済みの部品」を前後で比べる |
 | bundler-audit | `mise exec -- bundle exec bundle-audit check` | `No vulnerabilities found`（無視リスト込み） |
-| brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`、`Ignored Warnings: 1`（EOLRails。Step 4 で EOLRuby の項目を消した） |
+| brakeman | `mise exec -- bundle exec brakeman --no-pager -q` | `Security Warnings: 0`。無視の項目はない（Step 4 で EOLRuby の項目を消し、Step 7 で EOLRails の項目を消して `config/brakeman.ignore` もなくなった） |
 | E2E | `e2e/` で `mise exec -- npm test` | 約 10 秒で 10 passed。手動確認用のサーバーが動いていると起動に失敗する |
 
 上の検査は、リポジトリ直下の `scripts/check-apps` でまとめて流せる（Step 1-b-3 から）。3 アプリの検査（`CI=1` の minitest と起動の途中の読み込みを含む）と E2E を順に流し、失敗しても後の検査を流して、最後に結果の一覧と minitest・E2E の件数を出す。各検査の出力は `CHECK_APPS_LOG_DIR`（scratchpad を指す）に残る。
@@ -50,7 +50,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 ## gem の更新
 
 - `bundle update <gem> --conservative` で上げ、`git diff -U0 Gemfile.lock | grep -E '^[-+]    [a-z]'` で、変わった gem を毎回見る
-- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb・rdoc・psych・stringio・benchmark・securerandom・tsort・uri）と、一時固定した gem（faraday-net_http・reline・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
+- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb・rdoc・psych・stringio・securerandom・tsort・uri。benchmark は Step 7 で lock から消えた）と、一時固定した gem（faraday-net_http・reline・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
   - Gemfile に既にある gem を固定するときは、行を足さずに既にある行に版を書き、後で元に戻す（Step 2-b の brakeman）。作業の前に Gemfile を scratchpad にコピーしておき、コピーで戻すと確実
   - 依存で入る gem が default gem と同じ名前のとき（Step 2-b の byebug 13 の reline・io-console）は、default gem の版で要件を満たせるならその版に（ダウンロードもビルドもしない）、満たせないなら要件を満たす最小の版に固定する。固定しないと最新の版（io-console は C 拡張）が入る
@@ -132,7 +132,7 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - ユーザーの資格情報は `rails_open_id_provider/tmp/manual_check_user.txt` にある。値をチャットやドキュメントに出さない。ブラウザでのログインと同意は人間が行う
 - ブラウザペインが画面に出ていないと、AI からは表示できない（`tabs_context` が「hidden」と返す）。手動確認を頼む前に、人間にペインを開いてもらう
 - プレビューのサーバーの標準出力は `preview_logs` で読む。`search` は部分一致で、正規表現は使えない
-- 手動確認のサーバーの出力に出る、元からあるエラー（新しいものかを判断するときに比べる。Step 5 で一覧にした）: RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`（どちらも `ActionController::RoutingError`。アセットパイプラインのないアプリで `stylesheet_link_tag` が出す要求）、RS・OP のトップ（Rails の歓迎ページ。プレビューが起動時に開く）の `/icon.png`（Rails 7.2 から。`public/icon.png` を採用していない。DEF-7.2-21）。Step 6（Rails 8.0.5.1）から Step 7 までは、起動の直後にプレビューが同時に送る `HEAD "/"`・`GET "/"` の片方が `ActionController::RoutingError` になる（ルーティングを最初の要求まで描く仕組みがスレッドに対して安全でない。rails/rails#58225 で直り、8.1.4 に入っている。DEF-8.0-03）。`preview_logs` の `level: error` はこれらを拾わないので、`search: Error` で探す
+- 手動確認のサーバーの出力に出る、元からあるエラー（新しいものかを判断するときに比べる。Step 5 で一覧にした）: RP の `/stylesheets/application.css`、OP の同意画面の `/stylesheets/doorkeeper/application.css`（どちらも `ActionController::RoutingError`。アセットパイプラインのないアプリで `stylesheet_link_tag` が出す要求）、RS・OP のトップ（Rails の歓迎ページ。プレビューが起動時に開く）の `/icon.png`（Rails 7.2 から。`public/icon.png` を採用していない。DEF-7.2-21）。Step 6（Rails 8.0.5.1）では、起動の直後にプレビューが同時に送る `HEAD "/"`・`GET "/"` の片方が `ActionController::RoutingError` になっていたが（DEF-8.0-03）、Step 7（Rails 8.1.4）で出なくなった（rails/rails#58225）。Step 7 から、起動のたびに Active Storage の WARN（「Generating image variants require the image_processing gem.」）が 1 行出る（DEF-8.1-29。使っていない Active Storage を読み込んでいるため。IMP-012）。`preview_logs` の `level: error` はこれらを拾わないので、`search: Error` で探す
 - 手動確認でログインすると、RP と OP の development DB に行が増えてハッシュが変わる。手動確認の直前にハッシュが作業前と一致することを確かめ、前後の件数を読み取り専用の `sqlite3 -readonly` で数えて記録する（Step 0-f-2）。以降の基準は手動確認の後のハッシュ
 - Step 3 の verify から、development DB は WAL になっている（DEF-7.1-48）。`-wal` があるときは、件数を `-wal` の中も含めて数えるため、本体のファイルだけをコピーして数えない。`sqlite3 -readonly` は `-shm` があれば開ける。`-shm` がない WAL の DB は `unable to open database file` になる。本体（と、あれば `-wal`）を scratchpad にコピーし、`-wal` があれば `sqlite3 -readonly <写し>`、`-wal` がなければ `sqlite3 "file:<写し>?immutable=1"` で数える（Step 5。`-wal` のない WAL の DB は、`-readonly` でも `-shm` を作れずに開けなかった）
 - Step 5 の sqlite3 2.x から、サーバーやコマンドを正しく終えると、最後の接続が閉じるときに `-wal` が本体に移って消える（sqlite3 1.x は、Rails が残す準備済みの文のために接続を閉じられず、`-wal` が残っていた。DEF-7.2-29）。手動確認の後に `-wal` がなくても、データは本体にある

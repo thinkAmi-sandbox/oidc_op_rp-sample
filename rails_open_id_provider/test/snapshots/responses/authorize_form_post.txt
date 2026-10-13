@@ -32,7 +32,7 @@ x-xss-protection: 0
 </header>
 
 <form name="redirect_form" action="http://localhost:3781/auth/my_op/callback" accept-charset="UTF-8" method="post">
-    <input type="hidden" name="code" id="code" value="<AUTH_CODE>" autocomplete="off" />
+    <input type="hidden" name="code" id="code" value="<AUTH_CODE>" />
 </form>
 <script>
   window.onload = function () {

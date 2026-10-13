@@ -69,7 +69,7 @@ x-xss-protection: 0
         <a class="btn btn-link" href="/oauth/applications/607634479/edit">Edit</a>
       </td>
       <td class="align-middle">
-        <form action="/oauth/applications/607634479" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+        <form action="/oauth/applications/607634479" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" />
   <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
 </form>
       </td>
@@ -88,7 +88,7 @@ x-xss-protection: 0
         <a class="btn btn-link" href="/oauth/applications/465844991/edit">Edit</a>
       </td>
       <td class="align-middle">
-        <form action="/oauth/applications/465844991" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+        <form action="/oauth/applications/465844991" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" />
   <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
 </form>
       </td>
@@ -107,7 +107,7 @@ x-xss-protection: 0
         <a class="btn btn-link" href="/oauth/applications/311508750/edit">Edit</a>
       </td>
       <td class="align-middle">
-        <form action="/oauth/applications/311508750" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" autocomplete="off" />
+        <form action="/oauth/applications/311508750" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" />
   <input type="submit" name="commit" value="Destroy" onclick="return confirm(&#39;Are you sure?&#39;)" class="btn btn-link" data-disable-with="Destroy" />
 </form>
       </td>

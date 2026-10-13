@@ -2882,7 +2882,7 @@ Step 全体（見直しの流れ）:
 
 ## Step 6: Rails 8.0（2026-10-12）
 
-- ブランチ / PR: `upgrade/step6-rails80` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step6-rails80` / [#35](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/35)
 - バージョン: Ruby 3.3.12（変更なし）/ Rails 7.2.4 → 8.0.5.1。その直後に RP・OP の web-console 4.2.1 → 4.3.0
 - 追随した Rails と gem の既定値・雛形は、[defaults/rails-8.0.md](defaults/rails-8.0.md) に記録した（DEF-8.0-01〜27）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま
 - Rails 8.0.5.1 には、8-0-stable で直った不具合が 2 つ入っていない（起動の途中の `ActionController::Live` の読み込み（rails/rails#58145）、ルーティングを描く処理の競合（#58225））。前者は検査で 1 件だけ Step 7 まで許した（DEF-8.0-02）。Rails 8.0 のセキュリティ保守は 2026-11-07 まで
@@ -3091,3 +3091,217 @@ verify:
 
 16. 手動確認で、research・rails-lock の検査では出なかった Rails 8.0.5.1 の不具合（ルーティングを描く処理の競合）が、プレビューの起動直後の同時の要求で見つかった。E2E と minitest は要求を 1 つずつ送るので出ない。development を threads 3 の Puma で動かす手動確認が、同時の要求を試す唯一の場になっている
 17. Step 5 の気づきの 16 と同じく、ブラウザペインが隠れていて、人間に開いてもらう往復が 1 回増えた。今回は依頼のメッセージに開き方と操作の順を一緒に書いたので、往復はその 1 回で済んだ
+
+## Step 7: Rails 8.1（2026-10-12）
+
+- ブランチ / PR: `upgrade/step7-rails81` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12（変更なし）/ Rails 8.0.5.1 → 8.1.4
+- 追随した Rails と gem の既定値・雛形・依存は、[defaults/rails-8.1.md](defaults/rails-8.1.md) に記録した（DEF-8.1-01〜29）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はなくなった
+- Rails 8.1 では、RP の omniauth-rails_csrf_protection 2.0.1 が起動の途中で `ActionController::Base` を読み込む（上流の #33）。検査で 1 件だけ許し、IMP-009 で見張る（DEF-8.1-07）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 2 つ: Rails 8.1 の事実、周辺 gem の事実。lock の解決と持ち込んだ後の `bundle lock`、advisory、benchmark の依存、brakeman の EOL、omniauth-rails_csrf_protection の 8.1 の分岐、`load_defaults 8.1` の各項目が読まれる時期、`app:update` が作るファイルは自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 research で Rails 8.1.4 を起動して試す | 試す。scratchpad に HEAD の git worktree を作り、3 アプリに解決した lock と Gemfile（rails を `~> 8.1.4`）を置き、`BUNDLE_PATH` を本体の各アプリの `vendor/bundle` に向けて入れる。worktree で `scripts/check-apps --no-e2e` と `scripts/compare-config dump` を流す。本体の Gemfile・lock と手動確認用の環境は変えない。ダウンロード（Rails の構成 gem 8.1.4 の 13 個と action_text-trix 2.1.19。計 1,967,616 B）は、この論点への返事で承認を得た。RS で 1 回だけ落として照合し、RP・OP のキャッシュにコピーする | Step 6 では research で起動しなかったので、Rails 8.0.5.1 自身の起動の途中の読み込み（DEF-8.0-02）を rails-lock で初めて見つけた（Step 6 の気づきの 9）。今回は、RP の omniauth-rails_csrf_protection 2.0.1 が Rails 8.1 で require の時点に `ActionController::Base` を読み込むことが、コードからは見込まれる（`railtie.rb:2` → `token_verifier.rb:20-34` → v8.1.4 の `request_forgery_protection.rb` の `included do`。上流の cookpad/omniauth-rails_csrf_protection#33 は open）。検出の中身と、config/initializers の設定が効かなくなる範囲を、後の論点の前に実行で確かめる。落とした gem は rails-lock でそのまま使う（人間が判断） |
+| 2 起動の途中の読み込み | ⑤ 検査で許す。omniauth-rails_csrf_protection 2.0.1 はそのまま使い、`scripts/check-load-hooks` の KNOWN を、DEF-8.0-02 の 1 件から、RP のこの gem の 1 件（`on_load(:action_controller_base)` と `omniauth-rails_csrf_protection-2.0.1/lib/omniauth/rails_csrf_protection/token_verifier.rb:26:`）に替える。スクリプトは残し、check-apps と CI はそのまま。隠れる分は、各作業の前後の compare-config の「読み込み済みの部品」で補う。gem が直ったら KNOWN を外す（PLAN.md の 7 章に書く）。RP の config/initializers に action_controller の設定を書かない | research の worktree（8.1.4、`load_defaults 8.0`）で、RP の test・`CI=1`・development の 3 つだけが失敗し、検出は `token_verifier.rb:26` の `config`（`config/application.rb:19` の Bundler.require → `railtie.rb:2` → `token_verifier.rb:34` の include）。この gem を `require: false` にすると検出は 0 件で、後ろに隠れた検出はない。原因は、Rails 8.1 の `ActiveSupport::Configurable` の非推奨（rails/rails#53970）で、`RequestForgeryProtection` が `config_accessor` から `delegate ..., to: :config` に変わり、gem の 8.1 の分岐（2.0.0 の 2cf722b）が `config` を `ActionController::Base.config` にしたため（include の `included do` がすぐに `config` を呼ぶ）。上流の cookpad/omniauth-rails_csrf_protection#33 は open で、直った版はない。影響は、RP の Base に config/initializers の action_controller の値が届かないこと（worktree で `asset_host`・`per_form_csrf_tokens` を initializer に書いて確かめた。8.0.5.1 の RP と 8.1.4 の OP には届く）。今の RP にそういう設定はなく、環境のファイルと `load_defaults` の値は届くので、今の挙動は変わらない。`new_framework_defaults_8_1.rb` の `escape_json_responses`・`action_on_path_relative_redirect` は RP の Base には効かない。①②は直った版も修正もないのでとれず、③（`after_initialize` で gem を読む）は CSRF の守りの組み込みをアプリで持つことになり、④（omniauth の組み込みの `AuthenticityTokenProtection` に置き換える）は、rack-protection を 2.2 以上に上げてもなお、失敗したときのリダイレクト先（`message=authenticity_error`）・test 環境の `allow_forgery_protection`・Origin の確かめが変わるのでとらない。gem は Rails の `verified_request?` をそのまま使うので守りが強く、今の挙動を変えずに済む（人間が判断） |
+| 3 lock | uri 0.13.3 の一時固定は続ける。3 アプリで benchmark 0.3.0 が lock から消えるのは受け入れ、Gemfile に足さない。action_text-trix 2.1.19 は入れる。json 2.7.2・connection_pool 2.5.5・minitest 5.14.4・rack 2.2.24 は動かさない。PLAN.md の 7 章の benchmark の行に、Step 7 で lock から消えたことと、Step 8（Ruby 3.4）で見直すことを書く | `scripts/resolve-lock --gem 'rails=~> 8.1.4' --rails` は 3 アプリとも `--unpin` なしで解決し、動くのは Rails の構成 gem 13 個だけ。増えるのは action_text-trix 2.1.19（actiontext 8.1.4 の `~> 2.1.15`。依存は railties だけ）。解決した lock を Gemfile を `~> 8.1.4` にしたコピーに持ち込んで `bundle lock --local` すると、benchmark 0.3.0 が消える（resolve-lock の「消えた gem」には出ない）。activesupport 8.1.4 が依存から外し（632b2c5128）、Rails 8.1.4 も lock のほかの gem も require しない。require されても Ruby 3.3.12 の default gem の同じ 0.3.0 が読まれ、Ruby 3.3 の `bundled_gems.rb` の警告の一覧にない。worktree の `RUBYOPT=-W:deprecated` 付きのテストと eager load で `warning:` は 0 件（Step 6 の cgi と同じ）。activesupport 8.1.4 が足した json（rails/rails#55847）は、lock の 2.7.2（default gem と同じ版）のまま（人間が判断） |
+| 4 brakeman の無視の項目 | rails-lock の Rails 8.1.4 のコミットで、3 アプリの `config/brakeman.ignore` の 2 つの項目（Medium の `pending_eol_rails` `98b26f60…db42`、High の `eol_rails` `d8492437…101c`）を両方消し、項目がなくなるのでファイルごと消す。TIPS.md の brakeman の期待する結果（`Ignored Warnings: 1`）を直す | brakeman 8.1.0 の Rails 8.1 の EOL は 2027-10-10（`check_eol_rails.rb:29`）で、2027-08-11 までは EOL の警告が出ない（`eol_check.rb:18-25`）。worktree の 8.1.4 で、3 アプリとも `Security Warnings: 0`、2 つの項目は「Obsolete Ignore Entries」に出た。fingerprint に Rails の版は入らないので、残すと 8.1 の EOL の警告も黙って無視する（Step 4 の EOLRuby と同じ理由）。High の項目の note の「アップグレードの途中」は、Step 7 で当てはまらなくなる（人間が判断） |
+| 5 defaults の効かない項目と YJIT | `escape_js_separators_in_json` は、3 アプリの defaults のファイルで理由のコメントを付けてコメントのまま残し、`load_defaults 8.1` で値を確かめる（Step 6 の `strict_freshness` と同じ）。RP の `escape_json_responses`・`action_on_path_relative_redirect` も、RP の defaults のファイルでは同じ扱い（理由は論点 2 の gem）。RS・OP では defaults のファイルで有効にする。`remove_hidden_field_autocomplete` は、有効にするグループで追随の解説をしてから OP の応答のスナップショットを作り直し、同じコミットに入れる。`yjit` は雛形にないので、`load_defaults 8.1` のときに追随として解説し、Rails の既定値（development・test で false）に合わせる。グループの分け方と順番は rails-defaults の始めに決める | worktree の 8.1.4 で、各項目を defaults のファイルに置いたときと `load_defaults 8.1` にしたときの値を 3 アプリの test で確かめた。defaults のファイルから効かないのは、`escape_js_separators_in_json`（3 アプリ。initializer `active_support.set_configs` が config/initializers より前に写す。`activesupport/lib/active_support/railtie.rb:142-147`）と、RP の Base の action_controller の 2 項目（RS・OP と RP の API には効く）。`render_tracker` は、initializer `action_view.set_render_tracker` がアプリの `load_config_initializers` より後に走るので効く（サブエージェントの見立ての「効かない」は、実行で外れた）。`load_defaults 8.1` では 3 アプリとも全項目が入り、RP の Base にも入る。YJIT は 3 アプリの development・test で切れる（`configuration.rb:349`、#53746）。テストは、OP の応答のスナップショット 6 つ（差分は hidden の input の `autocomplete="off"` が消えることだけ）を除いて通った。アプリの `redirect_to` は RP の path ヘルパーだけで、OP のリダイレクト（devise・doorkeeper）は `/` で始まるパスか絶対 URL（人間が判断） |
+| 6 rubocop・webmock | Step 7 では上げない。Step 8 の research で、その時点の最新版と、公開から 2 週間たっているかを確かめる（案 B。Step 5・6 と同じ決め方） | 10-13 の時点で、rubocop 1.92.0（10-10）・webmock 3.27.0〜3.29.0（10-10・10-11）は 2 週間たっていない（10-24・10-25）。research の途中で webmock 3.30.0（10-12。2 週間は 10-26）が出た。rubocop 1.92.0 は新しい cop がなく、`Lint/UselessAssignment` の新しい指摘（#14666）などで違反が出うる。webmock の 3.28.0 の `to_rack`、3.30.0 の RSpec の `with`・`disable_net_connect!(allow:)`、master の Unreleased の HTTP メソッドの照合（#821）は、3 アプリのテストに当たらない見込み。AI は、10-26 以降に 2 週間たった最新の版で区切る別のサブステップ（案 A）を案にした（人間が判断） |
+| 7 手動確認と環境の片付け | 手動確認は verify で 1 回（`load_defaults 8.1` と `TargetRailsVersion` 8.1 の後）。RP の my_op のログインと introspection 用 RP の流れ、OP の「Redirected to」行の `code=`、サーバーの出力のエラーを見る。起動の直後の `HEAD "/"`・`GET "/"` が両方 200 なら、TIPS.md の元からあるエラーの一覧から DEF-8.0-03 を外す。直前に、12 ファイルのハッシュを確かめ、3 アプリの development DB を `tmp/manual_check_backup/` に写す。research の出口で、Step 6 の写しを消し、前のセッションの RS の puma（ポート 3992）を止め、research の worktree 2 つを外す | Rails の版を上げる。#58225 が直ったことは、要求を同時に送る手動確認でしか見えない（Step 6 の気づきの 16）。Rails 8.1.0 で SQLite の真偽値の書き方が変わるので、元に戻せるようにする。Step 6 の写しは、#35 が epic に入ったので消してよい（TIPS.md の「手動確認用の環境」）。この論点への返事で、作業計画の承認も得た（人間が判断） |
+
+- 上げないもの: rubocop・webmock（論点 6）、json・connection_pool・minitest・rack（論点 3）、8.0 系のパッチ（8.0.5.1 が最新）
+- 採用しないもの: `app:update` の Solid 系（`config/puma.rb` の `plugin :solid_queue`）。新しく作られる `config/ci.rb`・`bin/ci`・`bin/bundler-audit`・`config/bundler-audit.yml` は、rails-app-update の理解の関門で扱う
+- ダウンロード: 論点 1 で承認を得て、research の中で済ませた（14 個、計 1,967,616 B。RS の `bundle install` で落としたのは 14 個だけで、`scripts/verify-gem-checksums rs` ですべて rubygems.org の SHA-256 と一致した。RP・OP は照合した `.gem` をキャッシュにコピーし、`--local --no-cache` で入れた。`Installing` は 14 行だけで、lock は解決したものと同じ）
+- research の worktree: scratchpad に HEAD の git worktree を作り、3 アプリに解決した lock と Gemfile を置き、`vendor/bundle` を本体へのシンボリックリンクにした（mise は `MISE_TRUSTED_CONFIG_PATHS` で信頼させ、`mise trust` の設定は残していない。OP の署名鍵は worktree の中で使い捨てのものを作り、E2E 用の DB は本体から写した）。論点 2 の掘り下げのために、8.0.5.1 のままの worktree も作った。research の出口で 2 つとも外した
+- 調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 7: Rails 8.1」に書いた。7 章の devise・omniauth-rails_csrf_protection・rubocop・webmock・benchmark の行を直した
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| 起動のたびの Active Storage の WARN を受け入れ（DEF-8.1-29）、使っていないフレームワークを読み込まないことを改善の候補にした（IMP-012） | 作業計画では見つけていなかった。rails-lock の時点から出ていたが、verify の手動確認のサーバーの出力で気づいた。`variant_processor = :disabled` を足す案はとらず、Rails の既定値の変化として受け入れた（人間が判断） |
+| rails-defaults の前に、`scripts/lib/dump_config.rb` に 8.1 の 6 つの値の読み出しを足した（`6dc71cc`） | 設定のキーがないとクラスの値が書き出しに出ず、グループの前後を比べられなかったため（Step 6 の `5e3f661` と同じ） |
+| IMP-009 に omniauth-rails_csrf_protection を書き足した（`e843a3f`） | 作業計画の論点 2 の後に、omniauth の組み込みの対策への置き換えを候補にするかを確かめたところ、置き換えは候補にせず、既にある IMP-009（起動の途中にフレームワークのクラスを読み込む gem）に足すことになった（人間が承認した） |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 7 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 6 の手動確認の後と同じだった（OP `oauth_access_grants` 29・`oauth_access_tokens` 72（revoke 済み 13）、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま）。
+
+- 開始時に、前のセッション（Ruby 3.2 の頃の bundle）で起動した RS の puma（ポート 3992、10-11 から）が動いていた。RS の `development.log` に書き込んでいて、development DB は開いていなかった。research の出口で、人間に確かめて止めた（TERM）
+- research の出口で、Step 6 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（本体だけ）を、人間に確かめて消した
+- puma を止め、写しを消し、worktree を外した後も、12 ファイルのハッシュは開始時と同じ
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| Rails | 8.0.5.1 → 8.1.4 | 3 アプリ（rails-lock）。8.0.5.1 は 8.0 系の最新なので、先に上げるパッチはなかった。research で `scripts/resolve-lock --gem 'rails=~> 8.1.4' --rails` で解決した lock を持ち込み、Gemfile の rails を `~> 8.1.4` にして `bundle lock --local`（research で試した結果と同じ lock になった）。動いたのは Rails の構成 gem 13 個だけ。gem は research の worktree で入れてあり（論点 1）、`bundle install --local` で `Installing` はなかった。`scripts/verify-gem-checksums <アプリ> --changed HEAD` で、3 アプリとも 14 個が rubygems.org の SHA-256 と一致した。3 アプリの `config/brakeman.ignore` を消した（論点 4）。DEF-8.1-01〜09（RS `72ec831`・RP `a721c44`・OP `0067bcf`） |
+| action_text-trix | （なし）→ 2.1.19 | actiontext 8.1.4 の依存（DEF-8.1-09） |
+| benchmark | 0.3.0 → （なし） | activesupport 8.1.4 が依存から外し、3 アプリの lock から消えた（論点 3。受け入れた） |
+| uri・json・connection_pool・minitest・rack | 0.13.3・2.7.2・2.5.5・5.14.4・2.2.24（変更なし） | 論点 3 |
+
+- `scripts/check-load-hooks` は、許す組の一覧にして、RP の omniauth-rails_csrf_protection の組を足し（`f88f27a`）、3 アプリを上げた後に Rails 8.0.5.1 の組を消した（`cb01977`。check-apps と CI のコメントも直した）。最初のコミットの時点のアプリは 8.0.5.1 なので、新しいスクリプトが 8.0.5.1 の検出も許すことを、HEAD の worktree で確かめてからコミットした。各アプリのコミットの前（`commit-per-app`）は、そのアプリの検査と E2E が通った
+- 解説（DEF-8.1-01〜09）に人間の返事を得てから、記録（`c86723f`）、上のコミットの順にした。IMP-009 の書き足し（`e843a3f`）は、その前に人間の承認を得た
+
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update`（DB は E2E 用）を流し、戻す前の差分を控えてから `scripts/restore-app-config` で独自設定を戻し、差分を人間が確かめた。項目ごとの解説は [defaults/rails-8.1.md](defaults/rails-8.1.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| development の `verbose_redirect_logs = true` | 採用 | development のログだけ（DEF-8.1-10） |
+| production.rb の `assume_ssl`・`force_ssl` のコメント化と、コメントの句読点 | 採用 | 雛形に追従するだけ（DEF-8.1-11。`true` を残す案もあったが、人間が決まりどおりと判断した） |
+| `config/puma.rb` のコメント | 採用（port は道具で戻した） | DEF-8.1-12 |
+| `config/puma.rb` の `plugin :solid_queue` | 採用しない | 新しい構成（DEF-8.1-13。手で消した） |
+| `content_security_policy.rb` の `content_security_policy_nonce_auto` のコメント（RP・OP） | 採用 | コメントだけ（DEF-8.1-14） |
+| `bin/setup` の `--reset` | 採用 | 付けなければ同じ（DEF-8.1-15） |
+| public の 400・404・422・500（RP・OP） | 採用 | production だけで使う（DEF-8.1-16） |
+| `bin/rubocop`・`bin/brakeman` | 採用しない | DEF-8.0-21 と同じ（DEF-8.1-17） |
+| `bin/bundler-audit`・`config/bundler-audit.yml` | 採用しない | 無視リストは `.bundler-audit.yml` の 1 か所（DEF-8.1-18） |
+| `bin/ci`・`config/ci.rb` | 採用しない | 新しい構成。check-apps と CI が同じ役目（DEF-8.1-19） |
+| `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`（RP・OP） | 採用しない | DEF-8.0-23 と同じ（DEF-8.1-20） |
+| test の `deprecation = :raise`、puma の port、`filter_parameter_logging.rb` の `:code` とコメント、RP の `autoload_lib_once` と inflector | 戻した | アプリの独自設定（`scripts/restore-app-config`。戻せない項目はなかった） |
+| `active_storage:update` のマイグレーション 3 本 | 採用しない | Active Storage を使わない（DEF-7.0-14。道具で消した） |
+| `new_framework_defaults_8_1.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- 戻す前の差分で、戻した設定（puma の port、test の deprecation、RP の `autoload_lib`）の上の雛形のコメントが 8.0.5.1 から変わっていないことを確かめた（Step 5 の気づきの 19）。`config/application.rb`（RS・OP）・`test.rb`・`filter_parameter_logging.rb` は、戻した後に差分がない
+- 前後で、`scripts/check-apps` の 36 の検査がすべて通り（件数は同じ）、応答と E2E のスナップショットの差分はない。`scripts/compare-config dump` で変わったのは development の `verbose_redirect_logs`（false → true）だけ。development だけのヘッダーも同じ。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- 記録 `0d508a9`、コミット: RS `1c0ce7f`・RP `58ea88c`・OP `3f17437`
+
+### `new_framework_defaults_8_1.rb` を有効にした順番
+
+グループと順番は人間が決めた。前の書き出しを取る前に、`scripts/lib/dump_config.rb` に、設定しないとクラスの値が書き出しに出ない 6 つの値を足した（`6dc71cc`。前の書き出しは 2 回取って同じ）。各グループで、前後に `scripts/compare-config` で 3 アプリの test・development の値を書き出して比べた。項目ごとの解説は [defaults/rails-8.1.md](defaults/rails-8.1.md) の「`load_defaults 8.1`」。
+
+| 順 | グループ | 設定 | 結果 |
+|---|---|---|---|
+| 1 | 内部の処理だけ | `render_tracker = :ruby`、`raise_on_missing_required_finder_order_columns = true` | 値だけが変わった（nil → `:ruby`、false → true）。fragment cache は使わず、モデルにはすべて主キーがある（DEF-8.1-21・22。記録 `649040b`、RS `9d4a61c`・RP `946d74f`・OP `4b0c04e`） |
+| 2 | リダイレクト | `action_on_path_relative_redirect = :raise` | RS・OP は `:log` → `:raise`。`:log` のときも test.log に警告はなかった。RP は理由のコメント（DEF-8.1-07）を付けてコメントのまま（DEF-8.1-23。記録 `5ae62e0`、RS `b8056c0`・RP `4a8586c`・OP `bc210d5`） |
+| 3 | JSON の書き方 | `escape_json_responses = false`、`escape_js_separators_in_json = false` | RS・OP の Base・API の `escape_json_responses` が true → false。今のスナップショットに書き換えられた文字はない。RP の `escape_json_responses` と、3 アプリの `escape_js_separators_in_json` は、理由のコメントを付けてコメントのまま（DEF-8.1-24・25。記録 `883ecb8`、RS `82c4484`・RP `6ef3f50`・OP `7619b55`。記録の直し `5213a29`） |
+| 4 | hidden の autocomplete | `remove_hidden_field_autocomplete = true` | false → true。OP の応答のスナップショット 6 つで `autocomplete="off"` が消え（29 行）、解説の後に作り直して OP のコミットに入れた（DEF-8.1-26。記録 `711b9e3`、RS `fb1e098`・RP `61654b5`・OP `3b39b8a`） |
+
+- 4 グループとも、検査と E2E の件数は前と同じ（グループ 4 の OP のスナップショットを除き、応答と E2E のスナップショットの差分はない）。`-W:deprecated` の警告と development だけのヘッダーも同じ。読み込み済みの部品は同じ（RP の DEF-8.1-07 の検出の後ろに、新しい読み込みは増えていない）。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- defaults のファイルから効かなかった 3 つ（3 アプリの `escape_js_separators_in_json`、RP の action_controller の 2 項目）は、research の worktree で分かっていたとおりで、作業計画の論点 5 から変えていない
+
+### `load_defaults 8.1`
+
+- 3 アプリを `config.load_defaults 8.1` にし、`new_framework_defaults_8_1.rb` を消した（ステージしない `rm`）。前（グループ 4 の後の書き出し）と比べて、値で変わったのは、defaults のファイルからは効かなかった 3 アプリの `escape_js_separators_in_json`（true → false）と RP の `escape_json_responses`・`action_on_path_relative_redirect`、development・test の `config.yjit`・`RubyVM::YJIT.enabled?`（true → false）だけ。読み込み済みの部品は同じ（DEF-8.1-27・28）
+- 雛形から消えた initializer はない（3 アプリの initializer は、8.1.4 の雛形にあるものか、アプリの独自のものだけ）
+- 解説（DEF-8.1-27・28）に人間の返事を得てから、記録（`c14e828`）、RS `650ecf1`・RP `38d8dc1`・OP `ada7df7` の順にコミットした。検査と E2E は通り、スナップショットの差分はない。`-W:deprecated` の警告と development だけのヘッダーも同じ
+- RuboCop の `TargetRailsVersion` を 8.1 にした（`ba14f44`）。3 アプリとも新しい指摘はない。`RuboCop::ConfigStore` で読む値が 8.1 になることを確かめた。rubocop-rails 2.38.0 に、Rails 8.1 を条件にする cop はない
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| Rails 8.1.4 で、新しい非推奨の警告は出なかった。`RUBYOPT=-W:deprecated` を付けたテストと eager load の `warning:` は、各作業の前後とも 0 件、DEPRECATION は前からある OP の `auth_time_from_resource_owner`（IMP-011）だけ。omniauth-rails_csrf_protection 2.0.1 の `ActiveSupport::Configurable` は、Rails 8.1 では読まない分岐を通る | なし |
+| 起動のたびに、Active Storage が image_processing gem がないことを Rails のログに WARN で出す（非推奨ではない） | 受け入れた（DEF-8.1-29）。使っていないフレームワークを読み込まないことを、改善の候補にした（IMP-012。人間が承認した） |
+
+### 意図的な仕様変更
+
+なし。応答のスナップショット・E2E・verify の手動確認で、業務的な挙動の変化は見つからなかった。応答とファイルの変化はすべて既定値・雛形・依存への追随として解説し、人間の返事を得た（[defaults/rails-8.1.md](defaults/rails-8.1.md) の DEF-8.1-01〜29）。OP の応答のスナップショットの変化は、hidden の input の `autocomplete="off"` が消えることだけ（DEF-8.1-26）
+
+### 前後の比較
+
+lock を変える前（`e843a3f` の後。アプリは research の開始時から変わっていない）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた（compare-config は research の worktree の前に取ったものとも同じ）。
+
+- Rails 8.1.4（rails-lock）
+  - `scripts/check-apps`: 前は 36 の検査がすべて通った（RS 11・RP 33・OP 69 runs、0 failures。`CI=1` も同じ。E2E 10 passed。起動の途中の読み込みの 9 項目は DEF-8.0-02 の組で許していた）。後も 36 の検査がすべて通り、件数は同じ。応答のスナップショットと E2E のスナップショットの差分はない。起動の途中の読み込みは、RS・OP の 6 項目が許す条件なしで通り、RP の 3 項目が omniauth-rails_csrf_protection の組で許された
+  - `scripts/compare-config dump`（3 アプリ、test・development）: 違いは DEF-8.1-01〜07 に振り分けた（`to_time_preserves_timezone` のキー、開いたリダイレクトの設定、リダイレクトと Active Record の新しい設定、Active Storage のキー、読み込み済みの部品）
+  - `RUBYOPT=-W:deprecated` を付けた minitest と development の eager load: 前後で同じ（`warning:` は 0 件、DEPRECATION は OP の IMP-011 だけ）
+  - development だけのヘッダー（E2E 用の DB で Puma に通した。RS の `/apples/show`、RP のトップ、OP の discovery・ログイン画面。日付・ID・数値・`x-miniprofiler-ids` などは伏せた）: 前後で同じ
+  - brakeman: 前は 3 アプリとも警告 0・無視 1。後は警告 0・無視 0（`config/brakeman.ignore` を消した）で、チェックの数は同じ（79）。research の worktree では、2 つの項目が「Obsolete Ignore Entries」に出ていた
+  - SQLite: OP の test.log で、fixtures の INSERT の真偽値が `1` → `TRUE` になった（DEF-8.1-08）
+  - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- `app:update`（rails-app-update）。前は rails-lock の後の書き出し。結果は上の「`app:update` で採用したもの・戻したもの」（変わった値は development の `verbose_redirect_logs` だけ）
+- rails-defaults・rails-load-defaults。前はそれぞれ直前の書き出し。結果は上の「`new_framework_defaults_8_1.rb` を有効にした順番」「`load_defaults 8.1`」（各グループで、検査・スナップショット・`-W:deprecated` の警告・development だけのヘッダー・読み込み済みの部品を比べた）
+- 比べていないもの: Rails のログ（`log/*.log`）の WARN・ERROR の行。Active Storage の WARN（DEF-8.1-29）は、これを比べていなかったので verify まで見えなかった（気づきの 14）
+
+### 手動確認
+
+verify で、`load_defaults 8.1` と `TargetRailsVersion` 8.1 の後（`bee5797`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Puma 8.0.2・threads 3 で起動し、Ruby の版の表示に Step 6 にあった `+YJIT` は出なかった（DEF-8.1-28）。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 7）
+- 起動の直後: プレビューが同時に送った `HEAD "/"`・`GET "/"` は、3 アプリとも両方 200。Step 6 の RoutingError（DEF-8.0-03）は出なくなった（rails/rails#58225 が 8.1.4 に入っている）。TIPS.md の元からあるエラーの一覧から外した
+- ログイン（RP の my_op）: 人間が「Re Login」を押した（OP のセッションが残っていて、ログインと同意の画面は出なかった。Step 6 と同じ）。OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`。RP の「Redirected to」の次の行に `↳ app/controllers/sessions_controller.rb:10` などが出た（DEF-8.1-10。OP は doorkeeper の中のリダイレクトなので出ない）
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。OP は introspect を 3 回、revoke を 1 回受けた。Step 6 と同じ
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。起動のたびに、Active Storage の image_processing gem の WARN が出た（DEF-8.1-29。rails-lock の時点から出ていたが、前後の比較では数えていなかった。人間が受け入れ、IMP-012 を足した）
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 29 → 31 件、`oauth_access_tokens` が 72 → 77 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 13 → 14）、RP は `sessions` 12 件・`op_users` 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| research の worktree に RS の E2E 用の DB を `sqlite3 -readonly ... ".backup"` で写すと、0 バイトの写しになり `unable to open database file` が出た（`-wal`・`-shm` のない WAL の DB） | `-wal` がないのでデータは本体にあり、`cp` で写した（TIPS.md の「手動確認用の環境」と同じ性質） |
+| research の worktree の compare-config の書き出しにだけ、ActiveStorage などのモデルの関連付けの行がなかった | `vendor/bundle` をシンボリックリンクにした worktree のときだけの違いで、本体では 8.0.5.1・8.1.4 とも出る。worktree の書き出しは、本体の前後の比較には使わなかった |
+| 一時ファイルを消す `rm $WT/$d/...` が、Claude Code の安全チェックで止められた（変数が空だと根を指すため） | `"${WT:?}/${d:?}/..."` の形に直した |
+| サブエージェントの見立て（`render_tracker` は defaults のファイルから効かない）が、実行で外れた | worktree で値と initializer の並び順を確かめ、論点 5 の材料を直した（下の気づきの 8） |
+| DEF-8.1-24 の記録の `\u` の並びが、実際の文字（目に見えない U+2028・U+2029 を含む）になってコミットされた | Python で直した（`5213a29`・`123c837`。下の気づきの 13） |
+| 起動のたびの Active Storage の WARN（DEF-8.1-29）に、rails-lock の前後の比較では気づかず、verify の手動確認で気づいた | 警告の数え方は `warning:`・`DEPRECATION` の行で、Rails のログの WARN を見ていなかった。人間が受け入れ、IMP-012 を足した（下の気づきの 14） |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: `TargetRailsVersion` 8.1 と記録のコミットの後（`bee5797`）に、36 の検査がすべて通った。各コミットの前には、そのアプリと E2E で流した。起動の途中の読み込みは、RP の omniauth-rails_csrf_protection の 1 件だけを `scripts/check-load-hooks` で許している（DEF-8.1-07）。RS・OP は許す条件なしで通る
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットの差分は、グループ 4 の OP の 6 つ（`autocomplete="off"` が消える。DEF-8.1-26）だけ。E2E のスナップショットの差分は、この Step を通して出なかった
+- RuboCop（`TargetRailsVersion: 8.1`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空）・brakeman: すべて通った（`check-apps` の項目）。brakeman は 3 アプリとも `Security Warnings: 0`、無視の項目はない（`config/brakeman.ignore` を消した）
+- lock: epic（`bb51ff5`）からの動きは、Rails の構成 gem（8.1.4）、増えた action_text-trix 2.1.19、3 アプリから消えた benchmark 0.3.0、`DEPENDENCIES` の rails だけ。default gem に合わせた版と、一時固定の uri 0.13.3・reline 0.6.0・connection_pool 2.5.5・faraday-net_http 3.0.2（RS・RP）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.13.1・reline 0.6.0。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。`scripts/check-load-hooks` を呼ぶ CI の 2 つのステップが、RP で許した 1 件で通ることも、そのときに見る
+- 手動確認用の環境: 上の「手動確認」。HEAD で、12 ファイルのハッシュが手動確認の後の基準と同じ
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `scripts/lib/dump_config.rb` の「アプリのモデルだけを見る」が、モデルのファイルが `Rails.root` の下かで分けるので、アプリのディレクトリの中の `vendor/bundle` にある gem のモデル（ActiveStorage など）も含める | 直さない。同じ場所での前後の比較には影響しない（research の worktree の書き出しとの違いの原因だった）。Step 6 のコードレビューの 4 と同じく、道具の見直しで扱う（下の気づきの 16。人間が判断） |
+| RP で omniauth-rails_csrf_protection の 1 件を許すと、その後ろの早い読み込みが CI で見えない（CI は compare-config を流さない） | 直さない。作業計画の論点 2 で、隠れる分を各作業の前後の compare-config で補うと決めた。IMP-009 で見張る（人間が判断） |
+| production.rb の `assume_ssl`・`force_ssl` がコメントになり、production で HTTPS を強制しなくなる | 直さない。DEF-8.1-11 で、決まりどおり雛形に追従すると決めた（人間が判断） |
+| `bin/setup --reset` は、RS では `db/schema.rb` がないので失敗し、RP・OP では手動確認用の DB を作り直す | 記録を直した。DEF-8.1-15 に、RS では失敗すること（流しては確かめていない）を書き足した。注意書きは README の仕上げで書く（人間が判断） |
+| DEF-8.1-06 の「読み込みの時期は 8.0.5.1 と同じ」は、8.1.4 でしか流しておらず、8.0.5.1 はソースを読んだ見立て | 記録を直した。8.0.5.1 は同じ行（`activerecord-8.0.5.1/lib/active_record/errors.rb:444`）をソースで確かめた見立てだと書き分けた（人間が判断） |
+
+- 直したのは記録だけで、アプリと道具のコードは変えていない
+
+### スキルについて気づいたこと
+
+Step 3〜6 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+resume:
+
+1. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#35 の取り込みが入っていなかった（Step 5 の気づきの 3、Step 6 の気づきの 1 と同じ）。人間の指示にあったので、fetch して早送りしてから切った
+2. 前のセッション（Ruby 3.2 の頃）の調査で起動した RS の puma（ポート 3992）が残っていて、development.log に書き込んでいた。resume の手順 3 で手動確認用の環境を控えるときに、サーバーが動いていないかを確かめる手順がない（ps で見つけた）
+
+research:
+
+3. resolve-lock の「消えた gem」に出ずに lock から消える gem が、また出た（3 アプリの benchmark 0.3.0）。Step 3 の method_source、Step 5 の mutex_m、Step 6 の cgi に続いて 4 回目。持ち込んだ後の `bundle lock` まで試して見つけた
+4. 新しい Rails を research で起動して試すには、ダウンロードが先に要る。templates.md の「質問」は、ダウンロードの承認を最後の論点（作業計画の承認）の返事に含める形なので、今回は最初の論点で先に承認をもらった
+5. omniauth-rails_csrf_protection の Rails 8.1 の分岐による早い読み込みは、サブエージェントが gem のソースを読んで見つけた。research の手順 2 は「上げるものの事実」を調べるが、lock の gem が新しい Rails で別の分岐（`ActionPack.version` などの条件）を通るかを見る手順はない
+6. 論点 2 で、人間は 5 回掘り下げた（何が問題か・なぜ 8.1 で起きたか・omniauth の組み込みの対策で足りるか・rack-protection を上げれば足りるか・gem のままのほうがよいか）。templates.md の「質問」は「本題・根拠・見立て」の型で、影響の具体例（実際に流した結果）、原因の版の差、とらない案の理由を出す決まりがない。最初の示し方に、影響を実行で示した例と、原因の差分を入れておけば、往復が減った
+7. 論点 1 の試行（worktree）は、論点 2 の掘り下げでも使えた（8.0.5.1 と 8.1.4 で initializer の値が届くかを並べて試した）。比べるために、HEAD のままの worktree をもう 1 つ作った
+8. サブエージェントの見立て（`render_tracker` は defaults のファイルから効かない）が、worktree で流すと外れた（initializer の並び順で、アプリの `load_config_initializers` より後に走っていた）。Step 6 の気づきの 11 と同じく、initializer の時期は、ソースを読むだけでなく `Rails.application.initializers.tsort_each` の並び順か、実際の値で確かめる必要がある。research で起動して試せたので、計画の段階で直せた
+9. research の途中で日付が変わり、webmock 3.30.0（10-12）が出ていた。版の調べは research の始めに 1 回しているが、論点を決める直前にもう一度見る手順はない（論点 6 の直前に見直して気づいた）
+10. 論点 5 の示し方で、AI は「3 アプリの `redirect_to` は path ヘルパーと絶対 URL だけ」と、確かめずにサブエージェントの調べから書いた。記録の前に grep で確かめ、言い方を直した（アプリの `redirect_to` は RP の path ヘルパーだけ）
+11. 論点 7 で、research の出口の片付け（写しを消す・残っていたサーバーを止める・worktree を外す）を決めた。research.md の出口には、research で作ったもの（worktree など）を片付ける手順がない
+
+rails-app-update:
+
+12. `config/puma.rb` の `plugin :solid_queue` を、Step 6 に続いて手で消した。`scripts/restore-app-config` は独自設定を戻す道具で、採用しない雛形の行は消さない。毎回同じ判断（DEF-8.0-19・DEF-8.1-13）なので、道具の一覧に足すかを決めておくと手が減る
+
+rails-defaults:
+
+13. DEF-8.1-24 の記録で、`\u003c`・`\u2028` などの並びを heredoc で書いたところ、ツールに渡す段階で実際の文字（`<` と、目に見えない U+2028・U+2029）に変わり、そのままコミットした（TIPS.md の「コミット」の `\u` の性質が、コミットメッセージだけでなく、ファイルに書く文にも当たった）。後で気づき、Python で直した。`\u` を含む文を書くときは、ファイルでも Python で書き、U+2028・U+2029 が入っていないかを確かめる必要がある
+
+verify:
+
+14. 起動のたびの Active Storage の WARN（DEF-8.1-29）は、rails-lock から出ていたのに、前後の比較では見えなかった。設定の「前後の比較」の警告は、`RUBYOPT=-W:deprecated` の `warning:` と `DEPRECATION` の行を数えるだけで、Rails のログ（`log/*.log`）の WARN を見ていない。手動確認のサーバーの出力を読んで初めて気づいた。前後の比較に、test.log・development.log の WARN・ERROR の行（新しい種類のもの）を足すと、rails-lock の時点で見える
+15. 手動確認の前に、ブラウザペインが隠れていて、表示してもらう往復が要った（Step 5 の気づきの 16、Step 6 の気づきの 17 と同じ）。今回も依頼に表示の仕方と操作の順を一緒に書いたので、往復は 1 回で済んだ
+
+pr:
+
+16. コードレビューで、`scripts/lib/dump_config.rb` のアプリのモデルの絞り込みが、`vendor/bundle` の gem のモデルも含めると分かった。research の worktree（`vendor/bundle` をシンボリックリンクにした）の書き出しとの違いは、これが原因だった。worktree で新しい Rails を試す手順をスキルに足すなら、道具がアプリのディレクトリの場所に頼っているところ（この絞り込み、`$LOAD_PATH` の除外）を見直す必要がある

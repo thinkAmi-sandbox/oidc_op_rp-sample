@@ -32,8 +32,8 @@ x-xss-protection: 0
 </header>
 
 <form name="redirect_form" action="http://localhost:3781/auth/my_op/callback" accept-charset="UTF-8" method="post">
-    <input type="hidden" name="error" id="error" value="access_denied" autocomplete="off" />
-    <input type="hidden" name="error_description" id="error_description" value="The resource owner or authorization server denied the request." autocomplete="off" />
+    <input type="hidden" name="error" id="error" value="access_denied" />
+    <input type="hidden" name="error_description" id="error_description" value="The resource owner or authorization server denied the request." />
 </form>
 <script>
   window.onload = function () {

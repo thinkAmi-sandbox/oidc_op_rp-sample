@@ -27,6 +27,7 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 | IMP-009 | 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する | RP・OP | コードの整理 | 未着手 |
 | IMP-010 | OP のレイアウトに flash（ログイン失敗などのメッセージ）を出す | OP | 挙動の変更 | 未着手 |
 | IMP-011 | `max_age` の判定に `auth_time_from_session` を使う | OP | セキュリティの設定 | 未着手 |
+| IMP-012 | 使っていない Rails のフレームワーク（Active Storage など）を読み込まない | 3 アプリ | コードの整理 | 未着手 |
 
 ## IMP-001: PKCE を必須にし、S256 だけを受け付ける
 
@@ -114,15 +115,17 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 
 ## IMP-009: 起動の途中にフレームワークのクラスを読み込む gem に対応し、CI で検出する
 
-- 対象: activerecord-session_store（RP）、web-console（RP・OP の development）
+- 対象: activerecord-session_store（RP）、web-console（RP・OP の development）、omniauth-rails_csrf_protection（RP。Rails 8.1 から）
 - 現状: activerecord-session_store は `Bundler.require` の時点で（`activerecord-session_store-2.1.0/lib/action_dispatch/session/active_record_store.rb`）、web-console は initializer の `web_console.permissions` で（`web-console-4.2.1/lib/web_console/railtie.rb`）、`ActionDispatch::Request` を読み込む（activerecord-session_store 2.3.0・web-console 4.3.0 でも同じ）。そのため、`config/initializers` に書いた `ActionDispatch::Request` の設定（`new_framework_defaults_*.rb` を含む）は、RP と OP の development では効かず、`load_defaults` を上げたときに効く
 - 改善案: gem に修正を送る（`ActiveSupport.on_load` で読み込みを遅らせる）。あわせて、起動の途中に読み込まれた部品を書き出して許可した一覧と比べるテストを各アプリに置き、CI で検出する（Rails 本体の rails/rails#56201「Load hook guard」は main にだけ入っていて、8.1.4 までのリリースにはない。main では rails/rails#56901 で `action_dispatch_request` が監視から外れた）
   - Step 1-b-1 で、a-nti_manner_kick_course を CI で test と development に流すようにした。検出するのは、`config/application.rb`・gem の require・`config/environments/*.rb` で監視の一覧の部品を読み込んだときだけ。このテストで残るのは、ほかの gem の initializer（web-console の `web_console.permissions` もここ）と `config/initializers/*.rb` での読み込み、監視の一覧にない `action_dispatch_request` の 3 つ（PLAN.md の Step 1-b-1「検出できる範囲」）
+  - omniauth-rails_csrf_protection 2.0.1 は、Rails 8.1 では `Bundler.require` の時点で `ActionController::Base` を読み込む。Rails 8.1 用の分岐（`omniauth-rails_csrf_protection-2.0.1/lib/omniauth/rails_csrf_protection/token_verifier.rb:20-34`）が、`config` を `ActionController::Base.config` にしてから `ActionController::RequestForgeryProtection` を include し、その `included` ブロックが `config` を呼ぶため（Rails 8.1 は `ActiveSupport::Configurable` を非推奨にし、rails/rails#53970、`RequestForgeryProtection` が include した側の `config` に任せる形になった）。上流の cookpad/omniauth-rails_csrf_protection#33 は open。そのため、RP の `config/initializers` に書いた action_controller の設定は `ActionController::Base` に届かない（`new_framework_defaults_8_1.rb` の action_controller の 2 項目を含む。`load_defaults` と環境のファイルの値は届く）。Step 7 で、a-nti_manner_kick_course のこの検出だけを `scripts/check-load-hooks` で許した（LOG.md の Step 7 の論点 2）
+  - omniauth-rails_csrf_protection の改善案: 上流が直ったら上げて、`scripts/check-load-hooks` の許す組を消す。直らなければ、gem に修正を送る（include を `ActiveSupport.on_load(:action_controller_base)` まで遅らせるなど。送るかどうかは人間が判断し、送るときも人間が送る）か、アプリ側で gem の読み込みを `after_initialize` に遅らせるかを決める。OmniAuth の組み込みの `AuthenticityTokenProtection` への置き換えは、失敗したときのリダイレクト先・test 環境の `allow_forgery_protection`・Origin の確かめが変わるので、候補にしない（LOG.md の Step 7 の論点 2）
   - a-nti_manner_kick_course に、initializer `anti_manner` を `after: :load_config_initializers` にする提案（issue か PR）を送る。送るかどうかは人間が判断し、送るときも人間が送る（AI は送らない）。取り込まれれば、上の 3 つのうち `config/initializers/*.rb` での読み込みと、`config/initializers` より前に走るほかの gem の initializer（OP では web-console の initializer がこの位置。ただし web-console が読み込む `ActionDispatch::Request` は監視の一覧にないので、それ自体は検出されない）での読み込みが検出できるようになる。devise・doorkeeper のように `config/initializers` より後に走る gem の initializer は、それでも見られない
 - 経緯: docs/upgrade/defaults/rails-7.0.md の「補足: RP で設定が効かなかった理由（フレームワークの早い読み込み）」、LOG.md の Step 1「遭遇した問題」と「コードレビュー」。アプリのコードが原因だったもの（RP の `config/application.rb` の serializer の設定）は、Step 1 で直した。gem への提案は、LOG.md の Step 1-b-1「コードレビュー」で試した結果による: 手元で起動の前に initializer の `after` を `:load_config_initializers` に差し替えると（a-nti_manner_kick_course 0.5.0）、検査は OP の test で 217 個中 148 番目（アプリの `load_config_initializers` の直後）に移り、3 アプリとも test・development で通り、OP の `config/initializers` に置いた `ActionController::Base` の参照が検出された
 - 見送った理由: gem の修正はこのリポジトリの範囲外で、アップグレード中は挙動を変えない。今の RP・OP の development では `action_dispatch_request` が読み込まれるのが正しい状態なので、CI のテストは gem ごとの許可の一覧を持つことになる。それまでは、Step ごとに手で確かめる（PLAN.md 12 章、TIPS.md の「設定の値と応答の比較」）。Step 1-b-1 で入れた a-nti_manner_kick_course は、gem の検査が Rails の各フレームワークの initializer の直後で終わる仕組みで、上の 3 つは設定で検出できるようにならない
 - 確かめ方: TIPS.md の「設定の値と応答の比較」の確かめ方で、`action_dispatch_request` が起動の途中に読み込まれなくなること
-- 記録した Step: 1（Step 1-b-1 で、CI で検出する範囲と残る範囲を書き足した）
+- 記録した Step: 1（Step 1-b-1 で、CI で検出する範囲と残る範囲を書き足した。Step 7 で omniauth-rails_csrf_protection を足した）
 
 ## IMP-010: OP のレイアウトに flash（ログイン失敗などのメッセージ）を出す
 
@@ -143,3 +146,13 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: RP は `max_age` を送らない。ID トークンの項目も変わるので、アップグレード中は挙動を変えない
 - 確かめ方: `rails_open_id_provider/test/integration/response_snapshot_authorization_prompt_test.rb` の `max_age` のスナップショット、ID トークンのテスト（`authorization_code_flow_test.rb`）、E2E のログイン
 - 記録した Step: 1-b-3-2（Step 2-b で書き足した）
+
+## IMP-012: 使っていない Rails のフレームワーク（Active Storage など）を読み込まない
+
+- 対象: 3 アプリの `config/application.rb`（RS は `require "rails/all"`、RP・OP は `active_storage/engine`・`action_mailbox/engine`・`action_text/engine`・`action_cable/engine` などを require している）
+- 現状: 3 アプリは Active Storage・Action Text・Action Mailbox を使っていない（Action Cable・Active Job・Action Mailer も使っているかを確かめていない）が、起動時に読み込んでいる。Rails 8.1 では、Active Storage の engine が after_initialize で画像の変換の部品を読むようになり（rails/rails#55303）、image_processing gem がないので、起動のたびにログに WARN を 1 行出す（「Generating image variants require the image_processing gem.」。`activestorage-8.1.4/lib/active_storage/engine.rb:89-125`）。Action Text の Trix も、Rails 8.1 から action_text-trix gem として lock に入る（DEF-8.1-09）。使わない機能のマイグレーションや雛形も、`app:update` のたびに作られ、道具で消している（DEF-7.0-14）
+- 改善案: アプリが使うフレームワークを確かめ（devise が Action Mailer を使うか、Active Job を使うかなど）、使わないものを `config/application.rb` で require しないようにする（RS は `rails/all` をやめ、RP・OP と同じく 1 つずつ require する）。あわせて、`config/storage.yml`・`config/environments/*.rb` の `active_storage` などの設定、`app:update` で消している雛形、`scripts/restore-app-config` の一覧も見直す
+- 経緯: LOG.md の Step 7 の verify の手動確認（Rails 8.1.4 で起動の警告に気づいた。defaults/rails-8.1.md の DEF-8.1-29）
+- 見送った理由: 読み込むフレームワークを変えると、起動の途中の読み込み・設定の値・ミドルウェアが変わり、アップグレードの前後の比較に混ざる。警告はログの 1 行で、動きは変わらない
+- 確かめ方: `scripts/compare-config` の書き出し（設定の値と読み込み済みの部品）、`bin/rails middleware`、検査と E2E、起動のログに Active Storage の警告が出ないこと
+- 記録した Step: 7

@@ -9,17 +9,26 @@
 # gem は最初の 1 件で止まるので、許した検出の後ろにある検出は見えない。許している間は、各作業の前後で
 # scripts/compare-config の「読み込み済みの部品」を比べて補う。
 #
-# KNOWN（Step 7 で Rails 8.1 に上げたら消す。docs/upgrade/PLAN.md の Step 6、LOG.md の Step 6）:
-#   Rails 8.0.5.1 の initializer `action_controller.live_streaming_excluded_keys` が、起動の途中で ActionController::Live を
-#   読み込み、ActionDispatch::Response の load hook が config/initializers より先に走る（rails/rails#58145）。
-#   8-0-stable では直った（#58276）が、8.0.5.1 には入っていない。8.1.4 は直っている。
-#   版と行で絞っているので、Step 7 の前に 8.0 系のパッチ（セキュリティ修正など）に上げると、この検出も失敗になる。
-#   そのときは、同じ initializer による検出かを ANTI_MANNER_DEBUG のスタックトレースで確かめてから、KNOWN_LINE を直す
+# KNOWN（hook と行の組。どちらも出たときだけ許す）:
+#   1. omniauth-rails_csrf_protection 2.0.1（RP）は、Rails 8.1 では require の時点で ActionController::Base を読み込む。
+#      Rails 8.1 用の分岐が、`config` を ActionController::Base.config にしてから RequestForgeryProtection を include し、
+#      その included ブロックが `config` を呼ぶため（cookpad/omniauth-rails_csrf_protection#33。open）。
+#      その間、RP の config/initializers に書いた action_controller の設定は ActionController::Base に届かない。
+#      直った版が出たら上げて、この組を消す（docs/upgrade/PLAN.md の 6 章の Step 7 と 7 章、docs/IMPROVEMENTS.md の IMP-009）。
+#      gem の版と行で絞っているので、gem を上げるとこの検出も失敗になる。そのときは、同じ分岐による検出かを
+#      ANTI_MANNER_DEBUG のスタックトレースで確かめてから、行を直すか組を消す
 
 set -u
 
-KNOWN_HOOK='ActiveSupport.on_load(:action_dispatch_response)'
-KNOWN_LINE='actionpack-8.0.5.1/lib/action_controller/railtie.rb:35:'
+KNOWN_HOOKS=(
+  'ActiveSupport.on_load(:action_controller_base)'
+)
+KNOWN_LINES=(
+  'omniauth-rails_csrf_protection-2.0.1/lib/omniauth/rails_csrf_protection/token_verifier.rb:26:'
+)
+KNOWN_NAMES=(
+  'omniauth-rails_csrf_protection 2.0.1 の Rails 8.1 用の分岐。cookpad/omniauth-rails_csrf_protection#33'
+)
 
 output="$(ANTI_MANNER=1 ANTI_MANNER_DEBUG=1 bin/rails runner 1 2>&1)"
 status=$?
@@ -29,11 +38,13 @@ if [ "$status" -eq 0 ]; then
   exit 0
 fi
 
-if grep -qF "$KNOWN_HOOK" <<<"$output" && grep -qF "$KNOWN_LINE" <<<"$output"; then
-  echo "許している検出（Rails 8.0.5.1 の action_controller.live_streaming_excluded_keys。rails/rails#58145）だけが出た"
-  echo "この検出の後ろにある検出は見えない。scripts/compare-config の「読み込み済みの部品」で補う"
-  exit 0
-fi
+for i in "${!KNOWN_HOOKS[@]}"; do
+  if grep -qF "${KNOWN_HOOKS[$i]}" <<<"$output" && grep -qF "${KNOWN_LINES[$i]}" <<<"$output"; then
+    echo "許している検出（${KNOWN_NAMES[$i]}）だけが出た"
+    echo "この検出の後ろにある検出は見えない。scripts/compare-config の「読み込み済みの部品」で補う"
+    exit 0
+  fi
+done
 
 # 許していない検出は、gem の短い表示（疑わしい行）で出し直す。ANTI_MANNER_DEBUG の表示は、スタックトレースが 1 行の配列になる
 ANTI_MANNER=1 bin/rails runner 1 2>&1

@@ -24,7 +24,7 @@ x-xss-protection: 0
   <body>
     <h2>Edit User</h2>
 
-<form class="edit_user" id="edit_user" action="/users" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="put" autocomplete="off" />
+<form class="edit_user" id="edit_user" action="/users" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="put" />
   
 
   <div class="field">
@@ -55,7 +55,7 @@ x-xss-protection: 0
 </form>
 <h3>Cancel my account</h3>
 
-<div>Unhappy? <form class="button_to" method="post" action="/users"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button data-confirm="Are you sure?" data-turbo-confirm="Are you sure?" type="submit">Cancel my account</button></form></div>
+<div>Unhappy? <form class="button_to" method="post" action="/users"><input type="hidden" name="_method" value="delete" /><button data-confirm="Are you sure?" data-turbo-confirm="Are you sure?" type="submit">Cancel my account</button></form></div>
 
 <a href="javascript:history.back()">Back</a>
 

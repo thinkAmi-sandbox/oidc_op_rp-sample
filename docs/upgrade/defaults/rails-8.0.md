@@ -1,7 +1,7 @@
 # Rails 8.0 の既定値への追随
 
 - 版: Rails 7.2.4 → 8.0.5.1（Ruby 3.3.12）
-- Step: 6（ブランチ `upgrade/step6-rails80`）/ PR: （PR 作成後に記入）
+- Step: 6（ブランチ `upgrade/step6-rails80`）/ PR: [#35](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/35)
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
