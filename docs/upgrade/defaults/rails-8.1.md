@@ -34,6 +34,8 @@
 | DEF-8.1-24 | `render json:` で HTML の記号を書き換えなくなる | Rails の既定値（8.1） | 3 アプリ | 追随（RP は `load_defaults 8.1` で入る） |
 | DEF-8.1-25 | JSON で U+2028・U+2029 を書き換えなくなる | Rails の既定値（8.1） | 3 アプリ | 追随（defaults のファイルからは効かないので、`load_defaults 8.1` で入る） |
 | DEF-8.1-26 | hidden の input に `autocomplete="off"` を付けなくなる | Rails の既定値（8.1） | 3 アプリ（スナップショットが変わるのは OP） | 追随（OP の応答のスナップショットを作り直した） |
+| DEF-8.1-27 | `load_defaults 8.1` にし、`new_framework_defaults_8_1.rb` を消す | Rails の既定値 | 3 アプリ | 追随 |
+| DEF-8.1-28 | development・test で YJIT を切る | Rails の既定値（8.1） | 3 アプリ（development・test） | 追随 |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -292,3 +294,26 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 扱い: 追随（グループ 4）。OP の応答のスナップショットを `UPDATE_SNAPSHOTS=1` で作り直し、OP のコミットに入れた
 - 出典: `actionview-8.1.4/lib/action_view/helpers/form_tag_helper.rb`・`url_helper.rb`・`tags/hidden_field.rb`、`actionview-8.1.4/lib/action_view/railtie.rb:80-87`、ガイド「3.11.22 config.action_view.remove_hidden_field_autocomplete」
 - コミット: グループ 4（RS・RP・OP）
+
+### DEF-8.1-27: `load_defaults 8.1` にし、`new_framework_defaults_8_1.rb` を消す
+
+- 種類: Rails の既定値 / 対象: RS・RP・OP
+- 何が変わるか: `config/application.rb` の `config.load_defaults` が 8.0 → 8.1。`new_framework_defaults_8_1.rb` を消した。前（グループ 4 の後）と比べて、書き出しで値が変わったのは、defaults のファイルからは効かなかったものだけ
+  - 3 アプリ: `ActiveSupport.escape_js_separators_in_json` が true → false（DEF-8.1-25）
+  - RP: `escape_json_responses` が true → false、`action_on_path_relative_redirect` が `:log` → `:raise`（`ActionController::Base`・`API`。DEF-8.1-23・24）
+  - 3 アプリで有効にしてあったほかの項目は、同じ値のまま `load_defaults` から入る
+- なぜ: `load_defaults 8.1` は `config/application.rb` の段階で値を入れるので、config/initializers より前に値を写す initializer（`active_support.set_configs`）にも、RP の早い読み込み（DEF-8.1-07）にも間に合う
+- 3 アプリへの影響: 上の値と下の DEF-8.1-28 のほかは、書き出し（読み込み済みの部品を含む）・検査（36 の検査）・応答と E2E のスナップショット・`-W:deprecated` の警告・development だけのヘッダーとも同じ。3 アプリの応答に U+2028・U+2029 はなく、RP の `redirect_to` は path ヘルパーだけ。雛形から消えた initializer はない（3 アプリの initializer は、8.1.4 の雛形にあるものか、アプリの独自のものだけ）
+- 扱い: 追随
+- 出典: `railties-8.1.4/lib/rails/application/configuration.rb:343-367`
+- コミット: `load_defaults 8.1`（RS・RP・OP）
+
+### DEF-8.1-28: development・test で YJIT を切る
+
+- 種類: Rails の既定値（`load_defaults 8.1` の項目。`new_framework_defaults_8_1.rb` の雛形にはない）/ 対象: RS・RP・OP（development・test。CI の test を含む）
+- 何が変わるか: `config.yjit` が `true` → `!Rails.env.local?`（development・test で false）。Finisher の initializer `:enable_yjit` が YJIT を有効にしなくなり、`RubyVM::YJIT.enabled?` が true → false になる（production は true のまま）
+- なぜ: development・test はコードの読み直しやメソッドの差し替え（モックなど）が多く、YJIT で速くならないことが多いため（rails/rails#53746）
+- 3 アプリへの影響: 速さだけで、動きは変わらない。テストの件数と結果は同じで、OP のテストの時間は 0.56 秒 → 0.48 秒（1 回ずつの計測）。Step 5 で `load_defaults 7.2` から有効にした YJIT（DEF-7.2-26）を、development・test では切る形になる。手動確認の Puma の起動の出力は verify で見る
+- 扱い: 追随
+- 出典: `railties-8.1.4/lib/rails/application/configuration.rb:346-349`、`railties-8.1.4/lib/rails/application/finisher.rb:230-235`、ガイド「3.2.63 config.yjit」
+- コミット: `load_defaults 8.1`（RS・RP・OP）
