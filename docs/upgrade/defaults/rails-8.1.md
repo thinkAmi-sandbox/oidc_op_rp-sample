@@ -30,6 +30,7 @@
 | DEF-8.1-20 | `public/406-unsupported-browser.html`・`icon.png`・`icon.svg` | Rails の雛形 | RP・OP | 採用しない |
 | DEF-8.1-21 | Action View のテンプレートの依存を、Ruby のパーサーで追う | Rails の既定値（8.1） | 3 アプリ | 追随 |
 | DEF-8.1-22 | 並べる列のないモデルで `first` などを呼ぶと例外にする | Rails の既定値（8.1） | 3 アプリ | 追随 |
+| DEF-8.1-23 | `/` で始まらない相対パスへのリダイレクトを例外にする | Rails の既定値（8.1） | 3 アプリ | 追随（RP は `load_defaults 8.1` で入る） |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -248,3 +249,13 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 扱い: 追随（グループ 1）
 - 出典: `activerecord-8.1.4/lib/active_record/relation/finder_methods.rb:661-673`、`activerecord-8.1.4/lib/active_record/railtie.rb:210-221`、ガイド「3.8.89 config.active_record.raise_on_missing_required_finder_order_columns」
 - コミット: グループ 1（RS・RP・OP）
+
+### DEF-8.1-23: `/` で始まらない相対パスへのリダイレクトを例外にする
+
+- 種類: Rails の既定値（`load_defaults 8.1` の項目）/ 対象: RS・OP（RP は `load_defaults 8.1` で入る）
+- 何が変わるか: `action_on_path_relative_redirect` が `:log` → `:raise`（`ActionController::Base`・`API`）。`redirect_to "example.com"` のように、スキームも `/` もない文字列へのリダイレクトが、警告のログではなく `ActionController::Redirecting::UnsafeRedirectError`（`PathRelativeRedirectError`）になる
+- なぜ: こうした文字列は、ブラウザが相対パスとも他のホストとも解釈しうるので、開いたリダイレクトの穴になりうるため（rails/rails#55308）
+- 3 アプリへの影響: アプリの `redirect_to` は RP の path ヘルパーだけで、OP のリダイレクト（devise・doorkeeper）は `/` で始まるパスか絶対 URL。`:log` のときも、3 アプリの test.log にこの警告は 1 件もなかった。前後で、値の変化のほかに、書き出し・検査・スナップショット・`-W:deprecated` の警告・development だけのヘッダーは同じ。RP は、defaults のファイルで有効にしても `ActionController::Base` に届かない（DEF-8.1-07）ので、理由のコメントを付けてコメントのまま残した
+- 扱い: 追随（グループ 2）
+- 出典: `actionpack-8.1.4/lib/action_controller/metal/redirecting.rb:20,31,217,328-343`、`actionpack-8.1.4/lib/action_controller/railtie.rb:16`、ガイド「3.9.19 config.action_controller.action_on_path_relative_redirect」
+- コミット: グループ 2（RS・RP・OP。RP は理由のコメントだけ）
