@@ -3324,13 +3324,16 @@ pr:
 | 5 CI の setup-ruby の固定 | ruby の作業の最初のコミット（3 アプリの Ruby を上げる前）で、ci.yml の setup-ruby の 4 か所を v1.325.0 から v1.329.0（タグのコミット `651ff0d62c5c79bed6d53ec518387aae20e72c1a`）にする。v1.329.0 は 2026-10-12 公開で、公開から 2 週間の決まりの例外とする（人間が判断） | v1.325.0 の `ruby-builder-versions.json` は 3.4 系が 3.4.10 までで、`.ruby-version` を 3.4.11 にすると CI が Ruby を入れられない。3.4.11 は v1.326.0（09-23）で足された。v1.325.0 → v1.329.0 の差分の全文を読み、3.4.11 の追加、Windows の CRuby の一覧（v1.327.0）、Windows の MSYS1 の証明書のパスの 1 行（v1.328.0）、4.1.0-preview1 の追加（v1.329.0）だけで、ubuntu で 3.3.12・3.4.11 を入れる経路は変わらないことを確かめた。コミットの SHA で固定する。v1.329.0 の一覧にも 3.3.12 があるので、Ruby を順に上げる途中のコミットでも CI は Ruby を入れられる。AI は 2 週間たった最新の v1.327.0 を案にしたが、差分が小さいので最新にした |
 | 6 rubocop・webmock を次に確かめる時期 | Step 8 では上げない。次に確かめるのは、Step 9 を行うならその research の最初、行わないなら仕上げの最初（7 章の rubocop 系・webmock の行に書く） | 着手の日（10-14）に、rubocop 1.92.0（10-10）・webmock 3.27.0〜3.30.0（10-10〜10-12）は 2 週間たっていない（10-24〜10-26 から）。rubocop-rails 2.38.0・rubocop-ast 1.50.0・rubocop-minitest 0.41.0 は最新。Step に結び付けるとまた送りになりやすい（Step 6 の気づきの 7）が、Step 9 を行うかは Step 8 の完了時に決まるので、どちらでも送り先が決まる。試行の worktree で、rubocop 1.91.0 の `TargetRubyVersion: 3.4` で 3 アプリとも指摘はなかった |
 | 7 byebug 13.0.0 の Ruby 3.4 での不具合 | CLAUDE.md の ①（対応版を待つ）。byebug は 13.0.0 のままにし、`where` の不具合を 7 章の byebug の行に記録する。直った版が出たら、直接の gem の方針で上げる。debug gem への置き換えを IMP-013 に足した（人間が承認） | 試行で、3.4.11 の RS の `scripts/check-console`（`next`・`where`・`continue`）で、`where` だけが `undefined method 'Kernel.require' for class 'Kernel'` で失敗した（byebug#867。修正の #967 は 2026-04-25 にマージ、未リリース）。アプリのコードは byebug を呼ばず、業務的な挙動には関わらない。② GitHub の main は lock に git の参照が入り `.gem` を照合できない。④ debug gem への置き換えは開発の道具を替える改善で、epic の後に行う |
+| 8 手動確認の時期と DB の写し | verify で 1 回、すべての変更（json、Ruby、`TargetRubyVersion`、faraday-net_http）の後に行う。直前に 12 ファイルのハッシュを確かめ、3 アプリの development DB を `tmp/manual_check_backup/` に写す。research の出口で、Step 7 の写し（3 アプリの `tmp/manual_check_backup/`）を消し、試行の worktree を外す。本体の各アプリの `vendor/bundle/ruby/3.4.0` は ruby の作業で使うので残す | RP・OP・RS の間のやり取りに関わる変更（Ruby 3.4.11、json 2.21.2、faraday-net_http 3.4.4）は minitest・スナップショット・E2E で確かめるが、ブラウザでの流れ（RP の my_op でのログインと introspection 用 RP）は手動確認で見る。Step 7 の写しは、#36 が epic に入ったので消してよい（TIPS.md の「手動確認用の環境」） |
 
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 8 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 7 の手動確認の後と同じだった（OP `oauth_access_grants` 31・`oauth_access_tokens` 77（revoke 済み 14）、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま）。
 
 - 開始時に、前のセッションのサーバーが残っていないことを、`ps` とポートの待ち受け（`lsof`）で確かめた
-- Step 7 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（本体だけ）が残っている。消すかは作業計画で確かめる
+- Step 7 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（本体だけ）を、research の出口で、人間に確かめて消した（論点 8）
+- research の試行の worktree（scratchpad）は、出口で外した。試行で入れた gem は、本体の各アプリの `vendor/bundle/ruby/3.4.0` に残っている（ruby の作業で使う）
+- 写しを消し、worktree を外した後も、12 ファイルのハッシュは開始時と同じで、`-wal` はない
 
 ### スキルについて気づいたこと
 
@@ -3345,3 +3348,13 @@ research:
 2. mise 2026.5.10 の `mise install` は、入れる前に ruby-build を GitHub の最新のリリースと比べ、違えばリポジトリを clone し直す。TIPS.md の「Ruby を上げる」は Step 4 の時点で「手元の ruby-build は最新と同じ」としていて、この clone がダウンロードの確認に入ることと、その版が公開から 2 週間たっていないことがある（今回は 1 日目）ことを書いていない
 3. CI の setup-ruby の固定（v1.325.0）が 3.4.11 を持たなかった。Step 4 の「Ruby の版を持つ箇所」は「ci.yml は `.ruby-version` を読むので変えなくてよい」としていて、固定した setup-ruby が新しい版を持つかは、別に確かめる必要がある（Step 4 は `ruby-builder-versions.json` を見ていた）
 4. research の途中で日付が変わった（10-13 → 10-14。Step 7 の気づきの 9 と同じ）
+5. 新しい Ruby を research で試すときの worktree の作り方（`vendor/bundle` と `e2e/node_modules` を本体へのシンボリックリンクにする、OP の署名鍵を使い捨てで作る、E2E 用・テスト用の DB を写す、`MISE_TRUSTED_CONFIG_PATHS`）を、Step 7 の記録から組み立て直した。research.md に手順はない（Step 6 の気づきの 9、Step 7 の気づきの 4・11 と同じ）
+6. resolve で消える gem が、また出た（3 アプリの ruby2_keywords 0.0.5。drb 2.2.1 が依存しなくなった）。Step 3・5・6・7 に続いて 5 回目。合わせ直した lock を実際に解決して見つけた
+7. 8 章の 4 の「default gem の版に合わせ直す」は、合わせる先の版が advisory の対象でないことを前提にしていた。3.4.11 の json 2.9.1 が CVE-2026-54696 の対象だと、試行の bundler-audit で初めて分かった。research で、合わせ直す先の版を bundler-audit（無視リストなし）にかける手順があると、試行の前に分かる
+8. TIPS.md の「Ruby を上げる」の、一時的に足した行を消して `bundle lock --local` する手順は、その版が入っていないと解決できない（試行で json を 2.7.2 に戻したときに失敗した）。メタデータだけを取る `bundle lock` に替えた
+9. chilled string の警告は、通った経路でしか出ない。設定の「前後の比較」の `RUBYOPT=-W:deprecated` は minitest と eager load だけで、サーバーの経路は見ない。今回は E2E も `RUBYOPT=-W:deprecated` で流し、Playwright が出すサーバーの stderr を比べた
+10. 論点 2・5 で、人間は掘り下げた（Gemfile への書き方、Ruby 4.0 で解決するか、世の中の対応、2 週間の決まりの例外にできるかの差分の中身）。Step 7 の気づきの 6 と同じく、最初の示し方に、次の 3 つを入れておけば往復が減った
+    - 案ごとの具体的な書き方（Gemfile のどこに何を書くか）
+    - 先の Step（Ruby 4.0）でどうなるか
+    - 2 週間たっていない版の差分の中身
+11. 論点 1 で、AI は mise を通さずに ruby-build を直接流す案を推したが、人間は mise の普段の入れ方を選んだ。mise が入れる前に ruby-build を取り直すことは、TIPS.md に書いていなかった（気づきの 2）
