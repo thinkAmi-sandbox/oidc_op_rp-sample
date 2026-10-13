@@ -33,6 +33,7 @@
 | DEF-8.1-23 | `/` で始まらない相対パスへのリダイレクトを例外にする | Rails の既定値（8.1） | 3 アプリ | 追随（RP は `load_defaults 8.1` で入る） |
 | DEF-8.1-24 | `render json:` で HTML の記号を書き換えなくなる | Rails の既定値（8.1） | 3 アプリ | 追随（RP は `load_defaults 8.1` で入る） |
 | DEF-8.1-25 | JSON で U+2028・U+2029 を書き換えなくなる | Rails の既定値（8.1） | 3 アプリ | 追随（defaults のファイルからは効かないので、`load_defaults 8.1` で入る） |
+| DEF-8.1-26 | hidden の input に `autocomplete="off"` を付けなくなる | Rails の既定値（8.1） | 3 アプリ（スナップショットが変わるのは OP） | 追随（OP の応答のスナップショットを作り直した） |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -281,3 +282,13 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 扱い: 追随。3 アプリとも、defaults のファイルで理由のコメントを付けてコメントのまま残し、`load_defaults 8.1` で値を確かめる（グループ 3。LOG.md の Step 7 の論点 5）
 - 出典: `activesupport-8.1.4/lib/active_support/railtie.rb:142-147`、`activesupport-8.1.4/lib/active_support/json/encoding.rb:11,93-98`、ガイド「3.14.23 config.active_support.escape_js_separators_in_json」
 - コミット: グループ 3（RS・RP・OP。理由のコメントだけ）
+
+### DEF-8.1-26: hidden の input に `autocomplete="off"` を付けなくなる
+
+- 種類: Rails の既定値（`load_defaults 8.1` の項目）/ 対象: RS・RP・OP（応答のスナップショットが変わるのは OP）
+- 何が変わるか: `ActionView::Base.remove_hidden_field_autocomplete` が false → true。Rails のヘルパーが作る hidden の input（`hidden_field_tag`、`form_tag`・`button_to` の `_method`・authenticity token・params、`f.hidden_field` など）から、`autocomplete="off"` が消える。値と name は変わらない
+- なぜ: `autocomplete="off"` は、Firefox の「戻る・進むのキャッシュから戻したページで、hidden の値を別の値で上書きする」不具合への対策として付けていた（rails/rails#42610）。その後、この不具合は JavaScript で hidden の値（プロパティ）を書き換えたページでしか起きないと分かり（#55209 のコメント）、hidden の input に `autocomplete` の on・off を付けるのは HTML の仕様に反する（W3C の検証でエラーになる）ので、外した（#55336・#55634・#55989）
+- 3 アプリへの影響: OP の応答のスナップショット 6 つ（`authorize_consent`・`authorize_form_post`・`authorize_form_post_deny`・`oauth_applications`・`users_edit`・`users_update_failure`）で、計 29 行の `autocomplete="off"` が消えた。ほかの差分はない。3 アプリのビューで JavaScript があるのは OP の form_post の画面だけで、フォームを送るだけで hidden の値は書き換えないので、元の Firefox の不具合の条件に当たらない。RS・RP の応答のスナップショットに hidden の input はなく、変わらない。E2E（同意画面と form_post を通る）も通った。前後で、値の変化のほかに、書き出し・`-W:deprecated` の警告・development だけのヘッダーは同じ
+- 扱い: 追随（グループ 4）。OP の応答のスナップショットを `UPDATE_SNAPSHOTS=1` で作り直し、OP のコミットに入れた
+- 出典: `actionview-8.1.4/lib/action_view/helpers/form_tag_helper.rb`・`url_helper.rb`・`tags/hidden_field.rb`、`actionview-8.1.4/lib/action_view/railtie.rb:80-87`、ガイド「3.11.22 config.action_view.remove_hidden_field_autocomplete」
+- コミット: グループ 4（RS・RP・OP）
