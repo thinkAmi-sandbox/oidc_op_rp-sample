@@ -96,7 +96,7 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 
 - 種類: Rails の既定値（読み込みの順番）/ 対象: RS・RP・OP
 - 何が変わるか: (a) `action_dispatch_response` が、`config/initializers` の直前にも `initialize!` の後にも読み込まれなくなる。(b) `active_model_error` が、`config/application.rb` の後に読み込み済みと出る
-- なぜ: (a) は DEF-8.0-02 の不具合（rails/rails#58145）が 8.1.4 で直ったため（8-1-stable の #58147。initializer `action_controller.live_streaming_excluded_keys` の中身が `on_load(:action_controller_live)` に入った）。(b) は、8.1 で `ActiveModel::Error` に load hook が足され（#55347）、見えるようになっただけ。読み込みの時期は 8.0.5.1 と同じで、`active_record/errors.rb` の `UnknownAttributeError = ActiveModel::UnknownAttributeError` が、require の時点で `active_model/errors` を読む（load hook に `caller` を仕込んで確かめた）
+- なぜ: (a) は DEF-8.0-02 の不具合（rails/rails#58145）が 8.1.4 で直ったため（8-1-stable の #58147。initializer `action_controller.live_streaming_excluded_keys` の中身が `on_load(:action_controller_live)` に入った）。(b) は、8.1 で `ActiveModel::Error` に load hook が足され（#55347）、見えるようになっただけ。8.1.4 では、`active_record/errors.rb` の `UnknownAttributeError = ActiveModel::UnknownAttributeError` が、require の時点で `active_model/errors` を読む（load hook に `caller` を仕込んで確かめた）。8.0.5.1 も同じ行（`activerecord-8.0.5.1/lib/active_record/errors.rb:444`）があるので、読み込みの時期は同じと見られる（8.0.5.1 には load hook がなく、流しては確かめていない。ソースを読んだ見立て）
 - 3 アプリへの影響: (a) で、config/initializers に書く `ActionDispatch::Response` の設定が効くようになる（今のアプリにそういう設定はない）。RS・OP の起動の途中の読み込みの検査は、許す条件なしで通る。(b) は a-nti_manner_kick_course の監視の外で、`ActiveModel::Error.i18n_customize_full_message` の写し方が on_load に変わっただけ（値は `false` のまま）
 - 扱い: 追随。`scripts/check-load-hooks` の Rails 8.0.5.1 の組は、3 アプリを上げ終えたら消す
 - 出典: `actionpack-8.1.4/lib/action_controller/railtie.rb:36-40`、`activerecord-8.1.4/lib/active_record/errors.rb:451`、`activemodel-8.1.4/lib/active_model/error.rb:208`、`activemodel-8.1.4/lib/active_model/railtie.rb:23-27`、上の PR
@@ -187,7 +187,7 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 
 - 種類: Rails の雛形 / 対象: RS・RP・OP
 - 何が変わるか: `bin/setup --reset` のときだけ、`db:prepare` の後に `db:reset` を流す
-- 3 アプリへの影響: 付けなければ今と同じ。付けると development の DB を作り直すので、手動確認用の DB が消える（DEF-8.0-20 と同じく、README の仕上げで手動確認用の環境と一緒に書く）
+- 3 アプリへの影響: 付けなければ今と同じ。付けると development の DB を作り直すので、RP・OP では手動確認用の DB が消える。RS は `db/schema.rb` がないので、`db:reset` の schema の読み込みで失敗する（コードレビューで分かった。流しては確かめていない）。DEF-8.0-20 と同じく、README の仕上げで手動確認用の環境と一緒に書く
 - 扱い: 追随
 - 出典: `bin/setup.tt`
 - コミット: `app:update` の雛形（RS・RP・OP）

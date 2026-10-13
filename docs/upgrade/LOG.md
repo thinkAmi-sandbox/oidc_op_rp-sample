@@ -3256,6 +3256,18 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 - CI: push の後に確かめる（push は人間が行う）。`scripts/check-load-hooks` を呼ぶ CI の 2 つのステップが、RP で許した 1 件で通ることも、そのときに見る
 - 手動確認用の環境: 上の「手動確認」。HEAD で、12 ファイルのハッシュが手動確認の後の基準と同じ
 
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| `scripts/lib/dump_config.rb` の「アプリのモデルだけを見る」が、モデルのファイルが `Rails.root` の下かで分けるので、アプリのディレクトリの中の `vendor/bundle` にある gem のモデル（ActiveStorage など）も含める | 直さない。同じ場所での前後の比較には影響しない（research の worktree の書き出しとの違いの原因だった）。Step 6 のコードレビューの 4 と同じく、道具の見直しで扱う（下の気づきの 16。人間が判断） |
+| RP で omniauth-rails_csrf_protection の 1 件を許すと、その後ろの早い読み込みが CI で見えない（CI は compare-config を流さない） | 直さない。作業計画の論点 2 で、隠れる分を各作業の前後の compare-config で補うと決めた。IMP-009 で見張る（人間が判断） |
+| production.rb の `assume_ssl`・`force_ssl` がコメントになり、production で HTTPS を強制しなくなる | 直さない。DEF-8.1-11 で、決まりどおり雛形に追従すると決めた（人間が判断） |
+| `bin/setup --reset` は、RS では `db/schema.rb` がないので失敗し、RP・OP では手動確認用の DB を作り直す | 記録を直した。DEF-8.1-15 に、RS では失敗すること（流しては確かめていない）を書き足した。注意書きは README の仕上げで書く（人間が判断） |
+| DEF-8.1-06 の「読み込みの時期は 8.0.5.1 と同じ」は、8.1.4 でしか流しておらず、8.0.5.1 はソースを読んだ見立て | 記録を直した。8.0.5.1 は同じ行（`activerecord-8.0.5.1/lib/active_record/errors.rb:444`）をソースで確かめた見立てだと書き分けた（人間が判断） |
+
+- 直したのは記録だけで、アプリと道具のコードは変えていない
+
 ### スキルについて気づいたこと
 
 Step 3〜6 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
@@ -3289,3 +3301,7 @@ verify:
 
 14. 起動のたびの Active Storage の WARN（DEF-8.1-29）は、rails-lock から出ていたのに、前後の比較では見えなかった。設定の「前後の比較」の警告は、`RUBYOPT=-W:deprecated` の `warning:` と `DEPRECATION` の行を数えるだけで、Rails のログ（`log/*.log`）の WARN を見ていない。手動確認のサーバーの出力を読んで初めて気づいた。前後の比較に、test.log・development.log の WARN・ERROR の行（新しい種類のもの）を足すと、rails-lock の時点で見える
 15. 手動確認の前に、ブラウザペインが隠れていて、表示してもらう往復が要った（Step 5 の気づきの 16、Step 6 の気づきの 17 と同じ）。今回も依頼に表示の仕方と操作の順を一緒に書いたので、往復は 1 回で済んだ
+
+pr:
+
+16. コードレビューで、`scripts/lib/dump_config.rb` のアプリのモデルの絞り込みが、`vendor/bundle` の gem のモデルも含めると分かった。research の worktree（`vendor/bundle` をシンボリックリンクにした）の書き出しとの違いは、これが原因だった。worktree で新しい Rails を試す手順をスキルに足すなら、道具がアプリのディレクトリの場所に頼っているところ（この絞り込み、`$LOAD_PATH` の除外）を見直す必要がある
