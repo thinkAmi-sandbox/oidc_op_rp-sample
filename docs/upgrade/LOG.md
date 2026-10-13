@@ -3137,6 +3137,31 @@ verify:
 - `scripts/check-load-hooks` は、許す組の一覧にして、RP の omniauth-rails_csrf_protection の組を足し（`f88f27a`）、3 アプリを上げた後に Rails 8.0.5.1 の組を消した（`cb01977`。check-apps と CI のコメントも直した）。最初のコミットの時点のアプリは 8.0.5.1 なので、新しいスクリプトが 8.0.5.1 の検出も許すことを、HEAD の worktree で確かめてからコミットした。各アプリのコミットの前（`commit-per-app`）は、そのアプリの検査と E2E が通った
 - 解説（DEF-8.1-01〜09）に人間の返事を得てから、記録（`c86723f`）、上のコミットの順にした。IMP-009 の書き足し（`e843a3f`）は、その前に人間の承認を得た
 
+### `app:update` で採用したもの・戻したもの
+
+3 アプリで `yes a | bin/rails app:update`（DB は E2E 用）を流し、戻す前の差分を控えてから `scripts/restore-app-config` で独自設定を戻し、差分を人間が確かめた。項目ごとの解説は [defaults/rails-8.1.md](defaults/rails-8.1.md) の「`app:update` の雛形」。
+
+| ファイル | 判断 | 理由 |
+|---|---|---|
+| development の `verbose_redirect_logs = true` | 採用 | development のログだけ（DEF-8.1-10） |
+| production.rb の `assume_ssl`・`force_ssl` のコメント化と、コメントの句読点 | 採用 | 雛形に追従するだけ（DEF-8.1-11。`true` を残す案もあったが、人間が決まりどおりと判断した） |
+| `config/puma.rb` のコメント | 採用（port は道具で戻した） | DEF-8.1-12 |
+| `config/puma.rb` の `plugin :solid_queue` | 採用しない | 新しい構成（DEF-8.1-13。手で消した） |
+| `content_security_policy.rb` の `content_security_policy_nonce_auto` のコメント（RP・OP） | 採用 | コメントだけ（DEF-8.1-14） |
+| `bin/setup` の `--reset` | 採用 | 付けなければ同じ（DEF-8.1-15） |
+| public の 400・404・422・500（RP・OP） | 採用 | production だけで使う（DEF-8.1-16） |
+| `bin/rubocop`・`bin/brakeman` | 採用しない | DEF-8.0-21 と同じ（DEF-8.1-17） |
+| `bin/bundler-audit`・`config/bundler-audit.yml` | 採用しない | 無視リストは `.bundler-audit.yml` の 1 か所（DEF-8.1-18） |
+| `bin/ci`・`config/ci.rb` | 採用しない | 新しい構成。check-apps と CI が同じ役目（DEF-8.1-19） |
+| `public/406-unsupported-browser.html`・`icon.png`・`icon.svg`（RP・OP） | 採用しない | DEF-8.0-23 と同じ（DEF-8.1-20） |
+| test の `deprecation = :raise`、puma の port、`filter_parameter_logging.rb` の `:code` とコメント、RP の `autoload_lib_once` と inflector | 戻した | アプリの独自設定（`scripts/restore-app-config`。戻せない項目はなかった） |
+| `active_storage:update` のマイグレーション 3 本 | 採用しない | Active Storage を使わない（DEF-7.0-14。道具で消した） |
+| `new_framework_defaults_8_1.rb` | 足した（すべてコメント） | rails-defaults でグループごとに有効にする |
+
+- 戻す前の差分で、戻した設定（puma の port、test の deprecation、RP の `autoload_lib`）の上の雛形のコメントが 8.0.5.1 から変わっていないことを確かめた（Step 5 の気づきの 19）。`config/application.rb`（RS・OP）・`test.rb`・`filter_parameter_logging.rb` は、戻した後に差分がない
+- 前後で、`scripts/check-apps` の 36 の検査がすべて通り（件数は同じ）、応答と E2E のスナップショットの差分はない。`scripts/compare-config dump` で変わったのは development の `verbose_redirect_logs`（false → true）だけ。development だけのヘッダーも同じ。手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- 記録 `0d508a9`、コミット: RS `1c0ce7f`・RP `58ea88c`・OP `3f17437`
+
 ### 前後の比較
 
 lock を変える前（`e843a3f` の後。アプリは research の開始時から変わっていない）に次のものを書き出し、3 アプリを上げた後に取り直して比べた。前の `scripts/compare-config dump` と development だけのヘッダーは 2 回取って同じことを確かめた（compare-config は research の worktree の前に取ったものとも同じ）。
@@ -3179,3 +3204,7 @@ research:
 9. research の途中で日付が変わり、webmock 3.30.0（10-12）が出ていた。版の調べは research の始めに 1 回しているが、論点を決める直前にもう一度見る手順はない（論点 6 の直前に見直して気づいた）
 10. 論点 5 の示し方で、AI は「3 アプリの `redirect_to` は path ヘルパーと絶対 URL だけ」と、確かめずにサブエージェントの調べから書いた。記録の前に grep で確かめ、言い方を直した（アプリの `redirect_to` は RP の path ヘルパーだけ）
 11. 論点 7 で、research の出口の片付け（写しを消す・残っていたサーバーを止める・worktree を外す）を決めた。research.md の出口には、research で作ったもの（worktree など）を片付ける手順がない
+
+rails-app-update:
+
+12. `config/puma.rb` の `plugin :solid_queue` を、Step 6 に続いて手で消した。`scripts/restore-app-config` は独自設定を戻す道具で、採用しない雛形の行は消さない。毎回同じ判断（DEF-8.0-19・DEF-8.1-13）なので、道具の一覧に足すかを決めておくと手が減る
