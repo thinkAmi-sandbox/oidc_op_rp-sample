@@ -265,7 +265,7 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 ### DEF-8.1-24: `render json:` で HTML の記号を書き換えなくなる
 
 - 種類: Rails の既定値（`load_defaults 8.1` の項目）/ 対象: RS・OP（RP は `load_defaults 8.1` で入る）
-- 何が変わるか: `escape_json_responses` が true → false（`ActionController::Base`・`API`）。`render json:` が、`<`・`>`・`&` を `<`・`>`・`&` に、U+2028・U+2029 を ` `・` ` に書き換えなくなる（callback 付きの JSONP と、文字列をそのまま渡したときは対象外）
+- 何が変わるか: `escape_json_responses` が true → false（`ActionController::Base`・`API`）。`render json:` が、`<`・`>`・`&` を `\u003c`・`\u003e`・`\u0026` に、U+2028・U+2029 を `\u2028`・`\u2029` に書き換えなくなる（callback 付きの JSONP と、文字列をそのまま渡したときは対象外）
 - なぜ: JSON の応答を HTML に埋め込むわけではないので、書き換えは要らず、省けば速くなるため（rails/rails#54643・#54840。true を明示して代入すると非推奨の警告）
 - 3 アプリへの影響: 3 アプリの JSON の応答（RS の API、OP の discovery・トークン・userinfo・JWKS など。OP は doorkeeper の `render json:`）は、`Content-Type: application/json` で返し、HTML に埋め込んでいない。今の応答のスナップショットに書き換えられた文字はなく、前後で差分もない。前後で、値の変化のほかに、書き出し・検査・`-W:deprecated` の警告・development だけのヘッダーは同じ。RP は、defaults のファイルで有効にしても `ActionController::Base` に届かない（DEF-8.1-07）ので、理由のコメントを付けてコメントのまま残した
 - 扱い: 追随（グループ 3）
