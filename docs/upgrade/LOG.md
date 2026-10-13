@@ -3305,3 +3305,37 @@ verify:
 pr:
 
 16. コードレビューで、`scripts/lib/dump_config.rb` のアプリのモデルの絞り込みが、`vendor/bundle` の gem のモデルも含めると分かった。research の worktree（`vendor/bundle` をシンボリックリンクにした）の書き出しとの違いは、これが原因だった。worktree で新しい Rails を試す手順をスキルに足すなら、道具がアプリのディレクトリの場所に頼っているところ（この絞り込み、`$LOAD_PATH` の除外）を見直す必要がある
+
+## Step 8: Ruby 3.4（2026-10-13）
+
+- ブランチ / PR: `upgrade/step8-ruby34` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12 → 3.4.11 / Rails 8.1.4（変更なし）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 2 つ: Ruby 3.4 の事実、周辺 gem の事実。3.4.11 の版・tarball・ruby-build の定義、`bundled_gems.rb` の警告の一覧、resolv・net-http・erb・Bundler の版、合わせ直す版の依存、lock の gem が lock にない ostruct などを読むか、mise の ruby-build の更新、setup-ruby の版は自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 版と、research で入れて試すか | 3.4.11 にする。research で入れ、scratchpad に HEAD の git worktree を作り、3 アプリを 3.4.11 にして、lock を 3.4.11 の default gem の版に合わせて解決し、`BUNDLE_PATH` を本体の各アプリの `vendor/bundle`（新しい `ruby/3.4.0`）に向けて入れる。worktree で `scripts/check-apps --no-e2e`、`RUBYOPT=-W:deprecated` の minitest と eager load、ログの WARN・ERROR、`scripts/check-console` を流し、faraday-net_http 3.4.4 も試す。本体の Gemfile・lock と手動確認用の環境は変えない。research の出口で worktree を外す。入れ方は `mise install ruby@3.4.11`（mise 2026.5.10 が、入れる前に ruby-build を最新のリリース v20261013 に取り直す）。ダウンロード（tarball 22,492,449 B、ruby-build の clone、`.gem` 16 個・計 1,207,808 B）は、この論点への返事で承認を得た。`.gem` は RS で 1 回だけ落として照合し、RP・OP のキャッシュにコピーする | 3.4.11 は 3.4 系の最新（2026-09-23）で、公開から 2 週間たち、resolv の CVE-2026-80212・80213 の修正版（0.7.2）を含む。3.3 系に 3.3.12 より新しい版はない。合わせ直した lock の解決（irb 1.14.3 の依存で erb・cgi が増える見込み）、RS・RP の ostruct の bundled_gems の警告、gem 側の chilled string の警告は、入れて流さないと分からない（Step 6 の気づきの 9、Step 7 の論点 1）。AI は、手元の ruby-build 20260924 を直接流して、公開から 1 日の ruby-build を落とさない案を推したが、人間は mise の普段の入れ方を選んだ |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 8 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 7 の手動確認の後と同じだった（OP `oauth_access_grants` 31・`oauth_access_tokens` 77（revoke 済み 14）、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま）。
+
+- 開始時に、前のセッションのサーバーが残っていないことを、`ps` とポートの待ち受け（`lsof`）で確かめた
+- Step 7 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（本体だけ）が残っている。消すかは作業計画で確かめる
+
+### スキルについて気づいたこと
+
+Step 3〜7 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+resume:
+
+1. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#36 の取り込みが入っていなかった（Step 5 の気づきの 3、Step 6 の気づきの 1、Step 7 の気づきの 1 と同じ）。人間の指示にあったので、fetch して早送りしてから切った。前のセッションのサーバーは、人間の指示にあったので `ps` と `lsof` で確かめた（Step 7 の気づきの 2）
+
+research:
+
+2. mise 2026.5.10 の `mise install` は、入れる前に ruby-build を GitHub の最新のリリースと比べ、違えばリポジトリを clone し直す。TIPS.md の「Ruby を上げる」は Step 4 の時点で「手元の ruby-build は最新と同じ」としていて、この clone がダウンロードの確認に入ることと、その版が公開から 2 週間たっていないことがある（今回は 1 日目）ことを書いていない
+3. CI の setup-ruby の固定（v1.325.0）が 3.4.11 を持たなかった。Step 4 の「Ruby の版を持つ箇所」は「ci.yml は `.ruby-version` を読むので変えなくてよい」としていて、固定した setup-ruby が新しい版を持つかは、別に確かめる必要がある（Step 4 は `ruby-builder-versions.json` を見ていた）
+4. research の途中で日付が変わった（10-13 → 10-14。Step 7 の気づきの 9 と同じ）
