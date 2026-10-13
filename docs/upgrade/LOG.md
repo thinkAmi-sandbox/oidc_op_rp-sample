@@ -3119,6 +3119,14 @@ verify:
 - research の worktree: scratchpad に HEAD の git worktree を作り、3 アプリに解決した lock と Gemfile を置き、`vendor/bundle` を本体へのシンボリックリンクにした（mise は `MISE_TRUSTED_CONFIG_PATHS` で信頼させ、`mise trust` の設定は残していない。OP の署名鍵は worktree の中で使い捨てのものを作り、E2E 用の DB は本体から写した）。論点 2 の掘り下げのために、8.0.5.1 のままの worktree も作った。research の出口で 2 つとも外した
 - 調べたことの一覧と決めたことの全体は、PLAN.md の 6 章の「Step 7: Rails 8.1」に書いた。7 章の devise・omniauth-rails_csrf_protection・rubocop・webmock・benchmark の行を直した
 
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| 起動のたびの Active Storage の WARN を受け入れ（DEF-8.1-29）、使っていないフレームワークを読み込まないことを改善の候補にした（IMP-012） | 作業計画では見つけていなかった。rails-lock の時点から出ていたが、verify の手動確認のサーバーの出力で気づいた。`variant_processor = :disabled` を足す案はとらず、Rails の既定値の変化として受け入れた（人間が判断） |
+| rails-defaults の前に、`scripts/lib/dump_config.rb` に 8.1 の 6 つの値の読み出しを足した（`6dc71cc`） | 設定のキーがないとクラスの値が書き出しに出ず、グループの前後を比べられなかったため（Step 6 の `5e3f661` と同じ） |
+| IMP-009 に omniauth-rails_csrf_protection を書き足した（`e843a3f`） | 作業計画の論点 2 の後に、omniauth の組み込みの対策への置き換えを候補にするかを確かめたところ、置き換えは候補にせず、既にある IMP-009（起動の途中にフレームワークのクラスを読み込む gem）に足すことになった（人間が承認した） |
+
 ### 手動確認用の環境
 
 作業の開始時（ブランチを切って最初のコミットの前）に、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 7 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 6 の手動確認の後と同じだった（OP `oauth_access_grants` 29・`oauth_access_tokens` 72（revoke 済み 13）、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま）。
@@ -3208,6 +3216,9 @@ lock を変える前（`e843a3f` の後。アプリは research の開始時か�
   - brakeman: 前は 3 アプリとも警告 0・無視 1。後は警告 0・無視 0（`config/brakeman.ignore` を消した）で、チェックの数は同じ（79）。research の worktree では、2 つの項目が「Obsolete Ignore Entries」に出ていた
   - SQLite: OP の test.log で、fixtures の INSERT の真偽値が `1` → `TRUE` になった（DEF-8.1-08）
   - 手動確認用の環境の 12 ファイルのハッシュは、作業の開始時と同じ
+- `app:update`（rails-app-update）。前は rails-lock の後の書き出し。結果は上の「`app:update` で採用したもの・戻したもの」（変わった値は development の `verbose_redirect_logs` だけ）
+- rails-defaults・rails-load-defaults。前はそれぞれ直前の書き出し。結果は上の「`new_framework_defaults_8_1.rb` を有効にした順番」「`load_defaults 8.1`」（各グループで、検査・スナップショット・`-W:deprecated` の警告・development だけのヘッダー・読み込み済みの部品を比べた）
+- 比べていないもの: Rails のログ（`log/*.log`）の WARN・ERROR の行。Active Storage の WARN（DEF-8.1-29）は、これを比べていなかったので verify まで見えなかった（気づきの 14）
 
 ### 手動確認
 
