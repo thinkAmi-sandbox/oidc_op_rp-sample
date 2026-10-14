@@ -3340,10 +3340,18 @@ pr:
 | gem | バージョン | 対応 |
 |---|---|---|
 | json | 2.7.2 → 2.21.2（3 アプリ。Ruby 3.3.12 のまま） | Gemfile の「# 追加」の節に `gem 'json', '~> 2.21', '>= 2.21.2'` と理由のコメントを足し、`bundle lock --update json --conservative` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache bundle install --local --no-cache`。lock で動いたのは json と `DEPENDENCIES` の json だけ。`.gem` は research で RS に落として照合したもの（3 アプリとも `scripts/verify-gem-checksums --changed HEAD` で一致）。RS `499fad1`、RP `e41919d`、OP `e2293a9`（作業計画の論点 2） |
+| Ruby | 3.3.12 → 3.4.11（3 アプリ） | `.ruby-version`・Gemfile の `ruby` を 3.4.11 にし、lock の default gem を 3.4.11 の版に合わせ直した（Gemfile に版を一時的に足して `bundle lock` → 行を消して `bundle lock`）。RS `4636b45`、RP `c4cf11f`、OP `054c686`。lock は 3 アプリとも、research の試行の lock と json（2.21.2）・ostruct（0.6.1）だけが違う形になった。`.gem` は research で落として照合したものを `vendor/bundle/ruby/3.4.0/cache` から `--local --no-cache` で入れ、`Fetching` はない。`scripts/verify-gem-checksums --changed HEAD` は RS 14・RP 13・OP 14 個で一致。lock の gem は bundler を除いてすべて `vendor/bundle/ruby/3.4.0` から読まれる。Bundler の下で読まれる resolv は 0.7.2、erb は 4.0.4.1（3 アプリ）。CI の setup-ruby は、その前に v1.329.0 にした（`9b4b223`。論点 5）。RuboCop の `TargetRubyVersion` は 3.4 にした（`72175f1`。指摘なし。`Lint/ItWithoutArgumentsInBlock` は 3.4 で対象外になり、`Style/ItBlockParameter` は 3.4 から対象だが、どちらも pending で `NewCops: disable` のまま） |
+| default gem（lock） | 3 アプリ: bigdecimal 3.1.5→3.1.8、drb 2.2.0→2.2.1、mutex_m 0.2.0→0.3.0、io-console 0.7.1→0.8.1、irb 1.13.1→1.14.3、logger 1.6.0→1.6.4、psych 5.1.2→5.2.2、rdoc 6.6.3.1→6.14.0、securerandom 0.3.1→0.4.1、stringio 3.1.1→3.1.2、uri 0.13.3→1.0.4。増えた: erb 4.0.4.1（3 アプリ）、cgi 0.4.2（RS・OP。RP は元からある）。消えた: ruby2_keywords 0.0.5（3 アプリ）。OP: ostruct 0.6.0→0.6.1 | 作業計画の論点 2。reline 0.6.0・base64 0.2.0・tsort 0.2.0・cgi 0.4.2（RP）は動いていない。`RUBY VERSION` 3.4.11p137、`BUNDLED WITH` 2.6.9 |
+| ostruct | 0.6.1（RS・RP に追加） | Gemfile の「# 追加」の節に `gem 'ostruct', require: false` と理由のコメントを足した。Ruby を上げるコミットに入れた（論点 3） |
 
 ### 前後の比較
 
 - json（gems）: 作業の前（`718c5e3`）に `scripts/check-apps`（36 の検査と E2E がすべて通った）と `scripts/compare-config dump`（3 アプリの test・development）を取った。`RUBYOPT=-W:deprecated` の minitest・eager load・E2E の前の書き出しは、research で同じアプリのコードの本体で取ったものを使った。各アプリの後に、compare-config（そのアプリの test・development）は前と同じ。`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>`（E2E を含む）は通り、警告は OP の IMP-011 の DEPRECATION だけ（前と同じ）。応答のスナップショットと E2E のスナップショットの差分はない
+- Ruby（ruby）: 作業の前（`9b4b223`、3.3.12、json 2.21.2 の後）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った）、`RUBYOPT=-W:deprecated` の minitest と development の eager load、test.log・development.log の新しい行、`scripts/compare-config dump`（3 アプリの test・development）、`scripts/check-console`（3 アプリ。irb 1.13.1）を取った。各アプリを 3.4.11 にした後に、同じものを取って比べた
+  - 検査: 各アプリの 11 の検査と E2E が通った（minitest RS 11・RP 33・OP 69 runs、`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない
+  - 警告: `RUBYOPT=-W:deprecated` の minitest・E2E のサーバーの出力・development の eager load で、新しい警告はない（ostruct の bundled_gems の警告は、RS・RP で明示したので出ない。chilled string の警告は出ない。OP の IMP-011 の DEPRECATION は前と同じ）。development.log に WARN・ERROR の行はない
+  - compare-config: 3 アプリとも test・development の違いは 3 行ずつで、どれも書き出しの道具が、もうない設定（`return_only_media_type_on_content_type`・`use_big_decimal_serializer`・`allow_deprecated_parameters_hash_equality`）を読んだときの `NoMethodError` のメッセージの開きの引用符（バッククォートからシングルクォートへ。Ruby 3.4 のエラーメッセージの形の変化。NEWS-3.4.0）。設定の値と読み込み済みの部品は変わっていない
+  - `rails c`: 3 アプリとも起動し、Tab の補完と複数行の入力ができる（irb 1.14.3・reline 0.6.0・io-console 0.8.1）
 
 ### 遭遇した問題
 

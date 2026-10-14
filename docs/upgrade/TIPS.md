@@ -45,12 +45,12 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 - ジョブとステップの結果: `gh run view <run-id>`。失敗したステップのログだけを見るときは `gh run view <run-id> --log-failed`
 - bundler-audit だけが落ちたときは、CI が取った advisory のデータベースに新しい advisory が入った可能性が高い（CI は `--update` を付けて最新を使う。手元は `bundle-audit update` を流すまで古いまま）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」に従い、上げるか、無視リストに入れるかを人間に確かめる。変更と関係のない PR でも落ちる
 - E2E が失敗したときは、artifact `e2e-failure` にレポート・トレースと 3 アプリのログがある（`gh run download <run-id> -n e2e-failure -D <scratchpad のディレクトリ>`）。中のトークンは CI の使い捨てのものだが、LOG.md に貼るときは公開物の記載ルールに従う
-- 手元で mise なしの経路（CI と同じ）を試すときは、`env -i HOME="$HOME" LANG=ja_JP.UTF-8 PATH="$(mise where ruby@3.3.12)/bin:$(mise where node@24.21.0)/bin:/usr/bin:/bin"` の下で `npm test` を流す（Step 0-g）
+- 手元で mise なしの経路（CI と同じ）を試すときは、`env -i HOME="$HOME" LANG=ja_JP.UTF-8 PATH="$(mise where ruby@3.4.11)/bin:$(mise where node@24.21.0)/bin:/usr/bin:/bin"` の下で `npm test` を流す（Step 0-g）
 
 ## gem の更新
 
 - `bundle update <gem> --conservative` で上げ、`git diff -U0 Gemfile.lock | grep -E '^[-+]    [a-z]'` で、変わった gem を毎回見る
-- lock に入れた default gem（json・bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・ruby2_keywords・io-console・irb・rdoc・psych・stringio・securerandom・tsort・uri。benchmark は Step 7 で lock から消えた）と、一時固定した gem（faraday-net_http・reline・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
+- lock に入れた default gem（bigdecimal・logger・base64・cgi・ostruct・drb・mutex_m・io-console・irb・rdoc・psych・stringio・securerandom・tsort・uri・erb・reline。bigdecimal・base64・drb・mutex_m は Ruby 3.4 から bundled gems。benchmark は Step 7 で、ruby2_keywords は Step 8 で lock から消えた。json は Step 8 で Gemfile に明示した）と、一時固定した gem（faraday-net_http・connection_pool など）が動いていないことを確かめる。理由と見直す時期は PLAN.md の 7 章・8 章
 - default gem を置き換える依存が入るときは、一時固定する。Gemfile に `gem '<名前>', '<版>'` を足して `bundle update` → 行を消して `bundle lock --local` → `git diff` で Gemfile が戻り、lock に意図しない変化がないことを確かめる
   - Gemfile に既にある gem を固定するときは、行を足さずに既にある行に版を書き、後で元に戻す（Step 2-b の brakeman）。作業の前に Gemfile を scratchpad にコピーしておき、コピーで戻すと確実
   - 依存で入る gem が default gem と同じ名前のとき（Step 2-b の byebug 13 の reline・io-console）は、default gem の版で要件を満たせるならその版に（ダウンロードもビルドもしない）、満たせないなら要件を満たす最小の版に固定する。固定しないと最新の版（io-console は C 拡張）が入る
@@ -76,11 +76,13 @@ CI（`.github/workflows/ci.yml`）も同じコマンドを流す（起動の途�
 ## Ruby を上げる（Step 2）
 
 - mise 2026.5 系は ruby-build でソースからビルドする（2026.8.0 から、既定は jdx/ruby のビルド済みのものを落とす形に変わる。Step 2 の時点の手元は 2026.5.10。mise を上げたら、落とすものとサイズを確かめ直す）。ruby-build の定義（`share/ruby-build/<版>`）は tarball の SHA256 を持ち、展開の前に検証する。Homebrew の openssl@3・libyaml があれば、OpenSSL のソースは落とさない。入れた後は `mise where ruby@<版>` の `bin/ruby -ropenssl -e 'puts OpenSSL::OPENSSL_LIBRARY_VERSION'` でリンク先を見る
+  - mise 2026.5 系の `mise install` は、入れる前に ruby-build の版を GitHub の最新のリリースと比べ、違えば ruby-build のリポジトリを clone し直す（`src/plugins/core/ruby.rs` の `update_ruby_build`）。この clone もダウンロードの確認に入れ、その ruby-build が公開から何日目かも示す（Step 8 では 20260924 → 20261013。公開から 1 日目だった）
 - その Ruby の default gem の版は、`ruby -e 'puts Gem::Specification.select(&:default_gem?).map { "#{_1.name} #{_1.version}" }'` で分かる。lock に入れた default gem（PLAN.md の 7 章）と比べる
 - 同じ系列の別のパッチ（Step 2 では手元の 3.2.3）で試さない。後から入れた Bundler（3.2.3 には 4.0.6）があると、素の `bundle` がそれで動く
 - lock の試行は、scratchpad の Gemfile と lock のコピーで、`env -i HOME="$HOME" PATH="$(mise where ruby@<版>)/bin:/usr/bin:/bin" BUNDLER_VERSION=<その Ruby の Bundler> BUNDLE_GEMFILE=<コピー> bundle _<その Bundler>_ lock` のように流す。`BUNDLER_VERSION` を付けないと、lock の `BUNDLED WITH` の版に切り替えようとする（`bundle install` なら、その版を落とす）。付けて lock を書くと、`BUNDLED WITH` は実行中の Bundler の版になる
-- default gem の合わせ直しは、コピーの Gemfile の `ruby` を変えて、合わせる版を `gem '<名前>', '<版>'` で足して `bundle lock` → 足した行を消して `bundle lock --local`。lock の差分が default gem の行と `RUBY VERSION`・`BUNDLED WITH` だけなら、その lock をアプリに持ち込める（Step 2 では Gemfile の `ruby` だけを変えたアプリの Gemfile と同じになることを `diff` で確かめた）
-- gem の置き場所は `vendor/bundle/ruby/<ABI の版>`（3.3 系は `3.3.0`）なので、Ruby のマイナーを上げると入れ直しになる。前の版のキャッシュの `.gem` を `vendor/bundle/ruby/<新しい版>/cache` にコピーし、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/<新しい版>/cache mise exec -- bundle install --local --no-cache` で入れると、gem を落とさない
+- default gem の合わせ直しは、コピーの Gemfile の `ruby` を変えて、合わせる版を `gem '<名前>', '<版>'` で足して `bundle lock` → 足した行を消して `bundle lock --local`（lock の版がその Ruby の `vendor/bundle` に入っていないと解決できない。入っていないときは、gem を落とさずにメタデータだけを取る `bundle lock` にする。Step 8）。lock の差分が default gem の行と `RUBY VERSION`・`BUNDLED WITH` だけなら、その lock をアプリに持ち込める（Step 2 では Gemfile の `ruby` だけを変えたアプリの Gemfile と同じになることを `diff` で確かめた）
+  - 合わせる先の版が advisory の対象でないかを、無視リストなしの bundle-audit で確かめる。Ruby が持つ default gem の版でも、対象のことがある（Step 8 の json 2.9.1 は CVE-2026-54696 の対象だったので、合わせ直さずに修正版を Gemfile に明示した）
+- gem の置き場所は `vendor/bundle/ruby/<ABI の版>`（3.4 系は `3.4.0`）なので、Ruby のマイナーを上げると入れ直しになる。前の版のキャッシュの `.gem` を `vendor/bundle/ruby/<新しい版>/cache` にコピーし、`BUNDLE_CACHE_PATH=vendor/bundle/ruby/<新しい版>/cache mise exec -- bundle install --local --no-cache` で入れると、gem を落とさない
   - `bundle install --local` は、インストール先のキャッシュではなく、アプリのキャッシュ（`cache_path`。既定は `vendor/cache`）しか見ない。`BUNDLE_CACHE_PATH` を付けないと、gem が見つからずに止まる
   - `--no-cache` を付けないと、入れた後でアプリのキャッシュを最新にしようとして、キャッシュにない default gem の `.gem` を、`--local` でも rubygems.org から落とす（Step 2 の RS・RP で起きた。LOG.md の Step 2「遭遇した問題」）
   - lock にある、新しい Ruby の default gem と同じ名前・版の gem も、`vendor/bundle` に入れる（Step 4-b で決めた。下の「gem の更新」の Bundler 2.5 の項目）。CI（setup-ruby）は Bundler 2.5 で rubygems.org から入れ、`vendor/bundle` のものを読むので、手元も揃える。前の版のキャッシュにある `.gem` はコピーし、キャッシュにないもの（Ruby の版が上がって版が変わったもの）は、落として照合してからキャッシュに置く。`--local` で入れるとき、キャッシュに `.gem` があれば入れ、なければ default gem で済ませてしまう（Step 4 では、CI も default gem を使うと考えて、RS の 3 つを外した。Bundler 2.4 までの振る舞いで、2.5 では誤りだった）
