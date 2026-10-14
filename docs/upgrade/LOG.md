@@ -3335,6 +3335,23 @@ pr:
 - research の試行の worktree（scratchpad）は、出口で外した。試行で入れた gem は、本体の各アプリの `vendor/bundle/ruby/3.4.0` に残っている（ruby の作業で使う）
 - 写しを消し、worktree を外した後も、12 ファイルのハッシュは開始時と同じで、`-wal` はない
 
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| json | 2.7.2 → 2.21.2（3 アプリ。Ruby 3.3.12 のまま） | Gemfile の「# 追加」の節に `gem 'json', '~> 2.21', '>= 2.21.2'` と理由のコメントを足し、`bundle lock --update json --conservative` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache bundle install --local --no-cache`。lock で動いたのは json と `DEPENDENCIES` の json だけ。`.gem` は research で RS に落として照合したもの（3 アプリとも `scripts/verify-gem-checksums --changed HEAD` で一致）。RS `499fad1`、RP `e41919d`、OP `e2293a9`（作業計画の論点 2） |
+
+### 前後の比較
+
+- json（gems）: 作業の前（`718c5e3`）に `scripts/check-apps`（36 の検査と E2E がすべて通った）と `scripts/compare-config dump`（3 アプリの test・development）を取った。`RUBYOPT=-W:deprecated` の minitest・eager load・E2E の前の書き出しは、research で同じアプリのコードの本体で取ったものを使った。各アプリの後に、compare-config（そのアプリの test・development）は前と同じ。`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>`（E2E を含む）は通り、警告は OP の IMP-011 の DEPRECATION だけ（前と同じ）。応答のスナップショットと E2E のスナップショットの差分はない
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RS の json のコミットで、`scripts/commit-per-app` の中の E2E が webServer の起動待ち（120 秒）で時間切れになった。2 回目の commit-per-app は、ログのディレクトリを作ってから最初のログまで 16 分空いた | `pmset -g log` で、マシンが 09:23〜09:40、09:41〜09:57、09:58〜10:14 に Maintenance Sleep に入っていたと分かった（同じ時間の検査が止まっていた）。E2E だけを流し直すと通り、2 回目の commit-per-app も通ってコミットした |
+| RP の json のコミットで、commit-per-app 全体に `RUBYOPT=-W:deprecated` を付けたため、git の hook（`scripts/check-public-safety`。macOS 標準の Ruby 2.6）に渡り、`ruby: invalid option -:` でコミットが止まった（検査はすべて通っていた） | 作業ツリーが検査の通ったときと同じことを確かめ、`RUBYOPT` なしでコミットした。OP からは、`RUBYOPT` を検査（`scripts/check-apps --app op`）だけに付け、通った作業ツリーをそのままコミットした |
+
 ### スキルについて気づいたこと
 
 Step 3〜7 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
@@ -3358,3 +3375,8 @@ research:
     - 先の Step（Ruby 4.0）でどうなるか
     - 2 週間たっていない版の差分の中身
 11. 論点 1 で、AI は mise を通さずに ruby-build を直接流す案を推したが、人間は mise の普段の入れ方を選んだ。mise が入れる前に ruby-build を取り直すことは、TIPS.md に書いていなかった（気づきの 2）
+
+gems:
+
+12. `RUBYOPT=-W:deprecated` を付けた検査とコミットを一度に流すには、commit-per-app に検査だけの環境変数を渡す口がない。全体に付けると git の hook（Ruby 2.6）まで渡って止まる。今回は、検査を `scripts/check-apps --app` で流してから、作業ツリーのままコミットした
+13. マシンのスリープで検査が止まり、E2E が時間切れになった。止まった理由がスリープだと、`pmset -g log` で後から分かった。検査が普段より長いときや、時間切れのときに、まずスリープを疑う手順がない
