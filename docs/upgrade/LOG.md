@@ -3310,6 +3310,8 @@ pr:
 
 - ブランチ / PR: `upgrade/step8-ruby34` / （PR 作成後に記入）
 - バージョン: Ruby 3.3.12 → 3.4.11 / Rails 8.1.4（変更なし）
+- Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
+- Ruby 3.4.11 の default gem の json 2.9.1 が CVE-2026-54696 の対象なので、json は合わせ直さずに 2.21.2 に上げて Gemfile に明示した。RS・RP は ostruct を Gemfile に明示した。byebug の Ruby 3.4 の不具合は IMP-013 で見張る
 
 ### 作業計画で決めたこと
 
@@ -3325,6 +3327,13 @@ pr:
 | 6 rubocop・webmock を次に確かめる時期 | Step 8 では上げない。次に確かめるのは、Step 9 を行うならその research の最初、行わないなら仕上げの最初（7 章の rubocop 系・webmock の行に書く） | 着手の日（10-14）に、rubocop 1.92.0（10-10）・webmock 3.27.0〜3.30.0（10-10〜10-12）は 2 週間たっていない（10-24〜10-26 から）。rubocop-rails 2.38.0・rubocop-ast 1.50.0・rubocop-minitest 0.41.0 は最新。Step に結び付けるとまた送りになりやすい（Step 6 の気づきの 7）が、Step 9 を行うかは Step 8 の完了時に決まるので、どちらでも送り先が決まる。試行の worktree で、rubocop 1.91.0 の `TargetRubyVersion: 3.4` で 3 アプリとも指摘はなかった |
 | 7 byebug 13.0.0 の Ruby 3.4 での不具合 | CLAUDE.md の ①（対応版を待つ）。byebug は 13.0.0 のままにし、`where` の不具合を 7 章の byebug の行に記録する。直った版が出たら、直接の gem の方針で上げる。debug gem への置き換えを IMP-013 に足した（人間が承認） | 試行で、3.4.11 の RS の `scripts/check-console`（`next`・`where`・`continue`）で、`where` だけが `undefined method 'Kernel.require' for class 'Kernel'` で失敗した（byebug#867。修正の #967 は 2026-04-25 にマージ、未リリース）。アプリのコードは byebug を呼ばず、業務的な挙動には関わらない。② GitHub の main は lock に git の参照が入り `.gem` を照合できない。④ debug gem への置き換えは開発の道具を替える改善で、epic の後に行う |
 | 8 手動確認の時期と DB の写し | verify で 1 回、すべての変更（json、Ruby、`TargetRubyVersion`、faraday-net_http）の後に行う。直前に 12 ファイルのハッシュを確かめ、3 アプリの development DB を `tmp/manual_check_backup/` に写す。research の出口で、Step 7 の写し（3 アプリの `tmp/manual_check_backup/`）を消し、試行の worktree を外す。本体の各アプリの `vendor/bundle/ruby/3.4.0` は ruby の作業で使うので残す | RP・OP・RS の間のやり取りに関わる変更（Ruby 3.4.11、json 2.21.2、faraday-net_http 3.4.4）は minitest・スナップショット・E2E で確かめるが、ブラウザでの流れ（RP の my_op でのログインと introspection 用 RP）は手動確認で見る。Step 7 の写しは、#36 が epic に入ったので消してよい（TIPS.md の「手動確認用の環境」） |
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| verify の手動確認で、3 アプリを 2 回起動した（1 回目の後、人間の操作の前に、アプリがプレビューを止めた） | 起動し直して確かめた。その間に RP の DB が変わり、ブラウザのセッションのクッキーも消えていたので、RP の `sessions` は 12 → 14 件になった（下の「手動確認」） |
+| 各アプリのコミットの前の検査を、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>` で流し、通った作業ツリーをそのままコミットした（RP の json から） | commit-per-app 全体に `RUBYOPT` を付けると、git の hook（Ruby 2.6）まで渡って止まる（下の「遭遇した問題」）。ほかのアプリの変更はなく、退避は要らなかった |
 
 ### 手動確認用の環境
 
@@ -3344,6 +3353,18 @@ pr:
 | default gem（lock） | 3 アプリ: bigdecimal 3.1.5→3.1.8、drb 2.2.0→2.2.1、mutex_m 0.2.0→0.3.0、io-console 0.7.1→0.8.1、irb 1.13.1→1.14.3、logger 1.6.0→1.6.4、psych 5.1.2→5.2.2、rdoc 6.6.3.1→6.14.0、securerandom 0.3.1→0.4.1、stringio 3.1.1→3.1.2、uri 0.13.3→1.0.4。増えた: erb 4.0.4.1（3 アプリ）、cgi 0.4.2（RS・OP。RP は元からある）。消えた: ruby2_keywords 0.0.5（3 アプリ）。OP: ostruct 0.6.0→0.6.1 | 作業計画の論点 2。reline 0.6.0・base64 0.2.0・tsort 0.2.0・cgi 0.4.2（RP）は動いていない。`RUBY VERSION` 3.4.11p137、`BUNDLED WITH` 2.6.9 |
 | ostruct | 0.6.1（RS・RP に追加） | Gemfile の「# 追加」の節に `gem 'ostruct', require: false` と理由のコメントを足した。Ruby を上げるコミットに入れた（論点 3） |
 | faraday-net_http | 3.0.2 → 3.4.4（RS・RP。Ruby 3.4.11 の後） | Gemfile に faraday-net_http 3.4.4 と net-http 0.6.0 を一時的に足して `bundle lock --update faraday-net_http --conservative` → 行を消して `bundle lock --local`。lock で動いたのは faraday-net_http と、増えた net-http 0.6.0（一時固定。Ruby 3.4.11 の default gem と同じ版）だけ。`.gem` は research で落として照合したもの（`--changed HEAD` で 2 個とも一致）。net-http は `vendor/bundle` から読まれ、`Net::HTTP::VERSION` は 0.6.0。RS `905ec8a`、RP `3074896`（論点 4） |
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| RS・RP: `rake-13.0.6/lib/rake.rb:33: warning: .../ostruct.rb was loaded from the standard library, but will no longer be part of the default gems starting from Ruby 4.0.0.`（Ruby 3.4 の bundled_gems の警告。`-W:deprecated` なしでも出る。minitest と E2E のサーバーの起動の `db:` タスクで出た） | Gemfile に `gem 'ostruct', require: false` を明示した（論点 3。Ruby を上げたコミット）。明示した後は出ない |
+| chilled string（`RUBYOPT=-W:deprecated`） | 試行と各アプリの前後の比較で、minitest・E2E のサーバーの出力・development の eager load のどれにも出なかった |
+| OP: doorkeeper-openid_connect の `auth_time_from_resource_owner` の DEPRECATION | 元からある（IMP-011）。Step 8 で変わっていない |
+
+### 意図的な仕様変更
+
+なし
 
 ### 前後の比較
 

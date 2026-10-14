@@ -1098,7 +1098,7 @@ Step 7 が epic に入ってから（[#36](https://github.com/thinkAmi-sandbox/o
 - [x] gems: faraday-net_http 3.0.2 → 3.4.4（RS。net-http 0.6.0 を一時固定）
 - [x] gems: faraday-net_http 3.0.2 → 3.4.4（RP）
 - [x] verify（手動確認は 1 回。直前に 3 アプリの development DB を写した。RP の `sessions` が 12 → 14 件になったのは、ブラウザのセッションのクッキーが消えていたためと見ている。結果は LOG.md の Step 8 の「手動確認」と「確認結果」。CI は push の後）
-- [ ] pr
+- [x] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した）:
 
