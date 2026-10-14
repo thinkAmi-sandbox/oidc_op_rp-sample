@@ -3308,7 +3308,7 @@ pr:
 
 ## Step 8: Ruby 3.4（2026-10-13）
 
-- ブランチ / PR: `upgrade/step8-ruby34` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step8-ruby34` / [#37](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/37)
 - バージョン: Ruby 3.3.12 → 3.4.11 / Rails 8.1.4（変更なし）
 - Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
 - Ruby 3.4.11 の default gem の json 2.9.1 が CVE-2026-54696 の対象なので、json は合わせ直さずに 2.21.2 に上げて Gemfile に明示した。RS・RP は ostruct を Gemfile に明示した。byebug の Ruby 3.4 の不具合は IMP-013 で見張る
