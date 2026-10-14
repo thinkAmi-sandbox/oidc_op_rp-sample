@@ -28,6 +28,7 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 | IMP-010 | OP のレイアウトに flash（ログイン失敗などのメッセージ）を出す | OP | 挙動の変更 | 未着手 |
 | IMP-011 | `max_age` の判定に `auth_time_from_session` を使う | OP | セキュリティの設定 | 未着手 |
 | IMP-012 | 使っていない Rails のフレームワーク（Active Storage など）を読み込まない | 3 アプリ | コードの整理 | 未着手 |
+| IMP-013 | byebug を debug gem に置き換える | 3 アプリ | コードの整理 | 未着手 |
 
 ## IMP-001: PKCE を必須にし、S256 だけを受け付ける
 
@@ -156,3 +157,13 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 - 見送った理由: 読み込むフレームワークを変えると、起動の途中の読み込み・設定の値・ミドルウェアが変わり、アップグレードの前後の比較に混ざる。警告はログの 1 行で、動きは変わらない
 - 確かめ方: `scripts/compare-config` の書き出し（設定の値と読み込み済みの部品）、`bin/rails middleware`、検査と E2E、起動のログに Active Storage の警告が出ないこと
 - 記録した Step: 7
+
+## IMP-013: byebug を debug gem に置き換える
+
+- 対象: 3 アプリの Gemfile の development・test グループの `gem 'byebug', platforms: %i[mri mingw x64_mingw]`（Rails 6.1 の雛形のまま）
+- 現状: byebug 13.0.0 は、Ruby 3.4 で `where`（バックトレースの表示）がフレームによって `undefined method 'Kernel.require' for class 'Kernel'` で失敗する（deivid-rodriguez/byebug#867。Ruby 3.4 でフレームのラベルの形が変わったため）。直す PR（#967）は 2026-04-25 にマージされたが、リリースは 13.0.0（2026-01-15）のまま。`next`・`continue` は動く。アプリのコードは byebug を呼ばない
+- 改善案: Rails 7.0 からの雛形と同じく、debug gem（`gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"`。`railties-8.1.4` の `Gemfile.tt`）に置き換える。debug は Ruby 3.4 の bundled gems（3.4.11 は 1.11.0）。byebug 13 が依存に足した reline の一時固定（docs/upgrade/PLAN.md の 7 章）と、`scripts/check-console` の byebug の手順も見直す
+- 経緯: LOG.md の Step 8 の作業計画の論点 7（research の試行の worktree で、3.4.11 で `where` の失敗を再現した）
+- 見送った理由: 開発の道具を替える改善で、アップグレードの間は行わない（CLAUDE.md の「設定の改善は、epic を main に取り込んだ後に別作業で」）。業務的な挙動には関わらない。Step 8 では byebug 13.0.0 のままにし、直った版が出たら直接の gem の方針で上げる
+- 確かめ方: 3 アプリで `bin/rails c` と、`debugger` で止めてのステップ実行・バックトレースの表示（`scripts/check-console` の手順を debug gem に合わせる）、検査と E2E
+- 記録した Step: 8

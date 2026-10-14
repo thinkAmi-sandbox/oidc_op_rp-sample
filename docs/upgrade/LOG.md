@@ -3094,7 +3094,7 @@ verify:
 
 ## Step 7: Rails 8.1（2026-10-12）
 
-- ブランチ / PR: `upgrade/step7-rails81` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step7-rails81` / [#36](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/36)
 - バージョン: Ruby 3.3.12（変更なし）/ Rails 8.0.5.1 → 8.1.4
 - 追随した Rails と gem の既定値・雛形・依存は、[defaults/rails-8.1.md](defaults/rails-8.1.md) に記録した（DEF-8.1-01〜29）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はなくなった
 - Rails 8.1 では、RP の omniauth-rails_csrf_protection 2.0.1 が起動の途中で `ActionController::Base` を読み込む（上流の #33）。検査で 1 件だけ許し、IMP-009 で見張る（DEF-8.1-07）
@@ -3305,3 +3305,159 @@ verify:
 pr:
 
 16. コードレビューで、`scripts/lib/dump_config.rb` のアプリのモデルの絞り込みが、`vendor/bundle` の gem のモデルも含めると分かった。research の worktree（`vendor/bundle` をシンボリックリンクにした）の書き出しとの違いは、これが原因だった。worktree で新しい Rails を試す手順をスキルに足すなら、道具がアプリのディレクトリの場所に頼っているところ（この絞り込み、`$LOAD_PATH` の除外）を見直す必要がある
+
+## Step 8: Ruby 3.4（2026-10-13）
+
+- ブランチ / PR: `upgrade/step8-ruby34` / （PR 作成後に記入）
+- バージョン: Ruby 3.3.12 → 3.4.11 / Rails 8.1.4（変更なし）
+- Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
+- Ruby 3.4.11 の default gem の json 2.9.1 が CVE-2026-54696 の対象なので、json は合わせ直さずに 2.21.2 に上げて Gemfile に明示した。RS・RP は ostruct を Gemfile に明示した。byebug の Ruby 3.4 の不具合は IMP-013 で見張る
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 2 つ: Ruby 3.4 の事実、周辺 gem の事実。3.4.11 の版・tarball・ruby-build の定義、`bundled_gems.rb` の警告の一覧、resolv・net-http・erb・Bundler の版、合わせ直す版の依存、lock の gem が lock にない ostruct などを読むか、mise の ruby-build の更新、setup-ruby の版は自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 版と、research で入れて試すか | 3.4.11 にする。research で入れ、scratchpad に HEAD の git worktree を作り、3 アプリを 3.4.11 にして、lock を 3.4.11 の default gem の版に合わせて解決し、`BUNDLE_PATH` を本体の各アプリの `vendor/bundle`（新しい `ruby/3.4.0`）に向けて入れる。worktree で `scripts/check-apps --no-e2e`、`RUBYOPT=-W:deprecated` の minitest と eager load、ログの WARN・ERROR、`scripts/check-console` を流し、faraday-net_http 3.4.4 も試す。本体の Gemfile・lock と手動確認用の環境は変えない。research の出口で worktree を外す。入れ方は `mise install ruby@3.4.11`（mise 2026.5.10 が、入れる前に ruby-build を最新のリリース v20261013 に取り直す）。ダウンロード（tarball 22,492,449 B、ruby-build の clone、`.gem` 16 個・計 1,207,808 B）は、この論点への返事で承認を得た。`.gem` は RS で 1 回だけ落として照合し、RP・OP のキャッシュにコピーする | 3.4.11 は 3.4 系の最新（2026-09-23）で、公開から 2 週間たち、resolv の CVE-2026-80212・80213 の修正版（0.7.2）を含む。3.3 系に 3.3.12 より新しい版はない。合わせ直した lock の解決（irb 1.14.3 の依存で erb・cgi が増える見込み）、RS・RP の ostruct の bundled_gems の警告、gem 側の chilled string の警告は、入れて流さないと分からない（Step 6 の気づきの 9、Step 7 の論点 1）。AI は、手元の ruby-build 20260924 を直接流して、公開から 1 日の ruby-build を落とさない案を推したが、人間は mise の普段の入れ方を選んだ |
+| 2 lock の default gem の合わせ直し | json は、Ruby の前に gems の作業で 2.21.2 に上げる（Ruby 3.3.12 のまま、RS → RP → OP）。Gemfile にグループの外で `gem 'json', '~> 2.21', '>= 2.21.2'` と理由のコメントを付けて明示し、ruby の作業の合わせ直しの対象から外す。7 章の json の行に、直接の gem の「最新版に上げる」の例外（2 系にとどめる理由）を書く。json 2.21.2 の `.gem`（112,640 B）のダウンロードは、この論点への返事で承認を得た。ほかは、ruby の作業で 3.4.11 の版に合わせ直す（io-console 0.8.1・irb 1.14.3・logger 1.6.4・psych 5.2.2・rdoc 6.14.0・securerandom 0.4.1・stringio 3.1.2・uri 1.0.4、OP の ostruct 0.6.1。bundled gems に移った bigdecimal 3.1.8・drb 2.2.1・mutex_m 0.3.0 も、依存で増える erb 4.0.4.1（3 アプリ）・cgi 0.4.2（RS・OP）も 3.4.11 の版）。ruby2_keywords 0.0.5 が lock から消えるのは受け入れる。reline 0.6.0 は 3.4.11 の default gem と同じ版になり、合わせ直す側に移す。`BUNDLED WITH` は 2.6.9 | 試行で、3.4.11 の default gem の json 2.9.1 が CVE-2026-54696（GHSA-x2f5-4prf-w687、Low。`JSON.dump(obj, io)` などで IO に書き出すときのヒープバッファオーバーフロー。2.9.0〜2.19.8 が対象）の対象で、3 アプリの bundler-audit が落ちた。Ruby 4.0.7 の json 2.18.0 も対象で、ruby_3_4・ruby_4_0 のブランチにも修正版はない。AI は lock の 2.7.2（対象外）を残す案を推したが、人間は修正版に上げる案を選んだ（調べた範囲の対応は、どれも 2.19.9 以上に上げるもの。rails/rails-html-sanitizer #232 など）。2.21.2 は json の 4 つの advisory（CVE-2025-27788・CVE-2026-33210・54696・71847）のどれの対象でもなく、2 系で 2 週間たった最新（07-31）。activesupport 8.1.4 は `json >= 0` で、Rails v8.1.4 の開発用の lock は json 3.0.1。json 3 は既定値が変わる（重複キー・コメントで例外）ので別に判断する。Ruby の前の別の作業にするのは、json と Ruby の変化を別の前後の比較に分けるため。Gemfile の範囲の形は、下限を修正版、上限を 2 系という意図にするため（AI の案 a） |
+| 3 標準ライブラリから外れた gem の明示 | RS・RP の Gemfile の「# 追加」の節に、`gem 'ostruct', require: false` を理由のコメントを付けて足す。版は Gemfile に書かず、lock の合わせ直しで 3.4.11 の default gem の 0.6.1 にする。ruby の作業の RS・RP のコミット（Ruby を上げるコミット）に入れる。rake を 13.2.0 以上に上げたとき（14 章の間接の gem の更新）に、行を外せるかを見直す（7 章に書く） | 試行で、RS・RP の minitest と E2E のサーバーの起動（`db:` タスク）で、rake 13.0.6 の `lib/rake.rb:33` が lock にない ostruct を読み、bundled_gems の警告が出た（`-W:deprecated` なしでも出る）。OP は doorkeeper-openid_connect の依存で lock にあり、出ない。Ruby 4.0 で ostruct は bundled gems になり、lock にないと読み込めなくなる見込み。試行で、`require: false` で明示すると警告は消え、lock に増えるのは ostruct だけで、development の起動で `OpenStruct` は読み込まれない。rake は 13.2.0 から ostruct を読まないが、railties の依存の間接の gem で、上げるとタスクの挙動を確かめる別の更新になる（案 b）。Step 5 の mutex_m と同じ考え方 |
+| 4 faraday-net_http の一時固定 | ruby の作業の後に、gems の作業で faraday-net_http を 3.0.2 → 3.4.4 に上げる（RS → RP）。増える net-http は一時固定で 0.6.0（3.4.11 の default gem と同じ版）にし、Ruby を上げるたびに合わせ直す一覧（7 章・8 章の 4）に足す。3.0.2 の一時固定は外す（7 章の行を直す）。`.gem` は論点 1 で落として照合したものを使う | 3.0.2 に固定していた理由（3.4.x の `net-http ~> 0.5` を Ruby 3.3.12 の net-http 0.4.1 で満たせない）が、3.4.11 の net-http 0.6.0 でなくなる。faraday 2.14.4 は `< 3.5` なので 3.4.4（06-02）が上限。3.0.2 → 3.4.4 の変化は SSL・プロキシの機能の追加と本文の複製の直しで、RS・RP は localhost の http で SSL の設定もプロキシも使わない。試行で、lock で動くのは faraday-net_http と増える net-http だけで、RS・RP の minitest と E2E に差分はなかった。固定しないと net-http は `~> 0.5` の最新（0.10.0。2 週間たっていない）を取りにいく |
+| 5 CI の setup-ruby の固定 | ruby の作業の最初のコミット（3 アプリの Ruby を上げる前）で、ci.yml の setup-ruby の 4 か所を v1.325.0 から v1.329.0（タグのコミット `651ff0d62c5c79bed6d53ec518387aae20e72c1a`）にする。v1.329.0 は 2026-10-12 公開で、公開から 2 週間の決まりの例外とする（人間が判断） | v1.325.0 の `ruby-builder-versions.json` は 3.4 系が 3.4.10 までで、`.ruby-version` を 3.4.11 にすると CI が Ruby を入れられない。3.4.11 は v1.326.0（09-23）で足された。v1.325.0 → v1.329.0 の差分の全文を読み、3.4.11 の追加、Windows の CRuby の一覧（v1.327.0）、Windows の MSYS1 の証明書のパスの 1 行（v1.328.0）、4.1.0-preview1 の追加（v1.329.0）だけで、ubuntu で 3.3.12・3.4.11 を入れる経路は変わらないことを確かめた。コミットの SHA で固定する。v1.329.0 の一覧にも 3.3.12 があるので、Ruby を順に上げる途中のコミットでも CI は Ruby を入れられる。AI は 2 週間たった最新の v1.327.0 を案にしたが、差分が小さいので最新にした |
+| 6 rubocop・webmock を次に確かめる時期 | Step 8 では上げない。次に確かめるのは、Step 9 を行うならその research の最初、行わないなら仕上げの最初（7 章の rubocop 系・webmock の行に書く） | 着手の日（10-14）に、rubocop 1.92.0（10-10）・webmock 3.27.0〜3.30.0（10-10〜10-12）は 2 週間たっていない（10-24〜10-26 から）。rubocop-rails 2.38.0・rubocop-ast 1.50.0・rubocop-minitest 0.41.0 は最新。Step に結び付けるとまた送りになりやすい（Step 6 の気づきの 7）が、Step 9 を行うかは Step 8 の完了時に決まるので、どちらでも送り先が決まる。試行の worktree で、rubocop 1.91.0 の `TargetRubyVersion: 3.4` で 3 アプリとも指摘はなかった |
+| 7 byebug 13.0.0 の Ruby 3.4 での不具合 | CLAUDE.md の ①（対応版を待つ）。byebug は 13.0.0 のままにし、`where` の不具合を 7 章の byebug の行に記録する。直った版が出たら、直接の gem の方針で上げる。debug gem への置き換えを IMP-013 に足した（人間が承認） | 試行で、3.4.11 の RS の `scripts/check-console`（`next`・`where`・`continue`）で、`where` だけが `undefined method 'Kernel.require' for class 'Kernel'` で失敗した（byebug#867。修正の #967 は 2026-04-25 にマージ、未リリース）。アプリのコードは byebug を呼ばず、業務的な挙動には関わらない。② GitHub の main は lock に git の参照が入り `.gem` を照合できない。④ debug gem への置き換えは開発の道具を替える改善で、epic の後に行う |
+| 8 手動確認の時期と DB の写し | verify で 1 回、すべての変更（json、Ruby、`TargetRubyVersion`、faraday-net_http）の後に行う。直前に 12 ファイルのハッシュを確かめ、3 アプリの development DB を `tmp/manual_check_backup/` に写す。research の出口で、Step 7 の写し（3 アプリの `tmp/manual_check_backup/`）を消し、試行の worktree を外す。本体の各アプリの `vendor/bundle/ruby/3.4.0` は ruby の作業で使うので残す | RP・OP・RS の間のやり取りに関わる変更（Ruby 3.4.11、json 2.21.2、faraday-net_http 3.4.4）は minitest・スナップショット・E2E で確かめるが、ブラウザでの流れ（RP の my_op でのログインと introspection 用 RP）は手動確認で見る。Step 7 の写しは、#36 が epic に入ったので消してよい（TIPS.md の「手動確認用の環境」） |
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| verify の手動確認で、3 アプリを 2 回起動した（1 回目の後、人間の操作の前に、アプリがプレビューを止めた） | 起動し直して確かめた。その間に RP の DB が変わり、ブラウザのセッションのクッキーも消えていたので、RP の `sessions` は 12 → 14 件になった（下の「手動確認」） |
+| 各アプリのコミットの前の検査を、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>` で流し、通った作業ツリーをそのままコミットした（RP の json から） | commit-per-app 全体に `RUBYOPT` を付けると、git の hook（Ruby 2.6）まで渡って止まる（下の「遭遇した問題」）。ほかのアプリの変更はなく、退避は要らなかった |
+
+### 手動確認用の環境
+
+作業の開始時（ブランチを切って最初のコミットの前）に、12 ファイルのハッシュを控えた（前のセッションの控えは残っていないので、これを Step 8 の基準にする）。development DB に `-wal` はなく、件数は本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 7 の手動確認の後と同じだった（OP `oauth_access_grants` 31・`oauth_access_tokens` 77（revoke 済み 14）、RP `sessions` 12・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま）。
+
+- 開始時に、前のセッションのサーバーが残っていないことを、`ps` とポートの待ち受け（`lsof`）で確かめた
+- Step 7 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/`（本体だけ）を、research の出口で、人間に確かめて消した（論点 8）
+- research の試行の worktree（scratchpad）は、出口で外した。試行で入れた gem は、本体の各アプリの `vendor/bundle/ruby/3.4.0` に残っている（ruby の作業で使う）
+- 写しを消し、worktree を外した後も、12 ファイルのハッシュは開始時と同じで、`-wal` はない
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| json | 2.7.2 → 2.21.2（3 アプリ。Ruby 3.3.12 のまま） | Gemfile の「# 追加」の節に `gem 'json', '~> 2.21', '>= 2.21.2'` と理由のコメントを足し、`bundle lock --update json --conservative` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.3.0/cache bundle install --local --no-cache`。lock で動いたのは json と `DEPENDENCIES` の json だけ。`.gem` は research で RS に落として照合したもの（3 アプリとも `scripts/verify-gem-checksums --changed HEAD` で一致）。RS `499fad1`、RP `e41919d`、OP `e2293a9`（作業計画の論点 2） |
+| Ruby | 3.3.12 → 3.4.11（3 アプリ） | `.ruby-version`・Gemfile の `ruby` を 3.4.11 にし、lock の default gem を 3.4.11 の版に合わせ直した（Gemfile に版を一時的に足して `bundle lock` → 行を消して `bundle lock`）。RS `4636b45`、RP `c4cf11f`、OP `054c686`。lock は 3 アプリとも、research の試行の lock と json（2.21.2）・ostruct（0.6.1）だけが違う形になった。`.gem` は research で落として照合したものを `vendor/bundle/ruby/3.4.0/cache` から `--local --no-cache` で入れ、`Fetching` はない。`scripts/verify-gem-checksums --changed HEAD` は RS 14・RP 13・OP 14 個で一致。lock の gem は bundler を除いてすべて `vendor/bundle/ruby/3.4.0` から読まれる。Bundler の下で読まれる resolv は 0.7.2、erb は 4.0.4.1（3 アプリ）。CI の setup-ruby は、その前に v1.329.0 にした（`9b4b223`。論点 5）。RuboCop の `TargetRubyVersion` は 3.4 にした（`72175f1`。指摘なし。`Lint/ItWithoutArgumentsInBlock` は 3.4 で対象外になり、`Style/ItBlockParameter` は 3.4 から対象だが、どちらも pending で `NewCops: disable` のまま） |
+| default gem（lock） | 3 アプリ: bigdecimal 3.1.5→3.1.8、drb 2.2.0→2.2.1、mutex_m 0.2.0→0.3.0、io-console 0.7.1→0.8.1、irb 1.13.1→1.14.3、logger 1.6.0→1.6.4、psych 5.1.2→5.2.2、rdoc 6.6.3.1→6.14.0、securerandom 0.3.1→0.4.1、stringio 3.1.1→3.1.2、uri 0.13.3→1.0.4。増えた: erb 4.0.4.1（3 アプリ）、cgi 0.4.2（RS・OP。RP は元からある）。消えた: ruby2_keywords 0.0.5（3 アプリ）。OP: ostruct 0.6.0→0.6.1 | 作業計画の論点 2。reline 0.6.0・base64 0.2.0・tsort 0.2.0・cgi 0.4.2（RP）は動いていない。`RUBY VERSION` 3.4.11p137、`BUNDLED WITH` 2.6.9 |
+| ostruct | 0.6.1（RS・RP に追加） | Gemfile の「# 追加」の節に `gem 'ostruct', require: false` と理由のコメントを足した。Ruby を上げるコミットに入れた（論点 3） |
+| faraday-net_http | 3.0.2 → 3.4.4（RS・RP。Ruby 3.4.11 の後） | Gemfile に faraday-net_http 3.4.4 と net-http 0.6.0 を一時的に足して `bundle lock --update faraday-net_http --conservative` → 行を消して `bundle lock --local`。lock で動いたのは faraday-net_http と、増えた net-http 0.6.0（一時固定。Ruby 3.4.11 の default gem と同じ版）だけ。`.gem` は research で落として照合したもの（`--changed HEAD` で 2 個とも一致）。net-http は `vendor/bundle` から読まれ、`Net::HTTP::VERSION` は 0.6.0。RS `905ec8a`、RP `3074896`（論点 4） |
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| RS・RP: `rake-13.0.6/lib/rake.rb:33: warning: .../ostruct.rb was loaded from the standard library, but will no longer be part of the default gems starting from Ruby 4.0.0.`（Ruby 3.4 の bundled_gems の警告。`-W:deprecated` なしでも出る。minitest と E2E のサーバーの起動の `db:` タスクで出た） | Gemfile に `gem 'ostruct', require: false` を明示した（論点 3。Ruby を上げたコミット）。明示した後は出ない |
+| chilled string（`RUBYOPT=-W:deprecated`） | 試行と各アプリの前後の比較で、minitest・E2E のサーバーの出力・development の eager load のどれにも出なかった |
+| OP: doorkeeper-openid_connect の `auth_time_from_resource_owner` の DEPRECATION | 元からある（IMP-011）。Step 8 で変わっていない |
+
+### 意図的な仕様変更
+
+なし
+
+### 前後の比較
+
+- json（gems）: 作業の前（`718c5e3`）に `scripts/check-apps`（36 の検査と E2E がすべて通った）と `scripts/compare-config dump`（3 アプリの test・development）を取った。`RUBYOPT=-W:deprecated` の minitest・eager load・E2E の前の書き出しは、research で同じアプリのコードの本体で取ったものを使った。各アプリの後に、compare-config（そのアプリの test・development）は前と同じ。`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>`（E2E を含む）は通り、警告は OP の IMP-011 の DEPRECATION だけ（前と同じ）。応答のスナップショットと E2E のスナップショットの差分はない
+- Ruby（ruby）: 作業の前（`9b4b223`、3.3.12、json 2.21.2 の後）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った）、`RUBYOPT=-W:deprecated` の minitest と development の eager load、test.log・development.log の新しい行、`scripts/compare-config dump`（3 アプリの test・development）、`scripts/check-console`（3 アプリ。irb 1.13.1）を取った。各アプリを 3.4.11 にした後に、同じものを取って比べた
+  - 検査: 各アプリの 11 の検査と E2E が通った（minitest RS 11・RP 33・OP 69 runs、`CI=1` も同じ。E2E 10 passed）。応答のスナップショットと E2E のスナップショットの差分はない
+  - 警告: `RUBYOPT=-W:deprecated` の minitest・E2E のサーバーの出力・development の eager load で、新しい警告はない（ostruct の bundled_gems の警告は、RS・RP で明示したので出ない。chilled string の警告は出ない。OP の IMP-011 の DEPRECATION は前と同じ）。development.log に WARN・ERROR の行はない
+  - compare-config: 3 アプリとも test・development の違いは 3 行ずつで、どれも書き出しの道具が、もうない設定（`return_only_media_type_on_content_type`・`use_big_decimal_serializer`・`allow_deprecated_parameters_hash_equality`）を読んだときの `NoMethodError` のメッセージの開きの引用符（バッククォートからシングルクォートへ。Ruby 3.4 のエラーメッセージの形の変化。NEWS-3.4.0）。設定の値と読み込み済みの部品は変わっていない
+  - `rails c`: 3 アプリとも起動し、Tab の補完と複数行の入力ができる（irb 1.14.3・reline 0.6.0・io-console 0.8.1）
+- faraday-net_http（gems）: 前の書き出しは、Ruby を上げた直後の RS・RP のもの（その後の変更は `TargetRubyVersion` だけ）。各アプリの後に、compare-config（test・development）は前と同じ。`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>`（E2E を含む。RS の introspection、RP の JWKS・トークン・introspection・RS への呼び出し）は通り、警告はない。応答のスナップショットと E2E のスナップショットの差分はない
+
+### 手動確認
+
+verify で、すべての変更（json 2.21.2、Ruby 3.4.11、`TargetRubyVersion` 3.4、faraday-net_http 3.4.4）の後（`e27a4b9`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。RS・RP は、プレビューの出力で Ruby 3.4.11・Puma 8.0.2・threads 3 で起動したことを確かめた。OP は、出力の初め（起動の行）がプレビューに残っていなかったので、起動の行は確かめていない（要求に応えたことと、`.ruby-version` の 3.4.11 で動く mise の経路は確かめた）。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 8）
+- 1 回目の起動（10:37）の後、人間の操作の前に、アプリがプレビューを止めた（11:07。`was stopped by the app`）。その間に、プレビューが起動の直後に RP のトップページを開いたので、RP の development DB だけが変わった（`sessions` 12 → 14）。21:54 に 3 アプリを起動し直して確かめた
+- ログイン（RP の my_op）: 人間が「Login」を押した。OP のログイン画面が出て（Step 7 は OP のセッションが残っていて出なかった）、ログインの後、OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。OP はクライアントクレデンシャルのトークンを 3 回、introspect を 3 回、revoke を 1 回受けた。Step 7 と同じ
+- 起動の直後: プレビューが同時に送った `HEAD "/"`・`GET "/"` は、RS・OP とも 200
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。Active Storage の image_processing gem の行（DEF-8.1-29）は、3 アプリとも起動のたびに development.log に出た（Step 7 と同じ）。`preview_logs` の検索では見つからなかったが、プレビューに残っていた出力は初めの部分が欠けていた（OP は起動の行もなかった）ので、サーバーの出力に出なかったとは言えない
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 31 → 33 件、`oauth_access_tokens` が 77 → 82 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 14 → 15）。RP は `sessions` が 12 → 14 件、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+- RP の `sessions` が増えたこと（Step 7 までは手動確認の前後で 12 件のまま）: 増えたのは id 31（10:37。1 回目の起動の直後の、クッキーのない要求）と id 33（21:55。今回のログイン）で、前回（Step 7）のログインの行（id 30）が残った。Step 7 では、ブラウザに前回のセッションのクッキーが残っていて、ログインがその行を置き換えた。今回は、OP でもログイン画面が出たので、アプリがプレビューを止めたときにブラウザのセッションのクッキー（期限のないもの）が消えていた見込み（確かめたのは行の id と時刻、OP のログイン画面が出たこと）。行の中身の長さは前と同じ形（71・83 バイト）
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RS の json のコミットで、`scripts/commit-per-app` の中の E2E が webServer の起動待ち（120 秒）で時間切れになった。2 回目の commit-per-app は、ログのディレクトリを作ってから最初のログまで 16 分空いた | `pmset -g log` で、マシンが 09:23〜09:40、09:41〜09:57、09:58〜10:14 に Maintenance Sleep に入っていたと分かった（同じ時間の検査が止まっていた）。E2E だけを流し直すと通り、2 回目の commit-per-app も通ってコミットした |
+| RP の json のコミットで、commit-per-app 全体に `RUBYOPT=-W:deprecated` を付けたため、git の hook（`scripts/check-public-safety`。macOS 標準の Ruby 2.6）に渡り、`ruby: invalid option -:` でコミットが止まった（検査はすべて通っていた） | 作業ツリーが検査の通ったときと同じことを確かめ、`RUBYOPT` なしでコミットした。OP からは、`RUBYOPT` を検査（`scripts/check-apps --app op`）だけに付け、通った作業ツリーをそのままコミットした |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`e27a4b9`）に、36 の検査がすべて通った。各コミットの前には、そのアプリと E2E を `RUBYOPT=-W:deprecated` 付きで流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この Step を通して出なかった
+- RuboCop（`TargetRubyVersion: 3.4`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った（`check-apps` の項目）
+- lock: epic（`b5e4afd`）からの動きは、作業計画の論点 2・4 のとおり（合わせ直した default gem、json 2.21.2、増えた erb・cgi（RS・OP）・ostruct（RS・RP）・net-http（RS・RP）、消えた ruby2_keywords、faraday-net_http 3.4.4、`RUBY VERSION`・`BUNDLED WITH`、`DEPENDENCIES` の json・ostruct）。default gem に合わせていない固定（connection_pool 2.5.5・date 3.5.1・timeout 0.6.1・racc 1.5.2・minitest 5.14.4・rack 2.2.24）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.14.3・reline 0.6.0・io-console 0.8.1。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。setup-ruby v1.329.0 で 3.4.11 を入れられることも、そのときに見る
+- 手動確認用の環境: 上の「手動確認」。手動確認の後の 12 ファイルのハッシュを新しい基準にした
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 手動確認の「3 アプリとも Ruby 3.4.11・Puma 8.0.2・threads 3 で起動した」は、OP については起動の行を確かめていない（プレビューに残っていた出力の初めが欠けていた） | 記録を直した。RS・RP は出力で確かめ、OP は起動の行を確かめていないと書き分けた（人間が判断） |
+| 「Active Storage の行は `preview_logs` の出力には出なかった」は、残っていた出力が欠けていたので言えない | 記録を直した。development.log に出たことと、プレビューの出力では見つからなかったが欠けていたことを書いた（人間が判断） |
+| `scripts/lib/dump_config.rb` が例外のメッセージをそのまま書き出すので、Ruby を上げるたびに引用符の違いが compare-config の差分に出る | 直さない。Step 7 のコードレビューの指摘（dump_config がアプリのディレクトリの場所に頼る）と同じく、道具の見直しで扱う（下の気づきの 16。人間が判断） |
+| Gemfile の `gem 'json'` に `require: false` がなく、ostruct の行と揃っていない | 直さない。json は Rails が読むので、起動で読み込まれるものは変わらない（compare-config で前後同じ）。直すと 3 アプリのコミットと検査のやり直しが要る（人間が判断） |
+| Gemfile の json のコメントが「Ruby 3.4 の default gem の json（2.9.1）」と版を書いていて、Ruby 4.0 で古くなる | 直さない。Ruby を上げる Step で json の扱いと一緒にコメントも直すことを、PLAN.md の 7 章の json の行に書き足した（人間が判断） |
+| TIPS.md の「lock に入れた default gem」の一覧に、アプリの別（net-http は RS・RP だけなど）がない | 直した。net-http・cgi・ostruct がどのアプリに、何の依存で入っているかを書き足した（人間が判断） |
+
+- 直したのは記録と TIPS.md・PLAN.md だけで、アプリと道具のコードは変えていない
+
+### スキルについて気づいたこと
+
+Step 3〜7 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+resume:
+
+1. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#36 の取り込みが入っていなかった（Step 5 の気づきの 3、Step 6 の気づきの 1、Step 7 の気づきの 1 と同じ）。人間の指示にあったので、fetch して早送りしてから切った。前のセッションのサーバーは、人間の指示にあったので `ps` と `lsof` で確かめた（Step 7 の気づきの 2）
+
+research:
+
+2. mise 2026.5.10 の `mise install` は、入れる前に ruby-build を GitHub の最新のリリースと比べ、違えばリポジトリを clone し直す。TIPS.md の「Ruby を上げる」は Step 4 の時点で「手元の ruby-build は最新と同じ」としていて、この clone がダウンロードの確認に入ることと、その版が公開から 2 週間たっていないことがある（今回は 1 日目）ことを書いていない
+3. CI の setup-ruby の固定（v1.325.0）が 3.4.11 を持たなかった。Step 4 の「Ruby の版を持つ箇所」は「ci.yml は `.ruby-version` を読むので変えなくてよい」としていて、固定した setup-ruby が新しい版を持つかは、別に確かめる必要がある（Step 4 は `ruby-builder-versions.json` を見ていた）
+4. research の途中で日付が変わった（10-13 → 10-14。Step 7 の気づきの 9 と同じ）
+5. 新しい Ruby を research で試すときの worktree の作り方（`vendor/bundle` と `e2e/node_modules` を本体へのシンボリックリンクにする、OP の署名鍵を使い捨てで作る、E2E 用・テスト用の DB を写す、`MISE_TRUSTED_CONFIG_PATHS`）を、Step 7 の記録から組み立て直した。research.md に手順はない（Step 6 の気づきの 9、Step 7 の気づきの 4・11 と同じ）
+6. resolve で消える gem が、また出た（3 アプリの ruby2_keywords 0.0.5。drb 2.2.1 が依存しなくなった）。Step 3・5・6・7 に続いて 5 回目。合わせ直した lock を実際に解決して見つけた
+7. 8 章の 4 の「default gem の版に合わせ直す」は、合わせる先の版が advisory の対象でないことを前提にしていた。3.4.11 の json 2.9.1 が CVE-2026-54696 の対象だと、試行の bundler-audit で初めて分かった。research で、合わせ直す先の版を bundler-audit（無視リストなし）にかける手順があると、試行の前に分かる
+8. TIPS.md の「Ruby を上げる」の、一時的に足した行を消して `bundle lock --local` する手順は、その版が入っていないと解決できない（試行で json を 2.7.2 に戻したときに失敗した）。メタデータだけを取る `bundle lock` に替えた
+9. chilled string の警告は、通った経路でしか出ない。設定の「前後の比較」の `RUBYOPT=-W:deprecated` は minitest と eager load だけで、サーバーの経路は見ない。今回は E2E も `RUBYOPT=-W:deprecated` で流し、Playwright が出すサーバーの stderr を比べた
+10. 論点 2・5 で、人間は掘り下げた（Gemfile への書き方、Ruby 4.0 で解決するか、世の中の対応、2 週間の決まりの例外にできるかの差分の中身）。Step 7 の気づきの 6 と同じく、最初の示し方に、次の 3 つを入れておけば往復が減った
+    - 案ごとの具体的な書き方（Gemfile のどこに何を書くか）
+    - 先の Step（Ruby 4.0）でどうなるか
+    - 2 週間たっていない版の差分の中身
+11. 論点 1 で、AI は mise を通さずに ruby-build を直接流す案を推したが、人間は mise の普段の入れ方を選んだ。mise が入れる前に ruby-build を取り直すことは、TIPS.md に書いていなかった（気づきの 2）
+
+gems:
+
+12. `RUBYOPT=-W:deprecated` を付けた検査とコミットを一度に流すには、commit-per-app に検査だけの環境変数を渡す口がない。全体に付けると git の hook（Ruby 2.6）まで渡って止まる。今回は、検査を `scripts/check-apps --app` で流してから、作業ツリーのままコミットした
+13. マシンのスリープで検査が止まり、E2E が時間切れになった。止まった理由がスリープだと、`pmset -g log` で後から分かった。検査が普段より長いときや、時間切れのときに、まずスリープを疑う手順がない
+
+verify:
+
+14. 手動確認を頼んでから人間が操作するまでの間に、アプリがプレビューのサーバーを止めた（`was stopped by the app`）。人間の「表示した」の返事の後に `tabs_context` と `preview_list` で気づき、起動し直した。その間に、プレビューが開いた RP のトップページで RP の DB が変わり、ブラウザのセッションのクッキーも消えていて、手動確認の結果（RP の `sessions` の件数）が前の Step と比べにくくなった。manual-check.md の手順 3 は、操作を頼む前にブラウザの画面を確かめるだけで、操作の返事の後にサーバーが動き続けていたかを確かめる手順がない
+15. 手動確認の前に、ブラウザペインが隠れていて、表示してもらう往復が要った（Step 5 の気づきの 16、Step 6 の気づきの 17、Step 7 の気づきの 15 と同じ）
+
+pr:
+
+16. コードレビューで、`scripts/lib/dump_config.rb` が例外のメッセージをそのまま書き出すので、Ruby を上げると、メッセージの形の変化（Ruby 3.4 の引用符）が compare-config の差分に出ると分かった。Step 7 の気づきの 16（アプリのディレクトリの場所に頼る）と合わせて、道具の見直しで扱う候補
+17. 手動確認の記録で、`preview_logs` に残っている出力が初めから欠けていることがあり、起動の行や起動の直後の警告を後から確かめられなかった。manual-check.md の手順 4 は「サーバーの出力を読む」だけで、起動の直後に読む（残っているうちに控える）決まりがない
