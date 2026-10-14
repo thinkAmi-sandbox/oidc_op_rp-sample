@@ -3355,12 +3355,39 @@ pr:
   - `rails c`: 3 アプリとも起動し、Tab の補完と複数行の入力ができる（irb 1.14.3・reline 0.6.0・io-console 0.8.1）
 - faraday-net_http（gems）: 前の書き出しは、Ruby を上げた直後の RS・RP のもの（その後の変更は `TargetRubyVersion` だけ）。各アプリの後に、compare-config（test・development）は前と同じ。`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>`（E2E を含む。RS の introspection、RP の JWKS・トークン・introspection・RS への呼び出し）は通り、警告はない。応答のスナップショットと E2E のスナップショットの差分はない
 
+### 手動確認
+
+verify で、すべての変更（json 2.21.2、Ruby 3.4.11、`TargetRubyVersion` 3.4、faraday-net_http 3.4.4）の後（`e27a4b9`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Ruby 3.4.11・Puma 8.0.2・threads 3 で起動した。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 8）
+- 1 回目の起動（10:37）の後、人間の操作の前に、アプリがプレビューを止めた（11:07。`was stopped by the app`）。その間に、プレビューが起動の直後に RP のトップページを開いたので、RP の development DB だけが変わった（`sessions` 12 → 14）。21:54 に 3 アプリを起動し直して確かめた
+- ログイン（RP の my_op）: 人間が「Login」を押した。OP のログイン画面が出て（Step 7 は OP のセッションが残っていて出なかった）、ログインの後、OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。OP はクライアントクレデンシャルのトークンを 3 回、introspect を 3 回、revoke を 1 回受けた。Step 7 と同じ
+- 起動の直後: プレビューが同時に送った `HEAD "/"`・`GET "/"` は、RS・OP とも 200
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。Active Storage の image_processing gem の行（DEF-8.1-29）は、起動のたびに development.log に出た（Step 7 と同じ。`preview_logs` の出力には出なかった）
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 31 → 33 件、`oauth_access_tokens` が 77 → 82 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 14 → 15）。RP は `sessions` が 12 → 14 件、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+- RP の `sessions` が増えたこと（Step 7 までは手動確認の前後で 12 件のまま）: 増えたのは id 31（10:37。1 回目の起動の直後の、クッキーのない要求）と id 33（21:55。今回のログイン）で、前回（Step 7）のログインの行（id 30）が残った。Step 7 では、ブラウザに前回のセッションのクッキーが残っていて、ログインがその行を置き換えた。今回は、OP でもログイン画面が出たので、アプリがプレビューを止めたときにブラウザのセッションのクッキー（期限のないもの）が消えていた見込み（確かめたのは行の id と時刻、OP のログイン画面が出たこと）。行の中身の長さは前と同じ形（71・83 バイト）
+
 ### 遭遇した問題
 
 | 問題 | 対応 |
 |---|---|
 | RS の json のコミットで、`scripts/commit-per-app` の中の E2E が webServer の起動待ち（120 秒）で時間切れになった。2 回目の commit-per-app は、ログのディレクトリを作ってから最初のログまで 16 分空いた | `pmset -g log` で、マシンが 09:23〜09:40、09:41〜09:57、09:58〜10:14 に Maintenance Sleep に入っていたと分かった（同じ時間の検査が止まっていた）。E2E だけを流し直すと通り、2 回目の commit-per-app も通ってコミットした |
 | RP の json のコミットで、commit-per-app 全体に `RUBYOPT=-W:deprecated` を付けたため、git の hook（`scripts/check-public-safety`。macOS 標準の Ruby 2.6）に渡り、`ruby: invalid option -:` でコミットが止まった（検査はすべて通っていた） | 作業ツリーが検査の通ったときと同じことを確かめ、`RUBYOPT` なしでコミットした。OP からは、`RUBYOPT` を検査（`scripts/check-apps --app op`）だけに付け、通った作業ツリーをそのままコミットした |
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`e27a4b9`）に、36 の検査がすべて通った。各コミットの前には、そのアプリと E2E を `RUBYOPT=-W:deprecated` 付きで流した
+- minitest: RS 11 runs・15 assertions、RP 33・71、OP 69・123、0 failures。`CI=1`（eager load あり）でも同じ
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この Step を通して出なかった
+- RuboCop（`TargetRubyVersion: 3.4`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った（`check-apps` の項目）
+- lock: epic（`b5e4afd`）からの動きは、作業計画の論点 2・4 のとおり（合わせ直した default gem、json 2.21.2、増えた erb・cgi（RS・OP）・ostruct（RS・RP）・net-http（RS・RP）、消えた ruby2_keywords、faraday-net_http 3.4.4、`RUBY VERSION`・`BUNDLED WITH`、`DEPENDENCIES` の json・ostruct）。default gem に合わせていない固定（connection_pool 2.5.5・date 3.5.1・timeout 0.6.1・racc 1.5.2・minitest 5.14.4・rack 2.2.24）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.14.3・reline 0.6.0・io-console 0.8.1。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。setup-ruby v1.329.0 で 3.4.11 を入れられることも、そのときに見る
+- 手動確認用の環境: 上の「手動確認」。手動確認の後の 12 ファイルのハッシュを新しい基準にした
 
 ### スキルについて気づいたこと
 
@@ -3390,3 +3417,8 @@ gems:
 
 12. `RUBYOPT=-W:deprecated` を付けた検査とコミットを一度に流すには、commit-per-app に検査だけの環境変数を渡す口がない。全体に付けると git の hook（Ruby 2.6）まで渡って止まる。今回は、検査を `scripts/check-apps --app` で流してから、作業ツリーのままコミットした
 13. マシンのスリープで検査が止まり、E2E が時間切れになった。止まった理由がスリープだと、`pmset -g log` で後から分かった。検査が普段より長いときや、時間切れのときに、まずスリープを疑う手順がない
+
+verify:
+
+14. 手動確認を頼んでから人間が操作するまでの間に、アプリがプレビューのサーバーを止めた（`was stopped by the app`）。人間の「表示した」の返事の後に `tabs_context` と `preview_list` で気づき、起動し直した。その間に、プレビューが開いた RP のトップページで RP の DB が変わり、ブラウザのセッションのクッキーも消えていて、手動確認の結果（RP の `sessions` の件数）が前の Step と比べにくくなった。manual-check.md の手順 3 は、操作を頼む前にブラウザの画面を確かめるだけで、操作の返事の後にサーバーが動き続けていたかを確かめる手順がない
+15. 手動確認の前に、ブラウザペインが隠れていて、表示してもらう往復が要った（Step 5 の気づきの 16、Step 6 の気づきの 17、Step 7 の気づきの 15 と同じ）
