@@ -127,7 +127,7 @@ GEM
     irb (1.13.1)
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
-    json (2.7.2)
+    json (2.21.2)
     jwt (2.10.3)
       base64
     language_server-protocol (3.17.0.6)
@@ -301,6 +301,7 @@ DEPENDENCIES
   byebug
   dotenv-rails
   faraday
+  json (~> 2.21, >= 2.21.2)
   mutex_m
   oauth2
   puma (~> 8.0)
