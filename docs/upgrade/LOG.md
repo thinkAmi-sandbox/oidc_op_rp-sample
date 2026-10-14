@@ -3378,14 +3378,14 @@ pr:
 
 ### 手動確認
 
-verify で、すべての変更（json 2.21.2、Ruby 3.4.11、`TargetRubyVersion` 3.4、faraday-net_http 3.4.4）の後（`e27a4b9`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。3 アプリとも Ruby 3.4.11・Puma 8.0.2・threads 3 で起動した。
+verify で、すべての変更（json 2.21.2、Ruby 3.4.11、`TargetRubyVersion` 3.4、faraday-net_http 3.4.4）の後（`e27a4b9`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。RS・RP は、プレビューの出力で Ruby 3.4.11・Puma 8.0.2・threads 3 で起動したことを確かめた。OP は、出力の初め（起動の行）がプレビューに残っていなかったので、起動の行は確かめていない（要求に応えたことと、`.ruby-version` の 3.4.11 で動く mise の経路は確かめた）。
 
 - 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが作業の開始時と同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しのハッシュは元と同じ。作業計画の論点 8）
 - 1 回目の起動（10:37）の後、人間の操作の前に、アプリがプレビューを止めた（11:07。`was stopped by the app`）。その間に、プレビューが起動の直後に RP のトップページを開いたので、RP の development DB だけが変わった（`sessions` 12 → 14）。21:54 に 3 アプリを起動し直して確かめた
 - ログイン（RP の my_op）: 人間が「Login」を押した。OP のログイン画面が出て（Step 7 は OP のセッションが残っていて出なかった）、ログインの後、OP の認可エンドポイントが 302、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`
 - introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。OP はクライアントクレデンシャルのトークンを 3 回、introspect を 3 回、revoke を 1 回受けた。Step 7 と同じ
 - 起動の直後: プレビューが同時に送った `HEAD "/"`・`GET "/"` は、RS・OP とも 200
-- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。Active Storage の image_processing gem の行（DEF-8.1-29）は、起動のたびに development.log に出た（Step 7 と同じ。`preview_logs` の出力には出なかった）
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。Active Storage の image_processing gem の行（DEF-8.1-29）は、3 アプリとも起動のたびに development.log に出た（Step 7 と同じ）。`preview_logs` の検索では見つからなかったが、プレビューに残っていた出力は初めの部分が欠けていた（OP は起動の行もなかった）ので、サーバーの出力に出なかったとは言えない
 - 手動確認用の環境: OP の development DB は `oauth_access_grants` が 31 → 33 件、`oauth_access_tokens` が 77 → 82 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 14 → 15）。RP は `sessions` が 12 → 14 件、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
 - RP の `sessions` が増えたこと（Step 7 までは手動確認の前後で 12 件のまま）: 増えたのは id 31（10:37。1 回目の起動の直後の、クッキーのない要求）と id 33（21:55。今回のログイン）で、前回（Step 7）のログインの行（id 30）が残った。Step 7 では、ブラウザに前回のセッションのクッキーが残っていて、ログインがその行を置き換えた。今回は、OP でもログイン画面が出たので、アプリがプレビューを止めたときにブラウザのセッションのクッキー（期限のないもの）が消えていた見込み（確かめたのは行の id と時刻、OP のログイン画面が出たこと）。行の中身の長さは前と同じ形（71・83 バイト）
 
@@ -3409,6 +3409,19 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 - 公開物の安全チェック: 各コミットの hooks で通った
 - CI: push の後に確かめる（push は人間が行う）。setup-ruby v1.329.0 で 3.4.11 を入れられることも、そのときに見る
 - 手動確認用の環境: 上の「手動確認」。手動確認の後の 12 ファイルのハッシュを新しい基準にした
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 手動確認の「3 アプリとも Ruby 3.4.11・Puma 8.0.2・threads 3 で起動した」は、OP については起動の行を確かめていない（プレビューに残っていた出力の初めが欠けていた） | 記録を直した。RS・RP は出力で確かめ、OP は起動の行を確かめていないと書き分けた（人間が判断） |
+| 「Active Storage の行は `preview_logs` の出力には出なかった」は、残っていた出力が欠けていたので言えない | 記録を直した。development.log に出たことと、プレビューの出力では見つからなかったが欠けていたことを書いた（人間が判断） |
+| `scripts/lib/dump_config.rb` が例外のメッセージをそのまま書き出すので、Ruby を上げるたびに引用符の違いが compare-config の差分に出る | 直さない。Step 7 のコードレビューの指摘（dump_config がアプリのディレクトリの場所に頼る）と同じく、道具の見直しで扱う（下の気づきの 16。人間が判断） |
+| Gemfile の `gem 'json'` に `require: false` がなく、ostruct の行と揃っていない | 直さない。json は Rails が読むので、起動で読み込まれるものは変わらない（compare-config で前後同じ）。直すと 3 アプリのコミットと検査のやり直しが要る（人間が判断） |
+| Gemfile の json のコメントが「Ruby 3.4 の default gem の json（2.9.1）」と版を書いていて、Ruby 4.0 で古くなる | 直さない。Ruby を上げる Step で json の扱いと一緒にコメントも直すことを、PLAN.md の 7 章の json の行に書き足した（人間が判断） |
+| TIPS.md の「lock に入れた default gem」の一覧に、アプリの別（net-http は RS・RP だけなど）がない | 直した。net-http・cgi・ostruct がどのアプリに、何の依存で入っているかを書き足した（人間が判断） |
+
+- 直したのは記録と TIPS.md・PLAN.md だけで、アプリと道具のコードは変えていない
 
 ### スキルについて気づいたこと
 
@@ -3443,3 +3456,8 @@ verify:
 
 14. 手動確認を頼んでから人間が操作するまでの間に、アプリがプレビューのサーバーを止めた（`was stopped by the app`）。人間の「表示した」の返事の後に `tabs_context` と `preview_list` で気づき、起動し直した。その間に、プレビューが開いた RP のトップページで RP の DB が変わり、ブラウザのセッションのクッキーも消えていて、手動確認の結果（RP の `sessions` の件数）が前の Step と比べにくくなった。manual-check.md の手順 3 は、操作を頼む前にブラウザの画面を確かめるだけで、操作の返事の後にサーバーが動き続けていたかを確かめる手順がない
 15. 手動確認の前に、ブラウザペインが隠れていて、表示してもらう往復が要った（Step 5 の気づきの 16、Step 6 の気づきの 17、Step 7 の気づきの 15 と同じ）
+
+pr:
+
+16. コードレビューで、`scripts/lib/dump_config.rb` が例外のメッセージをそのまま書き出すので、Ruby を上げると、メッセージの形の変化（Ruby 3.4 の引用符）が compare-config の差分に出ると分かった。Step 7 の気づきの 16（アプリのディレクトリの場所に頼る）と合わせて、道具の見直しで扱う候補
+17. 手動確認の記録で、`preview_logs` に残っている出力が初めから欠けていることがあり、起動の行や起動の直後の警告を後から確かめられなかった。manual-check.md の手順 4 は「サーバーの出力を読む」だけで、起動の直後に読む（残っているうちに控える）決まりがない
