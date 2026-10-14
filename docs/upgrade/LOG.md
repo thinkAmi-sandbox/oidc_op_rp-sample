@@ -3343,6 +3343,7 @@ pr:
 | Ruby | 3.3.12 → 3.4.11（3 アプリ） | `.ruby-version`・Gemfile の `ruby` を 3.4.11 にし、lock の default gem を 3.4.11 の版に合わせ直した（Gemfile に版を一時的に足して `bundle lock` → 行を消して `bundle lock`）。RS `4636b45`、RP `c4cf11f`、OP `054c686`。lock は 3 アプリとも、research の試行の lock と json（2.21.2）・ostruct（0.6.1）だけが違う形になった。`.gem` は research で落として照合したものを `vendor/bundle/ruby/3.4.0/cache` から `--local --no-cache` で入れ、`Fetching` はない。`scripts/verify-gem-checksums --changed HEAD` は RS 14・RP 13・OP 14 個で一致。lock の gem は bundler を除いてすべて `vendor/bundle/ruby/3.4.0` から読まれる。Bundler の下で読まれる resolv は 0.7.2、erb は 4.0.4.1（3 アプリ）。CI の setup-ruby は、その前に v1.329.0 にした（`9b4b223`。論点 5）。RuboCop の `TargetRubyVersion` は 3.4 にした（`72175f1`。指摘なし。`Lint/ItWithoutArgumentsInBlock` は 3.4 で対象外になり、`Style/ItBlockParameter` は 3.4 から対象だが、どちらも pending で `NewCops: disable` のまま） |
 | default gem（lock） | 3 アプリ: bigdecimal 3.1.5→3.1.8、drb 2.2.0→2.2.1、mutex_m 0.2.0→0.3.0、io-console 0.7.1→0.8.1、irb 1.13.1→1.14.3、logger 1.6.0→1.6.4、psych 5.1.2→5.2.2、rdoc 6.6.3.1→6.14.0、securerandom 0.3.1→0.4.1、stringio 3.1.1→3.1.2、uri 0.13.3→1.0.4。増えた: erb 4.0.4.1（3 アプリ）、cgi 0.4.2（RS・OP。RP は元からある）。消えた: ruby2_keywords 0.0.5（3 アプリ）。OP: ostruct 0.6.0→0.6.1 | 作業計画の論点 2。reline 0.6.0・base64 0.2.0・tsort 0.2.0・cgi 0.4.2（RP）は動いていない。`RUBY VERSION` 3.4.11p137、`BUNDLED WITH` 2.6.9 |
 | ostruct | 0.6.1（RS・RP に追加） | Gemfile の「# 追加」の節に `gem 'ostruct', require: false` と理由のコメントを足した。Ruby を上げるコミットに入れた（論点 3） |
+| faraday-net_http | 3.0.2 → 3.4.4（RS・RP。Ruby 3.4.11 の後） | Gemfile に faraday-net_http 3.4.4 と net-http 0.6.0 を一時的に足して `bundle lock --update faraday-net_http --conservative` → 行を消して `bundle lock --local`。lock で動いたのは faraday-net_http と、増えた net-http 0.6.0（一時固定。Ruby 3.4.11 の default gem と同じ版）だけ。`.gem` は research で落として照合したもの（`--changed HEAD` で 2 個とも一致）。net-http は `vendor/bundle` から読まれ、`Net::HTTP::VERSION` は 0.6.0。RS `905ec8a`、RP `3074896`（論点 4） |
 
 ### 前後の比較
 
@@ -3352,6 +3353,7 @@ pr:
   - 警告: `RUBYOPT=-W:deprecated` の minitest・E2E のサーバーの出力・development の eager load で、新しい警告はない（ostruct の bundled_gems の警告は、RS・RP で明示したので出ない。chilled string の警告は出ない。OP の IMP-011 の DEPRECATION は前と同じ）。development.log に WARN・ERROR の行はない
   - compare-config: 3 アプリとも test・development の違いは 3 行ずつで、どれも書き出しの道具が、もうない設定（`return_only_media_type_on_content_type`・`use_big_decimal_serializer`・`allow_deprecated_parameters_hash_equality`）を読んだときの `NoMethodError` のメッセージの開きの引用符（バッククォートからシングルクォートへ。Ruby 3.4 のエラーメッセージの形の変化。NEWS-3.4.0）。設定の値と読み込み済みの部品は変わっていない
   - `rails c`: 3 アプリとも起動し、Tab の補完と複数行の入力ができる（irb 1.14.3・reline 0.6.0・io-console 0.8.1）
+- faraday-net_http（gems）: 前の書き出しは、Ruby を上げた直後の RS・RP のもの（その後の変更は `TargetRubyVersion` だけ）。各アプリの後に、compare-config（test・development）は前と同じ。`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps --app <アプリ>`（E2E を含む。RS の introspection、RP の JWKS・トークン・introspection・RS への呼び出し）は通り、警告はない。応答のスナップショットと E2E のスナップショットの差分はない
 
 ### 遭遇した問題
 
