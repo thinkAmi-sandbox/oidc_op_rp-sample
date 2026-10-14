@@ -124,7 +124,8 @@ GEM
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
-    faraday-net_http (3.0.2)
+    faraday-net_http (3.4.4)
+      net-http (~> 0.5)
     globalid (1.0.1)
       activesupport (>= 5.0)
     hashdiff (1.2.1)
@@ -159,6 +160,8 @@ GEM
     msgpack (1.8.5)
     multi_xml (0.6.0)
     mutex_m (0.3.0)
+    net-http (0.6.0)
+      uri
     net-imap (0.5.15)
       date
       net-protocol
