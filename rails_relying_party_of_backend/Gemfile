@@ -78,3 +78,7 @@ gem 'activerecord-session_store'
 
 # OPからもらった client_id と client_secret を .env ファイルから読み込むため
 gem 'dotenv-rails', groups: %i[development test]
+
+# Ruby 3.4 の default gem の json（2.9.1）は CVE-2026-54696 の対象なので、修正版を明示する。
+# json 3 は既定値が変わる（重複キー・コメントで例外）ので、2 系にとどめる（docs/upgrade/PLAN.md の Step 8）
+gem 'json', '~> 2.21', '>= 2.21.2'
