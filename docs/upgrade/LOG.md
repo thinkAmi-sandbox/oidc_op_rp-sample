@@ -3461,3 +3461,32 @@ pr:
 
 16. コードレビューで、`scripts/lib/dump_config.rb` が例外のメッセージをそのまま書き出すので、Ruby を上げると、メッセージの形の変化（Ruby 3.4 の引用符）が compare-config の差分に出ると分かった。Step 7 の気づきの 16（アプリのディレクトリの場所に頼る）と合わせて、道具の見直しで扱う候補
 17. 手動確認の記録で、`preview_logs` に残っている出力が初めから欠けていることがあり、起動の行や起動の直後の警告を後から確かめられなかった。manual-check.md の手順 4 は「サーバーの出力を読む」だけで、起動の直後に読む（残っているうちに控える）決まりがない
+
+## Step 9: Ruby 4.0（2026-10-14）
+
+- ブランチ / PR: `upgrade/step9-ruby40` / （PR 作成後に記入）
+- バージョン: Ruby 3.4.11 → 4.0 系（版は research で決める） / Rails 8.1.4（変更なし）
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 4 つ: Ruby 4.0 の事実、lock の gem の 4.0 への対応、Bundler 2.6.9 → 4.0.20 の変化、合わせ直すとメジャー版をまたぐ gem の変化。4.0.7 の版・tarball・保守の状況・json の版・bundled gems の一覧、minitest 5.14.4 の Ruby の要件、mise の ruby-build の版、lock の試行と bundler-audit、Bundler 4 の lock の書き直しと CHECKSUMS、faraday・oauth2 が Content-Type を付けること、railties の minitest 6 への対応は自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 Step 9 を行うか | 行う（PLAN.md の 14 章の未決事項）。research の前に、判断の材料を 1 論点として示した | 4.0 は公開から 10 か月で、パッチ版が 7 回出ている（4.0.7 は 2026-09-15）。主な gem の CI は 4.0 を含む。lock の gem で 4.0 に入らないのは minitest 5.14.4（`required_ruby_version` が `< 4.0`）だけで、Step 8 の json と同じく Ruby の前の gems の作業に分けられる。3.4 は normal maintenance で急ぐ理由はないが、外れる default gem と cgi の扱いを今の流れ（合わせ直し・前後の比較・試行）でまとめて片付けておくと、epic の後の保守が楽になる。リスク（Bundler 4 への移行、minitest を大きく上げること、byebug の `bt`（byebug#981））は、research の試行で確かめる |
+
+### スキルについて気づいたこと
+
+Step 3〜8 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+resume:
+
+1. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#37 の取り込みが入っていなかった（Step 5〜8 と同じ）。人間の指示にあったので、fetch して早送りしてから切った。前のセッションのサーバーは、人間の指示にあったので `ps` と `lsof` で確かめた（残っていなかった）
+2. resume.md は、Step 8 の後の次の作業を「次の Step の始めなら research」と決める。ロードマップで任意の Step（Step 9）を行うかを決める手順がなく、その判断でブランチ名（`upgrade/step9-...` か仕上げの名前）が変わるので、手順 2・3（ブランチを切る・最初のコミット）を判断の後に回した。今回は人間の指示で、判断の材料を 1 論点として示した
+3. 手動確認の写し（Step 8 の `tmp/manual_check_backup/`）を消すかの問いに返事がないまま、Step 9 を行うかの論点を示した（それぞれのメッセージで 1 論点）。返事は Step 9 の論点にだけあったので、写しは消さずに残し、research の手動確認の論点で改めて確かめることにした。resume で確かめることと、Step の始めの論点が重なるときの順番が決まっていない
+
+research:
+
+4. mise が使う ruby-build の置き場所（macOS では `~/Library/Caches/mise/ruby/ruby-build`）が TIPS.md にない。版（v20261013、最新）を確かめるのに探した。最新なら、入れるときに取り直しは起きない（Step 8 の気づきの 2）
+5. サブエージェントの報告で、版や番号の食い違いがあった（Ruby 4.0.7 の bundled gems の minitest は 6.0.0、net-http の Content-Type の変更は issue #205 を直した PR #207）。報告どうしを突き合わせ、要点を一次の出典で確かめて拾えた（research の手順 2）
+6. `cd` を含むコマンドで Bash の作業ディレクトリが変わり、次のコマンドがアプリやスキルのディレクトリで動いた（2 回）。TIPS.md の「コマンドの実行」の注意と同じ
