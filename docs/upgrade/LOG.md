@@ -3617,3 +3617,27 @@ ruby:
 pr:
 
 17. 手元の ruby-advisory-db は 10-10 のままで、research・verify の bundler-audit は古い DB で通っていた。CI（`--update`）で初めて、10-23 に入った crass の advisory に気づいた。research の「advisory の確かめ」と verify の前に `bundle-audit update` を流す手順がない（Step 8 の気づきの 7 と同じく、advisory の確かめが試行の lock だけに頼っていた）
+
+## 仕上げ（2026-10-24）
+
+PLAN.md の 6 章の「仕上げ」の記録。PR ごとに小見出しを置き、スキルについて気づいたことは節の最後にまとめる。
+
+### 作業計画で決めたこと
+
+Step 9 が epic に入ってから（[#38](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/38)）、`/rails-upgrade` の resume の後に、仕上げの進め方を 1 論点として示した。続けて、最初の項目（rubocop・webmock）を research と同じ手順で調べ（版と公開日、CHANGELOG、lock の試行、advisory）、版を決めた。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 仕上げの進め方 | rubocop・webmock（`upgrade/finish-rubocop-webmock`）→ 間接の依存の gem（14 章。rubocop・webmock の PR が epic に入った後に決め、上げるなら `upgrade/finish-indirect-gems`）→ Dependabot（`upgrade/finish-dependabot`）→ README の 2 項目とサポート終了時期の確認方法（`upgrade/finish-docs`）→ epic → main（人間）→ ルールセット（人間）。記録はこの節に PR ごとの小見出しで足す。Dependabot から後はスキルの作業にないので、スキルの外で計画と承認を経て進め、verify・pr の型を使う | 間接の gem を rubocop・webmock の後にするのは、その更新で依存の gem も動くため。Dependabot の前にするのは、Gemfile に `= 版` で書いた default gem・bundled gems（Step 9）と lock だけの固定の扱いで、Dependabot の `ignore`・`allow` が決まるため。Dependabot の version updates は、既定で manifest に明示した依存をすべて対象にし（Dependabot options reference の `allow`）、既定の枝（main）を見る（同 `target-branch`）。README とサポート終了時期の確認方法は文書だけで、ほかの項目に関わらない |
+| 2 rubocop・webmock の版と時期 | 今日（10-24）、rubocop 1.91.0 → 1.92.1（10-22）、webmock 3.26.4 → 3.34.0（10-14）にする。公開から 2 週間の決まりの例外（人間が判断。今回だけで、決まりは変えない）。手動確認はしない | 最初に示した案は、10-28 に rubocop 1.92.0・webmock 3.34.0（webmock の最新が 2 週間に届き、Gemfile に版を書かずに済む）。人間が、メンテナンスの間が開くので、1 日以上たち、脆弱性の情報がない今の最新を使いたいと返した。ruby-advisory-db（10-23）・GitHub Advisory Database・両リポジトリの Security Advisories に対象の advisory はなく、10-14〜10-24 に公表された RubyGems の advisory は crass（Step 9 で対応済み）だけ。公開後の issue は、rubocop が 2 件（#16141 は既定で無効の `Layout/ClassStructure` の、意図した挙動。3 アプリでも無効）、webmock は 0 件。2 つとも開発・テスト用で、development のサーバーは読まない |
+
+### 手動確認用の環境
+
+resume で、前のセッションのサーバーが残っていないこと（`ps` と 3780〜3782 の待ち受け）を確かめてから、12 ファイルのハッシュを控えた（控えは scratchpad）。DB 3 つの先頭 12 桁は、Step 9 のセッションでチャットに出した値と同じだった。ほかの 9 ファイルは比べる控えが残っていなかったので、更新日時（すべて 10-06）が変わっていないことで補った。件数は、本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 9 の手動確認の後と同じだった（OP `oauth_access_grants` 35・`oauth_access_tokens` 87（revoke 済み 16）、RP `sessions` 16・`op_users` 1。どちらも `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま。`-wal` はない）。
+
+- Step 9 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/` を、人間に確かめて消した。消した後も、12 ファイルのハッシュは控えと同じ
+
+### rubocop・webmock
+
+- ブランチ / PR: `upgrade/finish-rubocop-webmock` / （PR 作成後に記入）
+- バージョン: rubocop 1.91.0 → 1.92.1、webmock 3.26.4 → 3.34.0（Ruby 4.0.9 / Rails 8.1.4 は変更なし）
