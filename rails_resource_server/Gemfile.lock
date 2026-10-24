@@ -103,7 +103,7 @@ GEM
       bigdecimal
       rexml
     crass (1.0.8)
-    date (3.5.1)
+    date (3.6.0)
     dotenv (3.2.0)
     dotenv-rails (3.2.0)
       dotenv (= 3.2.0)
@@ -145,7 +145,7 @@ GEM
       net-pop
       net-smtp
     marcel (1.2.1)
-    mini_mime (1.1.1)
+    mini_mime (1.1.5)
     minitest (6.0.6)
       drb (~> 2.0)
       prism (~> 1.5)
@@ -153,7 +153,7 @@ GEM
     multi_xml (0.6.0)
     net-http (0.9.1)
       uri (>= 0.11.1)
-    net-imap (0.5.15)
+    net-imap (0.6.8)
       date
       net-protocol
     net-pop (0.1.2)
