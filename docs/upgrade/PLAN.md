@@ -1150,9 +1150,9 @@ Step 7 が epic に入ってから（[#36](https://github.com/thinkAmi-sandbox/o
 
 Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/37)）、research の前に Step 9 を行うかを人間と決め（14 章の未決事項）、`/rails-upgrade` の research で調べた。作業計画を出し、論点を 1 つずつ確かめてから承認を得た（2026-10-14〜24）。Rails 8.1.4 のまま Ruby を 3.4.11 から 4.0.9 に上げる。research の途中で 4.0.7 を入れ、scratchpad の git worktree で 3 アプリを 4.0.7 にして、検査・警告・E2E を流した。その後（10-22・10-23）に 4.0.8・4.0.9 が出たので、4.0.9 に変え、4.0.9 も research で入れた（論点 4）。経緯と作業の記録は LOG.md の Step 9。
 
-- [ ] gems: minitest 5.14.4 → 6.0.6（RS。Ruby 3.4.11 のまま。Gemfile に `= 6.0.6`・`require: false`・理由のコメント。test グループの mutex_m の行を外す）
-- [ ] gems: minitest 5.14.4 → 6.0.6（RP）
-- [ ] gems: minitest 5.14.4 → 6.0.6（OP）
+- [x] gems: minitest 5.14.4 → 6.0.6（RS。Ruby 3.4.11 のまま。Gemfile に `= 6.0.6`・`require: false`・理由のコメント。test グループの mutex_m の行を外す）
+- [x] gems: minitest 5.14.4 → 6.0.6（RP）
+- [x] gems: minitest 5.14.4 → 6.0.6（OP）
 - [ ] ruby: CI の setup-ruby を v1.329.0 から v1.334.0 にする（公開から 2 週間の決まりの例外）
 - [ ] ruby: RS（Ruby 4.0.9、Gemfile の default gem・bundled gems のまとまり、json のコメント、`platforms` を `:windows` に（DEF-8.1-30。最初のアプリのコミットの前に理解の関門）、`BUNDLED WITH` 4.0.20）
 - [ ] ruby: RP（同上）

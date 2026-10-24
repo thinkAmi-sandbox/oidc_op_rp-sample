@@ -3491,6 +3491,20 @@ resume で、前のセッションのサーバーが残っていないこと（`
 - research の試行の worktree（scratchpad）は、scratchpad と一緒に消えていた。git の記録は `git worktree prune` で片付けた。試行で入れた gem は、本体の各アプリの `vendor/bundle/ruby/4.0.0` に残っている（ruby の作業で使う）
 - Step 8 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/` を、research の出口で、人間に確かめて消した（論点 9）。消した後も、12 ファイルのハッシュは開始時と同じで、`-wal` はない
 
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| minitest | 5.14.4 → 6.0.6（3 アプリ。Ruby 3.4.11 のまま） | test グループの mutex_m の行（Step 5）とそのコメントを、`gem 'minitest', '6.0.6', require: false` と理由のコメントに置き換えた。照合済みの `minitest-6.0.6.gem` を 4.0.0 のキャッシュから 3.4.0 のキャッシュにコピーし（SHA-256 は rubygems.org と一致）、目録だけを取る `bundle lock`（Bundler 2.6.9）→ `git diff` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.4.0/cache bundle install --local --no-cache`。lock で動いたのは minitest（依存の drb・prism は lock にある版）と、消えた mutex_m と、`DEPENDENCIES` の行だけ。`Fetching` はなく、`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 1 個で一致。minitest は `vendor/bundle` から読まれ、mutex_m は読まれない。RS `ca2704e`、RP `1ba3c43`、OP `133da35`（作業計画の論点 3） |
+
+### 前後の比較
+
+- minitest（gems）: 作業の前（`41495c8`、Ruby 3.4.11）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った）、`scripts/compare-config dump`（3 アプリの test・development）、`RUBYOPT=-W:deprecated` の development の eager load を取った。各アプリの後に、同じものを取って比べた。`rails c` は irb・reline が動かないので比べていない
+  - 検査: 各アプリの 11 の検査と E2E（10 passed）が通った。runs は RS 11・RP 33・OP 69 で前と同じ。`CI=1` も同じ。応答のスナップショットと E2E のスナップショットの差分はない
+  - assertions の件数: RS 15（前と同じ）、RP 71 → 82、OP 123 → 129。minitest 6 の `assert_operator` が先に `assert_respond_to` を数え（`minitest-6.0.6/lib/minitest/assertions.rb:295`）、Rails の `assert_redirected_to`（`actionpack-8.1.4/lib/action_dispatch/testing/assertions/response.rb:71`）と rails-dom-testing の `assert_select`（`rails-dom-testing-2.3.0/lib/rails/dom/testing/assertions/selector_assertions.rb:347`）がそれを使うため。RS のテストはどちらも使わない。research の試行（4.0.7）で、RP のテストごとの数を 5.27.0 と比べ、増えたのはリダイレクトと `assert_select` を確かめるテストだけだと確かめた。通る・落ちるが変わったテストはない
+  - 警告: `RUBYOPT=-W:deprecated` の minitest・E2E のサーバーの出力・development の eager load で、新しい警告はない（OP の IMP-011 の DEPRECATION は前と同じ）
+  - compare-config: 3 アプリとも test・development で前と同じ
+
 ### スキルについて気づいたこと
 
 Step 3〜8 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
