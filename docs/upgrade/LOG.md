@@ -3466,6 +3466,8 @@ pr:
 
 - ブランチ / PR: `upgrade/step9-ruby40` / （PR 作成後に記入）
 - バージョン: Ruby 3.4.11 → 4.0.9 / Rails 8.1.4（変更なし）
+- Rails と gem の既定値・雛形への追随は 1 つ（DEF-8.1-30。Gemfile の `platforms` を `:windows` に）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
+- Ruby 4.0 に入らない minitest 5.14.4 を、Ruby の前に 6.0.6 にした。Ruby は、research の途中で出た 4.0.9（正規表現のエンジンの不具合の修正）にした（2 週間の決まりの例外）。lock にある default gem・bundled gems の版は、一時固定をやめて Gemfile のまとまりに書いた
 
 ### 作業計画で決めたこと
 
@@ -3505,6 +3507,19 @@ resume で、前のセッションのサーバーが残っていないこと（`
 | minitest | 5.14.4 → 6.0.6（3 アプリ。Ruby 3.4.11 のまま） | test グループの mutex_m の行（Step 5）とそのコメントを、`gem 'minitest', '6.0.6', require: false` と理由のコメントに置き換えた。照合済みの `minitest-6.0.6.gem` を 4.0.0 のキャッシュから 3.4.0 のキャッシュにコピーし（SHA-256 は rubygems.org と一致）、目録だけを取る `bundle lock`（Bundler 2.6.9）→ `git diff` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.4.0/cache bundle install --local --no-cache`。lock で動いたのは minitest（依存の drb・prism は lock にある版）と、消えた mutex_m と、`DEPENDENCIES` の行だけ。`Fetching` はなく、`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 1 個で一致。minitest は `vendor/bundle` から読まれ、mutex_m は読まれない。RS `ca2704e`、RP `1ba3c43`、OP `133da35`（作業計画の論点 3） |
 | Ruby | 3.4.11 → 4.0.9（3 アプリ） | `.ruby-version`・Gemfile の `ruby` を 4.0.9 にし、Gemfile の「# 追加」の節の後に、Ruby 4.0.9 の default gem・bundled gems のまとまり（`= 版`・`require: false`、先頭に理由のコメント）を書いた。json のコメントを 4.0 の内容に直し、RS・RP の ostruct の行に版を書いた（OP はまとまりに入れた）。byebug・tzinfo-data の `platforms` を `:windows` にした（DEF-8.1-30。理解の関門で人間が承認）。`BUNDLED WITH` は 4.0.20、`RUBY VERSION` は `ruby 4.0.9`（2 スペース）。CHECKSUMS の節は足されていない。RS `35f1331`、RP `9efec51`、OP `99bd957`。CI の setup-ruby は、その前に v1.334.0 にした（`2c14e37`。論点 4）。RuboCop の `TargetRubyVersion` は 4.0 にした（`22866bf`。指摘なし） |
 | default gem・bundled gems（lock） | 3 アプリ: base64 0.2.0→0.3.0、bigdecimal 3.1.8→4.0.1、drb 2.2.1→2.2.3、erb 4.0.4.1→6.0.7、io-console 0.8.1→0.8.2、irb 1.14.3→1.16.0、logger 1.6.4→1.7.0、ostruct 0.6.1→0.6.3、psych 5.2.2→5.3.1、rdoc 6.14.0→7.0.4、reline 0.6.0→0.6.3、stringio 3.1.2→3.2.0、uri 1.0.4→1.1.1。RS・RP: net-http 0.6.0→0.9.1。増えた: pp 0.6.3・prettyprint 0.2.0（3 アプリ）。消えた: cgi 0.4.2（RS・OP） | 作業計画の論点 5。securerandom 0.4.1・tsort 0.2.0・RP の cgi 0.4.2 と、前の Step からの lock だけの固定（connection_pool・rack・racc・date・timeout）は動いていない。`.gem` は research で落として照合したものを `--local --no-cache` で入れ、`Fetching` はない。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は RS 16・RP 16・OP 15 個で一致。lock の gem は bundler を除いてすべて `vendor/bundle/ruby/4.0.0` から読まれ、C 拡張は 4.0.9 の `libruby.4.0.dylib` にリンクしている。Bundler の下で読まれる json は 2.21.2、resolv は 0.7.2、erb は 6.0.7 |
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| Bundler 4.0.20: `[DEPRECATED] Platform :mingw, :mswin, :x64_mingw will be removed in the future. Please use platform :windows instead.`（`bundle lock`・`bundle install` のとき） | Gemfile の byebug・tzinfo-data の `platforms` を Rails の雛形の形（`:windows`）にした（DEF-8.1-30。Ruby を上げたコミット）。直した後は出ない |
+| chilled string などの Ruby の非推奨（`RUBYOPT=-W:deprecated`） | research の試行（4.0.7）と各アプリの前後の比較（4.0.9）で、minitest・E2E のサーバーの出力・development の eager load のどれにも出なかった |
+| cgi（`-w` のときだけ） | RS・OP は i18n 1.8.10 の `require 'cgi'` で「CGI library is removed from Ruby 4.0」、RP は cgi 0.4.2 の C 拡張の「method redefined」。通常の起動と `-W:deprecated` では出ない。7 章の cgi の行に書き、14 章の間接の gem の更新で見直す |
+| OP: doorkeeper-openid_connect の `auth_time_from_resource_owner` の DEPRECATION | 元からある（IMP-011）。Step 9 で変わっていない |
+
+### 意図的な仕様変更
+
+なし
 
 ### 前後の比較
 
