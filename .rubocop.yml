@@ -10,7 +10,7 @@ inherit_mode:
     - Exclude
 
 AllCops:
-  TargetRubyVersion: 3.4
+  TargetRubyVersion: 4.0
   TargetRailsVersion: 8.1
   # 新しいルールは、rubocop を更新するコミットで内容を見てから有効にする
   NewCops: disable
