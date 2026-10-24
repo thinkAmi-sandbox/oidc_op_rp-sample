@@ -3519,6 +3519,33 @@ resume で、前のセッションのサーバーが残っていないこと（`
 - compare-config: 3 アプリとも test・development で前と同じ（Step 8 で差分になった `NoMethodError` のメッセージの形も、3.4.11 と 4.0.9 で同じ）
 - `rails c`: 3 アプリとも起動し、Tab の補完と複数行の入力ができる（irb 1.16.0・reline 0.6.3・io-console 0.8.2）
 
+### 手動確認
+
+verify で、すべての変更（minitest 6.0.6、Ruby 4.0.9、Gemfile のまとまり、`:windows`、`TargetRubyVersion` 4.0）と記録のコミットの後（`d38c33b`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。起動の直後にプレビューの出力を読み、3 アプリとも Ruby 4.0.9・Puma 8.0.2・threads 3 で起動したことを控えた（Step 8 の気づきの 17）。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが research の出口で控えたものと同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しは元と同じ。作業計画の論点 9）
+- 操作を頼む前に、ブラウザペインが隠れていたので表示してもらった（Step 8 の気づきの 15 と同じ）。操作の返事の後に、3 アプリのサーバーが起動のときから動き続けていたことを `preview_list` で確かめた（Step 8 の気づきの 14）
+- ログイン（RP の my_op）: 人間が「Login」を押した。OP の認可エンドポイントは未ログインで 401 になり、ログイン画面（200）、ログイン（303）の後、認可エンドポイントが 302（同意画面は出ない）、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。OP はクライアントクレデンシャルのトークンを 3 回、introspect を 3 回、revoke を 1 回受けた。Step 8 と同じ
+- 起動の直後: プレビューが同時に送った `HEAD "/"`・`GET "/"` は、3 アプリとも 200
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない（`preview_logs` の検索）。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。Active Storage の image_processing gem の行（DEF-8.1-29）は、3 アプリとも起動のときに development.log に出た（Step 7・8 と同じ）
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 33 → 35 件、`oauth_access_tokens` が 82 → 87 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 15 → 16）。RP は `sessions` が 14 → 16 件、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB（写しと同じ）・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした（控えは scratchpad）。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+- RP の `sessions` が増えたこと: 増えたのは id 35（13:26:29。プレビューが起動の直後に開いた、クッキーのない要求）と id 36（13:28。今回のログイン）で、前回（Step 8）のログインの行（id 33）が残った。OP でもログイン画面が出たので、Step 8 と同じく、ブラウザのセッションのクッキーが消えていた見込み（確かめたのは行の id と時刻、OP のログイン画面が出たこと）
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`d38c33b`）に、36 の検査がすべて通った。各コミットの前には、そのアプリと E2E を `RUBYOPT=-W:deprecated` 付きで流した
+- minitest: RS 11 runs・15 assertions、RP 33・82、OP 69・129、0 failures。`CI=1`（eager load あり）でも同じ。assertions の件数の変化は minitest 6 によるもの（上の「前後の比較」）
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この Step を通して出なかった
+- RuboCop（`TargetRubyVersion: 4.0`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った（`check-apps` の項目）
+- lock: epic（`a9a3fba`）からの動きは、作業計画の論点 3・5 のとおり（minitest 6.0.6、まとまりの gem、増えた pp・prettyprint、消えた mutex_m・cgi（RS・OP）、`RUBY VERSION`・`BUNDLED WITH`、`DEPENDENCIES`）。前の Step からの lock だけの固定（connection_pool 2.5.5・rack 2.2.24・racc 1.5.2・date 3.5.1・timeout 0.6.1、RP の cgi 0.4.2）と json 2.21.2 は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.16.0・reline 0.6.3・io-console 0.8.2。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。setup-ruby v1.334.0 で 4.0.9 を入れられることと、Bundler 4.0.20 で入れられることも、そのときに見る
+- 手動確認用の環境: 上の「手動確認」。手動確認の後の 12 ファイルのハッシュを新しい基準にした
+
 ### 遭遇した問題
 
 | 問題 | 対応 |

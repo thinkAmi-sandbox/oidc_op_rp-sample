@@ -1158,7 +1158,7 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 - [x] ruby: RP（同上）
 - [x] ruby: OP（同上。ostruct はまとまりに入れる）
 - [x] ruby: RuboCop の `TargetRubyVersion` を 4.0 にする
-- [ ] verify（手動確認は 1 回。直前に 3 アプリの development DB を写す）
+- [x] verify（手動確認は 1 回。直前に 3 アプリの development DB を写した。RP の `sessions` が 14 → 16 件になったのは、Step 8 と同じくブラウザのセッションのクッキーが消えていたためと見ている。結果は LOG.md の Step 9 の「手動確認」と「確認結果」。CI は push の後）
 - [ ] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した。理由は LOG.md の Step 9 の「作業計画で決めたこと」）:
