@@ -3464,7 +3464,7 @@ pr:
 
 ## Step 9: Ruby 4.0（2026-10-14）
 
-- ブランチ / PR: `upgrade/step9-ruby40` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step9-ruby40` / [#38](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/38)
 - バージョン: Ruby 3.4.11 → 4.0.9 / Rails 8.1.4（変更なし）
 - Rails と gem の既定値・雛形への追随は 1 つ（DEF-8.1-30。Gemfile の `platforms` を `:windows` に）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
 - Ruby 4.0 に入らない minitest 5.14.4 を、Ruby の前に 6.0.6 にした。Ruby は、research の途中で出た 4.0.9（正規表現のエンジンの不具合の修正）にした（2 週間の決まりの例外）。lock にある default gem・bundled gems の版は、一時固定をやめて Gemfile のまとまりに書いた
