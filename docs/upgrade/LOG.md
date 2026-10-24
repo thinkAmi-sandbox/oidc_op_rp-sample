@@ -3708,6 +3708,23 @@ rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAm
 | 2 手動確認の要否と時期 | 手動確認は 1 回、verify ですべてのコミットの後に行う。直前に 3 アプリの development DB を `tmp/manual_check_backup/` に写す（写すときに人間に確かめる）。パスワードの入力と同意は人間が行う | development のサーバーが読む gem が動く（i18n、connection_pool、nio4r・racc・date の C 拡張、responders、RP の hashie・rack-protection・cgi、RS の hashie など）。画面の文字・リダイレクト先・ログインとセッションを通る。各コミットで、応答のスナップショットと E2E（development 環境で 3 アプリを起動する。`e2e/README.md`）を流すので、まとまりごとの変化はそこで拾い、手動確認は全部がそろった状態で 1 回にする（Step 9 と同じ） |
 | 3 作業計画の承認 | まとまり 0（rack の固定）〜 5 を、まとまりごとに RS → RP → OP の順でコミットする（計 16 コミット）。まとまり 1 の RS・RP では、ostruct の行のコメントを直す。まとまり 3 の RS・RP の前に、hashie の公開後の issue と advisory を見直す。ダウンロードは 19 個、1,102,848 B（RS で落として照合し、RP・OP にコピーする） | rack の固定は、ほかのまとまりと理由が違うので、まとまり 0 として分ける（1 コミット 1 理由）。rake 13.4.2 は ostruct を読まないので、RS・RP の ostruct の行のコメント（rake 13.0.6 が require する）が当たらなくなる。行は rack 2.2.24 のために残す。jwt 3.3.0（57,856 B）は RS のキャッシュに既にあるので落とさない（照合はする） |
 
+#### gem ごとの対応
+
+| まとまり | gem | 対応 |
+|---|---|---|
+| 0 rack の固定 | rack 2.2.24（3 アプリ。版は変えない） | json の行の後に `gem 'rack', '~> 2.2', '>= 2.2.24', require: false` と理由のコメントを足して `bundle lock`。lock で動いたのは `DEPENDENCIES` の rack の行だけ（落とす gem はない）。RS `49f77a7`、RP `7dd3aed`、OP `d7679be` |
+
+#### 前後の比較
+
+- 作業の前（`4bc6063`）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った。RS 11 runs・15 assertions、RP 33・82、OP 69・129、E2E 10 passed）、`scripts/compare-config dump`（3 アプリの test・development）、3 アプリの `RUBYOPT=-w RAILS_ENV=test bin/rails runner 1` の警告を取った。`-w` の警告は、RP の cgi 0.4.2 の C 拡張が `cgi/escape` を定義し直すもの、RS・OP の i18n 1.8.10 の `exceptions.rb` が出す「CGI library is removed from Ruby 4.0」、OP の devise と warden の定義し直し
+- まとまり 0: 各アプリの 11 の検査と E2E（ほかのアプリの変更は退避）が通り、件数は前と同じ。スナップショットの差分はない。検査のログの警告の行（行頭の点を落として比べた）と compare-config も前と同じ
+
+#### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| まとまり 0 で、`RUBYOPT=-W:deprecated` を付けて `scripts/commit-per-app` を流すと、検査と E2E は通ったが、コミットが `ruby: invalid option -:` で失敗した（ステージは外れ、変更は作業ツリーに残った）。git hooks の `scripts/check-public-safety` は `#!/usr/bin/env ruby` で、リポジトリ直下では macOS 標準の Ruby 2.6 になり、`-W:` の形を受け付けない | 検査はそのアプリの変更だけ（ほかは退避）で通っていたので、そのアプリの Gemfile と lock を指定してステージし、`git commit -F` でコミットした（hooks の安全チェックは通った）。以降は、`RUBYOPT` を `commit-per-app` に付けない |
+
 ### スキルについて気づいたこと
 
 Step 3〜9 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。Step 9 までの気づきで、この仕上げでまた当たったものは、その番号を書いた。
@@ -3741,3 +3758,8 @@ gems:
 16. `cd` を含むコマンドで、Bash の作業ディレクトリが RS に移った（2 回。仕上げの気づきの 11 と同じ）
 17. `mise exec` を付けずに `bundle exec bundle-audit update` を流し、macOS 標準の Ruby で止まった（TIPS.md の「コマンドの実行」にある注意）
 18. 論点 1 で、人間は「固定するなら Gemfile に」「止める gem は最新の修正内容を見て、問題なければ最新に」と 2 回掘り下げた。最初の示し方に、止める gem の最新版の修正内容と、止めるときの書き方（Gemfile か lock か）を入れておけば、往復が減った（Step 9 の気づきの 11 と同じ形）。公開から 2 週間の例外を判断する材料（advisory の 3 か所、公開後の issue）を調べる手順がスキルにないのは、仕上げの気づきの 7 と同じ
+
+間接の依存の gem の gems:
+
+19. 前後の比較の警告の行は、`RUBYOPT=-W:deprecated` を付けた検査のログで取るが、同じ環境変数を付けて `scripts/commit-per-app` を流すと、git hooks の Ruby（macOS 標準の 2.6）が `-W:` を受け付けず、コミットだけが失敗した（上の「遭遇した問題」）。before-after.md と commit.md は、比べるための検査と、コミットの前の検査を、別に流すのか兼ねるのかを書いていない
+20. `scripts/check-apps` のログは `01.log` から番号だけで、どの検査のログかがファイル名から分からない。前後で警告の行を比べるとき、アプリごとの番号の範囲（3 アプリなら 1〜11・12〜22・23〜33、1 アプリなら 1〜11）で拾った
