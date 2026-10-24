@@ -3717,6 +3717,7 @@ rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAm
 | 2 mail の依存 | mini_mime 1.1.1（RS）/ 1.1.0（RP・OP）→1.1.5、net-imap 0.5.15→0.6.8、date 3.5.1→3.6.0（3 アプリ） | 同じ手順。lock で動いたのは 3 つだけ。`.gem` 3 個（計 314,880 B）は RS で落とし（date は C 拡張をビルド）、RP・OP にコピーした。照合は 3 アプリとも 3 個で一致。RS `4cc358e`、RP `c3c4f72`、OP `74c0311` |
 | 3 認可の gem の依存 | RS: jwt 2.10.3→3.3.0、multi_xml 0.6.0→0.9.1、hashie 5.1.0→5.2.0。RP: multi_xml 0.6.0→0.9.1、hashie 4.1.0→5.2.0、rack-protection 2.1.0→3.2.0。OP: responders 3.1.1→3.2.1 | 先に hashie の公開後の issue と advisory を見直した（16:16。公開後に作られた issue はなく、ruby-advisory-db・GitHub Advisory Database・リポジトリの Security Advisories にもない。新しい版もない）。lock で動いたのは各アプリの gem と、依存の要件の行だけ（multi_xml 0.9.1 → bigdecimal `>= 3.1, < 5`、RP の hashie 5.2.0 → logger、rack-protection 3.2.0 → base64・rack `~> 2.2, >= 2.2.4`、responders → actionpack・railties `>= 7.0`）。指す先の bigdecimal・logger・base64 は Gemfile のまとまりの版、rack は 2.2.24 のままで動いていない。RS は hashie・multi_xml を落とし、jwt 3.3.0 はキャッシュにあった `.gem` を使った。RP は rack-protection と一緒に hashie・multi_xml も rubygems.org から落とした（計画では RS からコピーする予定だったが、道具を落とす形で流した。計 155,136 B。照合は一致）。OP は responders を落とした。照合は RS 3・RP 3・OP 1 個で一致。rack-protection は、omniauth の既定の設定が `OmniAuth::AuthenticityTokenProtection` を参照して読まれるが、RP では omniauth-rails_csrf_protection が判定を差し替える。OP に responders の generator の雛形はない。RS `e299908`、RP `cdb3add`、OP `aac478e` |
 | 4 activerecord-session_store の依存 | cgi 0.4.2→0.5.2（RP） | lock で動いたのは cgi だけ。`.gem`（41,984 B）を RP で落とし（C 拡張をビルド）、照合は 1 個で一致。activerecord-session_store 2.3.0 は lib で cgi を使わず、RP は Rails の `require "cgi/escape"` で lock の cgi を読む。0.5.2 では gem の `cgi/escape.rb` と C 拡張が対で読まれ（``）、`CGI.escapeHTML` の結果は同じ。RP `8d5ef63` |
+| 5 開発とテストの道具の依存 | parallel 1.28.0→2.3.0（rubocop）、public_suffix 6.0.2→7.0.5（webmock の addressable）（3 アプリ） | lock で動いたのは 2 つだけ。`.gem` 2 個（計 121,344 B）は RS で落とし、RP・OP にコピーした。照合は 3 アプリとも 2 個で一致。default グループから届かないので、development のサーバーは読まない。RS `f277621`、RP `413cccc`、OP `fdaefee` |
 
 #### 前後の比較
 
@@ -3726,6 +3727,7 @@ rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAm
 - まとまり 2: まとまり 1 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数・スナップショット・検査のログの警告の行・compare-config・`-w` の警告は前と同じ
 - まとまり 3: まとまり 2 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数・スナップショット（RP のログインの AuthHash、OP の devise の応答を含む）・検査のログの警告の行・compare-config・`-w` の警告は前と同じ（multi_xml の `MultiXml` の非推奨の警告も出ていない）
 - まとまり 4（RP）: まとまり 3 の後と比べた。11 の検査と E2E（10 passed）が通り、件数・スナップショット・検査のログの警告の行・compare-config は前と同じ。`-w` の警告は、cgi 0.4.2 の C 拡張が Ruby 4.0 の `cgi/escape` を定義し直す 8 行が消え、RP の `-w` の警告はなくなった（PLAN.md の 7 章の cgi の行の「0.5 系にするかを見直す」の答え）
+- まとまり 5: まとまり 3（RS・OP）・4（RP）の後と比べた。各アプリの 11 の検査（RuboCop の指摘なし）と E2E（10 passed）が通り、件数・スナップショット・検査のログの警告の行・compare-config・`-w` の警告は前と同じ
 
 #### 遭遇した問題
 
