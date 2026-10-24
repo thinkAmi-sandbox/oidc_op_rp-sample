@@ -2,6 +2,7 @@
 
 - 版: Rails 8.0.5.1 → 8.1.4（Ruby 3.3.12）
 - Step: 7（ブランチ `upgrade/step7-rails81`）/ PR: [#36](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/36)
+- Step 9（Ruby 3.4.11 → 4.0.9。ブランチ `upgrade/step9-ruby40`）で見つけたものも、Rails 8.1.4 のままなのでこのファイルに入れる（DEF-8.1-30）
 - 記録のルールは [README.md](README.md)
 
 ## 一覧
@@ -37,6 +38,7 @@
 | DEF-8.1-27 | `load_defaults 8.1` にし、`new_framework_defaults_8_1.rb` を消す | Rails の既定値 | 3 アプリ | 追随 |
 | DEF-8.1-28 | development・test で YJIT を切る | Rails の既定値（8.1） | 3 アプリ（development・test） | 追随 |
 | DEF-8.1-29 | 起動のたびに、Active Storage が image_processing gem がないことをログに出す | Rails の既定値 | 3 アプリ | 追随（受け入れる。改善の候補は IMP-012） |
+| DEF-8.1-30 | Gemfile の `platforms` の mingw・mswin を `:windows` にする | Rails の雛形（Ruby を上げる Step で、Bundler 4 の非推奨の警告が出る） | 3 アプリ | 追随 |
 
 ## Rails 8.1.4 の lock（rails-lock）
 
@@ -330,3 +332,17 @@ Rails を 8.0.5.1 → 8.1.4 にしたとき（`load_defaults` は 8.0 のまま�
 - 扱い: 追随（受け入れる。`variant_processor = :disabled` を足す案はとらず、使っていないフレームワークを読み込まないことを改善の候補にした。docs/IMPROVEMENTS.md の IMP-012。人間が判断）。TIPS.md の、手動確認のサーバーの出力の元からあるものの一覧に足した
 - 出典: `activestorage-8.1.4/lib/active_storage/engine.rb:89-125`、`activestorage-8.0.5.1/lib/active_storage/engine.rb:91-105`、activestorage の CHANGELOG（8.1.0「Allow analyzers and variant transformer to be fully configurable」）、`railties-8.1.4/lib/rails/application/configuration.rb:255`
 - コミット: なし（Rails 8.1.4 の lock から）
+
+## Ruby 4.0（Step 9）
+
+Ruby を 3.4.11 → 4.0.9（Bundler 2.6.9 → 4.0.20）にしたときに見つけた、雛形への追随。Rails は 8.1.4 のまま。
+
+### DEF-8.1-30: Gemfile の `platforms` の mingw・mswin を `:windows` にする
+
+- 種類: Rails の雛形（Ruby を上げる Step で、Bundler 4 の非推奨の警告が出るきっかけ） / 対象: RS・RP・OP
+- 何が変わるか: Gemfile の byebug の `platforms: %i[mri mingw x64_mingw]` を `%i[mri windows]` に、tzinfo-data の `platforms: %i[mingw mswin x64_mingw jruby]` を `%i[windows jruby]` にする
+- なぜ: Ruby 4.0.9 の Bundler 4.0.20 は、`platforms:` に mingw・mswin があると、`bundle lock`・`bundle install` のときに `[DEPRECATED] Platform :mingw, :mswin, :x64_mingw will be removed in the future. Please use platform :windows instead.` を出す（Bundler 2.6.9 は出さない）。Rails の雛形は rails/rails#46009（2022-09-15 マージ、Rails 7.1 から）で `:windows` の形になっている。3 アプリの 2 行は Rails 6.1 の雛形のままで、`app:update` は Gemfile を上書きしないので、Rails を上げる Step では上がらなかった
+- 3 アプリへの影響: RS で直して `bundle lock --local` を流し、`platforms` に関わる lock の変化はなく（`PLATFORMS`・`DEPENDENCIES` の byebug・tzinfo-data の行は同じ）、非推奨の警告も出なくなった。research で、scratchpad のコピーでこの 2 行だけを直して lock が変わらないことも確かめた。macOS・Linux（CI）では、どちらの書き方でも byebug は入り tzinfo-data は入らない。`:windows` は mingw・mswin のどちらも含み、違いは Windows で使うときの書き方だけ。`bundle exec` とアプリの起動では、もとから警告は出なかった
+- 扱い: 追随（今後の Bundler で非推奨の書き方が外れると Gemfile が読めなくなるおそれがあるため。人間が判断。LOG.md の Step 9 の論点 6）
+- 出典: rails/rails#46009、`railties-8.1.4/lib/rails/generators/rails/app/templates/Gemfile.tt`（13 行目・56 行目）、Bundler 4.0.20 の `bundler/dsl.rb:431-435`、Bundler 2.6.9 の `bundler/current_ruby.rb:23`。日本語版の Rails ガイドに、この書き方を説明した節は見つけられなかった（Rails の版の変化ではないので、ガイドの出典は付けない）
+- コミット: Ruby を 4.0.9 に上げる各アプリのコミットに入れる（RS → RP → OP）
