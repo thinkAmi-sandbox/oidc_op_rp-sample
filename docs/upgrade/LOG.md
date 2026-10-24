@@ -3649,7 +3649,7 @@ resume で、前のセッションのサーバーが残っていないこと（`
 | gem | バージョン | 対応 |
 |---|---|---|
 | rubocop | 1.91.0 → 1.92.1（3 アプリ） | Gemfile の `'1.91.0'` を `'1.92.1'` にして `bundle lock` → `git diff` → 入れた。lock で動いたのは rubocop と、その依存の要件の行（regexp_parser `>= 2.11.3`。lock の 2.13.1 は動かない）だけ。`.gem`（896,512 B）は RS の `bundle install` で落とし（`Fetching` は rubocop だけ）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 3 アプリとも 1 個で一致。1.92.0・1.92.1 は新しい cop を足さないので、`NewCops: disable` のまま有効にするものはない。RuboCop の指摘は 3 アプリとも 0 件（前と同じ）。RS `ea608d2`、RP `a62f811`、OP `adb4819` |
-| webmock | 3.26.4 → 3.34.0（3 アプリ） | Gemfile は版を書かない形のまま、`bundle lock --update webmock --conservative`（目録だけを取る）→ `git diff` → 入れた。lock で動いたのは webmock だけ（依存の要件は 3.26.4 と同じ）。`.gem`（80,896 B）は RS の `bundle install` で落とし（`Fetching` は webmock だけ）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。照合は 3 アプリとも 1 個で一致。RP で `--local` を付けた `bundle lock` は platforms の不足で止まり、lock は変わらなかったので、`--local` なしで書いた（下の「スキルについて気づいたこと」）。RS `5a1e508`、RP `2833633`、OP `06a24c1` |
+| webmock | 3.26.4 → 3.34.0（3 アプリ） | Gemfile は版を書かない形のまま、`bundle lock --update webmock --conservative`（目録だけを取る）→ `git diff` → 入れた。lock で動いたのは webmock だけ（依存の要件は 3.26.4 と同じ）。`.gem`（80,896 B）は RS の `bundle install` で落とし（`Fetching` は webmock だけ）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。照合は 3 アプリとも 1 個で一致。RP で `--local` を付けた `bundle lock --update` は platforms の不足で止まり、lock は変わらなかったので、`--local` なしで書いた（下の「遭遇した問題」）。RS `5a1e508`、RP `2833633`、OP `06a24c1` |
 
 #### 前後の比較
 
@@ -3679,8 +3679,18 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bu
 
 | 問題 | 対応 |
 |---|---|
-| RP で `bundle lock --update webmock --conservative --local` を流すと、lock の platforms にない `arm64-darwin-24` を足すよう求めて止まった（`bundle lock --add-platform arm64-darwin-24` を勧めるメッセージ）。lock は変わらなかった | `--local` を付けずに、目録だけを取る `bundle lock` で書いた（RS と同じ）。`.gem` は落とさず、照合済みの `.gem` を `--local --no-cache` で入れた。Step 9 の「作業計画からの変更点」と同じく、`bundle lock --local` は入れ済みの gem だけを候補にする |
+| RP で `bundle lock --update webmock --conservative --local` を流すと、`sqlite3 (~> 2.9)` の解決で、手元の macOS (arm64) の具体的なプラットフォームが lock の platforms（`arm64-darwin`・`x86_64-darwin-19`・`x86_64-linux`）にないとして止まり、`bundle lock --add-platform` を勧めた。lock は変わらなかった | `--local` を付けずに、目録だけを取る `bundle lock` で書いた（RS と同じ）。`.gem` は落とさず、照合済みの `.gem` を `--local --no-cache` で入れた。後で、RP の作業の前の Gemfile と lock の scratchpad のコピーで再現し、止まるのは `--update` と `--local` を一緒に付けたときだけで、`--update` のない `bundle lock --local` は通ることを確かめた。`--update` で、入れ済みのネイティブ版の gem（`sqlite3-2.9.6-arm64-darwin`）を手元のプラットフォームで解決し直そうとし、そのプラットフォームは Step 0-a で lock から外してあるため。Step 9 の「作業計画からの変更点」（`--local` の候補が入れ済みの gem だけになる）とは別の原因 |
 | `scripts/compare-config dump <ラベル> --app <アプリ>` をアプリごとに同じラベルで流したら、前のアプリの書き出しが消えた（ラベルのディレクトリを消してから書く） | RS・RP の rubocop の後の書き出しは、消える前に作業の前と同じことを確かめてあった。webmock は作業の前の書き出しと比べ、アプリごとに別のラベルにした |
+
+#### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 「遭遇した問題」と気づきの 9 で、RP の `bundle lock --local` が止まった原因を、確かめずに Step 9 と同じ（`--local` の候補が入れ済みの gem だけになる）と書いていた | 直した。scratchpad のコピーで再現し、`--update` と `--local` を一緒に付けたときだけ、手元のプラットフォームで解決し直して止まると確かめて、その内容に書き換えた（人間が判断） |
+| 同じ行に、手元の具体的なプラットフォーム名を書いていた（CLAUDE.md の「環境情報は『macOS (arm64)』程度まで」） | 直した。「手元の macOS (arm64) の具体的なプラットフォーム」と書いた。Step 0-a の節にある同じ名前は、過去の記録なので直していない（人間が判断） |
+| PLAN.md の 5 章のロードマップの仕上げの行が、rubocop・webmock と間接の依存の gem の判断を含んでいなかった | 直した。6 章のチェックリストに合わせた（人間が判断） |
+
+- 直したのは文書だけで、公開物の安全チェックを通した。手動確認用の 12 ファイルのハッシュは、resume で控えたものと同じ
 
 ### スキルについて気づいたこと
 
@@ -3702,7 +3712,7 @@ research（仕上げの最初の項目の調べ）:
 
 gems:
 
-9. RP の `bundle lock --local` が platforms の不足で止まった（上の「遭遇した問題」。Step 9 の気づきの 16 と同じく、`--local` の前提が成り立たなかった）。TIPS.md の「gem の更新」には、lock だけを書くのは `bundle lock --update <gem> --conservative` とあり、`--local` は付けない。Step 9 の手順の覚えで付けてしまった
+9. RP の `bundle lock --update webmock --conservative --local` が platforms の不足で止まった（上の「遭遇した問題」。`--update` と `--local` を一緒に付けると、手元のプラットフォームで解決し直すため。Step 9 の気づきの 16 とは別の原因）。TIPS.md の「gem の更新」には、lock だけを書くのは `bundle lock --update <gem> --conservative` とあり、`--local` は付けない。Step 9 の手順の覚えで付けてしまった
 10. `scripts/compare-config dump` は、同じラベルの書き出しを消してから書く（上の「遭遇した問題」）。アプリごとに上げる作業では、アプリごとに別のラベルにする必要がある。スキルの before-after.md にも、道具の使い方にもその注意がない
 11. `cd` を含むコマンドで、Bash の作業ディレクトリが RS に移った（Step 9 の気づきの 6）。以降は、サブシェル `( cd ... )` と絶対パスにした
 12. 検査のログの警告の行を前後で比べると、minitest の進み具合の点の数がテストの順番で変わり、同じ警告でも違う行に見えた。比べる前に行頭の点を落とした。scratchpad の小さなスクリプトで比べたが、決まった道具はない

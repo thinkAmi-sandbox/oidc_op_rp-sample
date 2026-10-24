@@ -79,7 +79,7 @@
 | 7 | 3.3 | **8.1.x** | 最終目標の Rails |
 | 8 | **3.4** | 8.1 | 標準ライブラリから外れた gem の明示、chilled string 警告への対応 |
 | 9 | **4.0** | 8.1 | Step 8 の完了時に行うと決めた（14 章）。minitest 6.0.6（5.14.4 は Ruby 4.0 に入らない）、Ruby 4.0.9、lock の default gem・bundled gems の版を Gemfile のまとまりに書く、Bundler 4.0.20 |
-| 仕上げ | — | — | Dependabot・README 更新、epic → main |
+| 仕上げ | — | — | rubocop 1.92.1・webmock 3.34.0、間接の依存の gem を上げるかの判断（14 章）、Dependabot・README 更新、epic → main |
 
 ## 6. 各 Step の詳細
 
