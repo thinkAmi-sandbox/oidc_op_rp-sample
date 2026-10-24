@@ -1226,7 +1226,15 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 - [x] gems: webmock 3.26.4 → 3.34.0（RS → RP → OP。同上）
 - [x] verify（手動確認はしない。下の決めたことの 2。結果は LOG.md の「仕上げ」の「確認結果」。CI は push の後）
 - [x] pr
-- [ ] research: 間接の依存の gem（14 章の未決事項）を上げるか。上の pr が epic に入った後に決める（下の決めたことの 1）
+- [x] research: 間接の依存の gem（14 章の未決事項）を上げるか。上の pr が epic に入った後に決める（下の決めたことの 1）→ 上げる（下の「間接の依存の gem で決めたこと」）
+- [ ] gems: rack を Gemfile で 2 系に固定（RS → RP → OP。`'~> 2.2', '>= 2.2.24', require: false` と理由のコメント。lock は動かない）
+- [ ] gems: Rails の構成 gem の依存（builder 3.3.0・connection_pool 3.0.2・globalid 1.4.0・i18n 1.15.2・marcel 1.2.1・nio4r 2.7.5・racc 1.8.1・rack-test 2.3.0・rake 13.4.2。RS → RP → OP。RS・RP は ostruct の行のコメントを直す）
+- [ ] gems: mail の依存（mini_mime 1.1.5・net-imap 0.6.8・date 3.6.0。RS → RP → OP）
+- [ ] gems: 認可の gem の依存（RS: jwt 3.3.0・multi_xml 0.9.1・hashie 5.2.0、RP: multi_xml 0.9.1・hashie 5.2.0・rack-protection 3.2.0、OP: responders 3.2.1。RS・RP の前に hashie の公開後の issue と advisory を見直す）
+- [ ] gems: activerecord-session_store の依存（RP: cgi 0.5.2）
+- [ ] gems: 開発とテストの道具の依存（parallel 2.3.0・public_suffix 7.0.5。RS → RP → OP）
+- [ ] verify（手動確認は 1 回。直前に 3 アプリの development DB を写す。下の「間接の依存の gem で決めたこと」の 2）
+- [ ] pr
 - [ ] Dependabot（bundler、npm、GitHub Actions をまとまった単位で更新）。CI ができてから有効にする
 - [ ] README の「Tested Environment」を更新。アップグレード前のコードはタグ `rails-6.1` にあること、Next.js 製 RP は新しい OP で確認していないことを書く
 - [ ] README の「How to use」に Ruby の入れ方を書く。各アプリの `mise.toml` は初回に `mise trust` が必要なこと、Ruby のバージョンは `.ruby-version` と Gemfile の `ruby` の両方にあること（mise は Gemfile を優先して読む）
@@ -1248,6 +1256,26 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 | webmock 3.27〜3.34 | テストの通る・落ちるが変わりうるのは、3.31.0（文字列・大文字の HTTP メソッドの stub も一致する。#821）と、3.28.0・3.34.0 の `to_rack`（`rack.session` を外す、env を `Rack::Lint` に合わせる）。3 アプリのテストは `:get`・`:post` のシンボルだけを使い、`to_rack` は使わない。依存の要件は 3.26.4 と同じ（CHANGELOG） |
 | lock の試行 | scratchpad の Gemfile と lock のコピーで、3 アプリとも動くのは rubocop か webmock そのものだけ。webmock は Gemfile に版がないので、`--conservative` でも最新まで上がる |
 | advisory | `bundle-audit update`（10-23 の DB）の後、3 アプリとも `No vulnerabilities found`。omniauth-rails_csrf_protection（2.0.1。#33 は open。IMP-009）・byebug（13.0.0。#981 は open。IMP-013）に新しい版はない |
+
+間接の依存の gem で決めたこと（2026-10-24。rubocop・webmock の PR #39 が epic に入った後に、research で人間と 1 つずつ決めた。理由は LOG.md の「仕上げ」の「間接の依存の gem」の「作業計画で決めたこと」）:
+
+1. 上げる。範囲は、rack 2 のまま動く間接の gem（RS 17・RP 18・OP 15 個。上のチェックリスト）。版は公開から 2 週間たった最新にし、rack-test 2.3.0・net-imap 0.6.8・hashie 5.2.0 は今の最新にする（公開から 2 週間の決まりの例外。人間が判断）。版を固定するときは Gemfile に書く（人間の希望）。固定するのは rack だけ。date・timeout・racc・rake・net-imap・cgi は、ふつうの間接の gem として扱う（Ruby の版に合わせない）。Gemfile のまとまりの default gem・bundled gems、json（2 系のまま。json 3 は Dependabot の項目で扱う）、ほかの直接の gem は対象外。依存元のまとまりごとに、アプリごとに 1 コミットにする（1 gem ずつにしない。検査が落ちたら、まとまりを gem ごとに分けて原因を探す）。rack 3 は別の PR（`upgrade/finish-rack3`）に分け、行うかは、この PR が epic に入った後に決める。RS・RP の ostruct の行の見直しは rack 3 の側で行う
+2. 手動確認は 1 回、verify ですべてのコミットの後に行う。直前に 3 アプリの development DB を `tmp/manual_check_backup/` に写す（写すときに人間に確かめる）
+3. 作業計画（上のチェックリストの順と、各コミットの手順）を承認した。ダウンロードは 19 個、1,102,848 B（jwt 3.3.0 は RS のキャッシュにあるので落とさない）
+
+調べたこと（2026-10-24。間接の依存の gem）:
+
+| 項目 | 分かったこと |
+|---|---|
+| 遅れている gem | 3 アプリの `bundle outdated` で、間接の gem は i18n 1.8.10（2021）・multi_xml 0.6.0（2016）・rack-test 1.1.0（2018）・racc 1.5.2（2020）・globalid 1.0.1・marcel 1.0.1 など。直接の gem の faraday 2.15.0（10-16）・sqlite3 2.10.1（10-19）・omniauth 2.3.1・omniauth-oauth2 1.10.0（10-22）・doorkeeper-openid_connect 2.1.0（10-20）は公開から 2 週間たっていない。Gemfile のまとまりの bigdecimal・io-console・irb・net-http・pp・prettyprint・psych・rdoc・reline・uri にも新しい版がある |
+| lock の試行 | scratchpad の Gemfile と lock のコピーで、`bundle lock --conservative --update <間接の gem すべて>`（rack は `~> 2.2`、公開から 2 週間たっていない版は上限）。`--conservative` がないと、RP で直接の gem の faraday まで動いた。動くのは上のチェックリストの gem だけ。marcel は activestorage の `~> 1.0` で 1.2.1 まで。timeout 0.6.1 は最新 |
+| rack 3 | 許すと rack 3.2.7・rack-session 2.1.2・rackup 2.3.1（RP は rack-protection 4.2.1）が動き、webrick 1.9.2 が消える。devise の `error_status` の書き直しにつながる（7 章の devise の行） |
+| ostruct | rake は 13.2.0 で OpenStruct を Struct にした（History.rdoc の #545）。rack 2.2.24 の `lib/rack/show_exceptions.rb` も `require "ostruct"` する（rack 3.2.7 はしない）。json の `generic_object.rb` も require するが、使うときだけ |
+| Ruby 4.0.9 の版 | date 3.5.1（default gem。lock と同じ）、timeout 0.6.0（default gem。lock は 0.6.1）、racc 1.8.1・rake 13.3.1・net-imap 0.6.4.1（bundled gems）。cgi はない |
+| 読まれる側 | parallel（rubocop）・public_suffix（webmock）のほかは default グループから届く。rack-test は `actionpack-8.1.4/lib/action_controller/metal/strong_parameters.rb` が require する。net-imap は mail の IMAP の受信でしか読まれない。RS の jwt は oauth2 の `strategy/assertion.rb` だけ |
+| 最新にする 3 つ | rack-test 2.3.0 は不具合の修正 5 つ。2.2.0 の `build_multipart` が返らなくなる不具合（rack-test#368）を直す版。Rails の `follow_redirect!` は自前の実装で、rack-test の 307・308 の修正は通らない。net-imap 0.6.8 は `SequenceSet` などの修正。hashie 5.2.0 は lib +2,926 −321 行（`mash.rb` +293 −62）で、`OmniAuth::KeyStore < Hashie::Mash` を通る。#592（Ruby 4.0 対応）は CI に足しただけ |
+| advisory | `bundle-audit update`（10-23 の DB）の後、3 アプリとも `No vulnerabilities found`。net-imap の 10 件は 0.5.15・0.6.4.1 以上で直っている。rack-test・hashie にはない（GitHub Advisory Database・各リポジトリの Security Advisories も同じ） |
+| C 拡張 | date・nio4r・racc・cgi。cgi 0.5.2 も `ext/cgi/escape` を条件なしでビルドする |
 
 ## 7. 周辺 gem の更新時期
 
@@ -1472,7 +1500,7 @@ Step 4-b で、人間が返事をした 16 回のうち、判断を伴うもの�
 ## 14. 未決事項
 
 - [x] 最終的に Ruby 4.0 まで上げるか（Step 8 完了時に判断）: Step 9 で上げる（Step 9 の research の最初に人間が判断。6 章の Step 9 の決めたことの 1）
-- [ ] 間接の依存の gem（Gemfile.lock にだけある gem）を、epic の最後の段階でまとめて上げるか。時期、まとめ方（一度に 1 つの決まりとの折り合い）、default gem に合わせた一時固定の扱いを、人間と相談して決める（Step 3 の着手後に人間が提案。RS の jwt 2.10.3 はそのときに上げる）。伊藤さん式（Qiita「永久保存版！？伊藤さん式・Railsアプリのアップグレード手順」の 4-d・7）は、引数なしの `bundle update` で、結果として間接の gem もまとめて上げる。ruby-jp の「Railsアップグレードガイド」「Rubyアップグレードガイド」は、gem の更新の手順を個別の記事へのリンクに任せていて、間接の gem の記述はない（Step 3 で調べた）
+- [x] 間接の依存の gem（Gemfile.lock にだけある gem）を、epic の最後の段階でまとめて上げるか（仕上げの research で人間が判断: rack 2 のまま動く間接の gem を、依存元のまとまりごとに上げる。rack 3 は別の PR。6 章の仕上げの「間接の依存の gem で決めたこと」）。時期、まとめ方（一度に 1 つの決まりとの折り合い）、default gem に合わせた一時固定の扱いを、人間と相談して決める（Step 3 の着手後に人間が提案。RS の jwt 2.10.3 はそのときに上げる）。伊藤さん式（Qiita「永久保存版！？伊藤さん式・Railsアプリのアップグレード手順」の 4-d・7）は、引数なしの `bundle update` で、結果として間接の gem もまとめて上げる。ruby-jp の「Railsアップグレードガイド」「Rubyアップグレードガイド」は、gem の更新の手順を個別の記事へのリンクに任せていて、間接の gem の記述はない（Step 3 で調べた）
 - [x] advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられる gem（7 章の表）を、いつ上げるか（Step 0-d-1 で人間が判断）: 脆弱性の修正だけのサブステップ 0-d-3 を設け、0-d-2 の後、0-e の前に上げる
 - [x] `rails_open_id_provider/jwtRS256.key.example` の扱い（Step 0-c で判断）: 鍵の中身のないプレースホルダーで、どこからも参照されていなかったため、`.pub.example` と一緒に削除した
 
