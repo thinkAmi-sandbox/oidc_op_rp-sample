@@ -3639,7 +3639,7 @@ resume で、前のセッションのサーバーが残っていないこと（`
 
 ### rubocop・webmock
 
-- ブランチ / PR: `upgrade/finish-rubocop-webmock` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/finish-rubocop-webmock` / [#39](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/39)
 - バージョン: rubocop 1.91.0 → 1.92.1、webmock 3.26.4 → 3.34.0（Ruby 4.0.9 / Rails 8.1.4 は変更なし）
 - Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
 - どちらも公開から 2 週間たっていない今の最新にした（作業計画で決めたことの 2。人間が判断）
