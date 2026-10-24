@@ -1222,7 +1222,7 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 
 ### 仕上げ
 
-- [ ] gems: rubocop 1.91.0 → 1.92.1（RS → RP → OP。公開から 2 週間の決まりの例外。下の決めたことの 2）
+- [x] gems: rubocop 1.91.0 → 1.92.1（RS → RP → OP。公開から 2 週間の決まりの例外。下の決めたことの 2）
 - [ ] gems: webmock 3.26.4 → 3.34.0（RS → RP → OP。同上）
 - [ ] verify（手動確認はしない。下の決めたことの 2）
 - [ ] pr

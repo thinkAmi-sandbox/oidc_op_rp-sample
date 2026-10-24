@@ -3641,3 +3641,14 @@ resume で、前のセッションのサーバーが残っていないこと（`
 
 - ブランチ / PR: `upgrade/finish-rubocop-webmock` / （PR 作成後に記入）
 - バージョン: rubocop 1.91.0 → 1.92.1、webmock 3.26.4 → 3.34.0（Ruby 4.0.9 / Rails 8.1.4 は変更なし）
+
+#### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| rubocop | 1.91.0 → 1.92.1（3 アプリ） | Gemfile の `'1.91.0'` を `'1.92.1'` にして `bundle lock` → `git diff` → 入れた。lock で動いたのは rubocop と、その依存の要件の行（regexp_parser `>= 2.11.3`。lock の 2.13.1 は動かない）だけ。`.gem`（896,512 B）は RS の `bundle install` で落とし（`Fetching` は rubocop だけ）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 3 アプリとも 1 個で一致。1.92.0・1.92.1 は新しい cop を足さないので、`NewCops: disable` のまま有効にするものはない。RuboCop の指摘は 3 アプリとも 0 件（前と同じ）。RS `ea608d2`、RP `a62f811`、OP `adb4819` |
+
+#### 前後の比較
+
+- 作業の前（`f9ec1ea`）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った）、`scripts/compare-config dump`（3 アプリの test・development）、各アプリの RuboCop の指摘の件数（`--format json`。3 アプリとも 0）を取った。各アプリを上げた後に、同じものを取って比べた
+- rubocop: 各アプリの 11 の検査と E2E（10 passed）が通った。runs・assertions は RS 11・15、RP 33・82、OP 69・129 で前と同じ。応答のスナップショットと E2E のスナップショットの差分はない。検査のログの警告の行は前と同じ（OP の IMP-011 の DEPRECATION だけ）。compare-config は 3 アプリとも test・development で前と同じ（rubocop は `require: false` で、起動では読み込まない）
