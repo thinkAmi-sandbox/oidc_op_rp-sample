@@ -147,10 +147,11 @@ GEM
       net-smtp
     marcel (1.0.1)
     mini_mime (1.1.1)
-    minitest (5.14.4)
+    minitest (6.0.6)
+      drb (~> 2.0)
+      prism (~> 1.5)
     msgpack (1.8.5)
     multi_xml (0.6.0)
-    mutex_m (0.3.0)
     net-http (0.6.0)
       uri
     net-imap (0.5.15)
@@ -309,7 +310,7 @@ DEPENDENCIES
   dotenv-rails
   faraday
   json (~> 2.21, >= 2.21.2)
-  mutex_m
+  minitest (= 6.0.6)
   oauth2
   ostruct
   puma (~> 8.0)

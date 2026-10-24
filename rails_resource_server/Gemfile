@@ -45,9 +45,9 @@ group :development, :test do
 end
 
 group :test do
-  # minitest 5.14.4 が require "mutex_m" する。Rails 7.2 で activesupport の依存から外れ、lock にないと
-  # Ruby 3.3 の bundled_gems の警告が出るので明示する（docs/upgrade/PLAN.md の Step 5）
-  gem 'mutex_m'
+  # activesupport の依存。5.14.4 は Ruby 4.0 に入らない（required_ruby_version が < 4.0）ので、Rails 8.1.4 が使う
+  # 6 系の版を明示する（docs/upgrade/PLAN.md の Step 9）
+  gem 'minitest', '6.0.6', require: false
   # カバレッジの計測と、外部への HTTP 通信の遮断・差し替え
   gem 'simplecov', require: false
   gem 'webmock', require: false
