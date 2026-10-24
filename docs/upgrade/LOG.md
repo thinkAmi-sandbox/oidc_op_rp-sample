@@ -3568,6 +3568,19 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 | RS を 4.0.9 にして `bundle install --local --no-cache` を流すと、`LoadError: linked to incompatible <HOME>/.local/share/mise/installs/ruby/4.0.7/lib/libruby.4.0.dylib - .../vendor/bundle/ruby/4.0.0/gems/date-3.5.1/lib/date_core.bundle` で止まった（json 2.21.2 の拡張でも同じ）。research の試行で、本体の `vendor/bundle/ruby/4.0.0` に 4.0.7 でビルドして入れた C 拡張（RS 15・RP 17・OP 17 個）が、`otool -L` で 4.0.7 の libruby（current version 4.0.7）にリンクしていた | 止まって人間に確かめ、3 アプリの `vendor/bundle/ruby/4.0.0` の `cache` 以外を消して、4.0.9 で照合済みの `.gem` から入れ直した（上の「作業計画からの変更点」）。入れ直した後、拡張は 4.0.9 の libruby にリンクし、`Fetching` はない。TIPS.md の「Ruby を上げる」に、パッチ版を上げても C 拡張は作り直しが要ることを書いた |
 | 入れ済みの gem を消した後、RP の `bundle lock --local` が `Could not find gem 'ostruct (= 0.6.3)' in locally installed gems.` で止まった | `--local` の候補が入れ済みの gem だけのため（論点 5）。RP は `bundle install --local --no-cache`（キャッシュの `.gem` を候補にする）で lock を書いて入れ、OP は目録だけを取る `bundle lock` で lock を書いてから入れた（上の「作業計画からの変更点」） |
 
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| TIPS.md が「ruby の作業は `bundle lock --local` で書ける」としたままで、入れ直しの後は使えなかった実際と食い違う | 直した。試行と違うパッチ版で作業するときは `--local` が使えないこと、Step 9 で各アプリをどう書いたか、迷ったら目録だけを取る `bundle lock` にすることを書いた（`f798ff5`。人間が判断） |
+| Gemfile のまとまりの先頭のコメントが「lock にある default gem・bundled gems は 4.0.9 の版にする」と書くが、date・timeout・racc・rake・prism・rexml・net-imap などは lock にあってもまとまりにない | 直した。「版を Ruby に合わせ直してきたもの（PLAN.md の 7 章・8 章の 4）」と絞った。コメントだけで lock は変わらない。`scripts/commit-per-app` で各アプリの検査と E2E を流してコミットした（RS `33a9ffc`、RP `ba9021d`、OP `a87cb8b`。人間が判断） |
+| DEF-8.1-30 の「コミット」に実際のハッシュがない | 直した（`f798ff5`。人間が判断） |
+| RS・RP の ostruct の版がまとまりの外（Step 8 の行）にあり、OP はまとまりの中 | 直さない。RS・RP の行には rake 13.0.6 のための別の理由があり、論点 5 でそう決めた。TIPS.md の一覧に置き場所の違いを書いてある（人間が判断） |
+| 同じまとまりが 3 つの Gemfile に重なっている（`eval_gemfile` で 1 つにできる） | 直さない。3 アプリは別々のアプリで、CI もアプリごとに入れる。共有のファイルはアプリどうしを結び付ける構成の変更で、アップグレードの範囲を越える。IMPROVEMENTS.md にも足さない（人間が判断） |
+| RP の cgi 0.4.2 が lock だけの固定で、C 拡張が Ruby 4.0.9 の `cgi/escape` を定義し直す | 直さない。論点 5 で残すと決め、7 章に `-w` の警告と、14 章の間接の gem の更新で見直すことを書いてある。通常の起動では警告は出ず、検査・E2E・手動確認も通った（人間が判断） |
+
+- 直した後に、3 アプリの検査と E2E が通り（各アプリの `commit-per-app`）、手動確認用の 12 ファイルのハッシュは手動確認の後の基準と同じだった
+
 ### スキルについて気づいたこと
 
 Step 3〜8 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
