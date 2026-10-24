@@ -3613,3 +3613,7 @@ ruby:
 
 15. Ruby のパッチ版を上げるとき（4.0.7 → 4.0.9）、ABI の版（`vendor/bundle/ruby/4.0.0`）が同じなら gem の入れ直しは要らないと考えたが、mise の Ruby は `--enable-shared` でビルドされ、C 拡張はその版の libruby に絶対パスでリンクするので、作り直しが要った。ruby.md と TIPS.md は、マイナーを上げるとき（ABI の版が変わる）の入れ直しだけを書いていた
 16. 入れ済みの gem を消して入れ直すと、`bundle lock --local` の前提（入れてあること）が崩れる。手順を決めた論点の前提が、後の作業（入れ直し）で崩れるのに、その場で気づけなかった（RP で止まってから気づいた）
+
+pr:
+
+17. 手元の ruby-advisory-db は 10-10 のままで、research・verify の bundler-audit は古い DB で通っていた。CI（`--update`）で初めて、10-23 に入った crass の advisory に気づいた。research の「advisory の確かめ」と verify の前に `bundle-audit update` を流す手順がない（Step 8 の気づきの 7 と同じく、advisory の確かめが試行の lock だけに頼っていた）
