@@ -3692,6 +3692,21 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bu
 
 - 直したのは文書だけで、公開物の安全チェックを通した。手動確認用の 12 ファイルのハッシュは、resume で控えたものと同じ
 
+### 間接の依存の gem
+
+- ブランチ / PR: `upgrade/finish-indirect-gems` / （PR 作成後に記入）
+
+rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/39)）、`/rails-upgrade` の resume の後に research の手順で調べた（2026-10-24）。resume では、前のセッションのサーバーが残っていないことを確かめ、手動確認用の 12 ファイルのハッシュの先頭 12 桁が、前のセッションでチャットに出した値と同じことを確かめた。件数も「手動確認用の環境」の節と同じだった。`bundle-audit update` の後の DB は 10-23 の 03da937 で、3 アプリとも `No vulnerabilities found`。
+
+#### 作業計画で決めたこと
+
+論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 上げるか、範囲・まとめ方・PR の分け方・ブランチ名 | 上げる。範囲は、rack 2 のまま動く間接の gem（RS 16・RP 18・OP 15 個）。版は公開から 2 週間たった最新にし、rack-test 2.3.0・net-imap 0.6.8・hashie 5.2.0（RS・RP）は今の最新にする（公開から 2 週間の決まりの例外。人間が判断）。版を固定するときは Gemfile に書く（人間の希望。Step 9 の決めたことの 2 と同じ）。固定するのは、rack 3 の PR まで 2 系にとどめる rack だけ（`'~> 2.2', '>= 2.2.24', require: false` と理由のコメント）。date・timeout・racc・rake・net-imap・cgi は、ふつうの間接の gem として扱う。Gemfile のまとまりの default gem・bundled gems と、json（直接の gem。2 系のまま）、ほかの直接の gem は対象外。依存元のまとまり 5 つ（Rails の構成 gem・mail・認可の gem・activerecord-session_store・開発とテストの道具）を、アプリごとに 1 コミットにする（RS → RP → OP）。rack 3 は別の PR（`upgrade/finish-rack3`）に分け、行うかは、この PR が epic に入った後に決める。RS・RP の ostruct の行の見直しは rack 3 の側で行う | 7 章の決まりのままでは、Dependabot の version updates も manifest に書いた依存だけを見るので、i18n 1.8.10・multi_xml 0.6.0・rack-test 1.1.0・racc 1.5.2 などは advisory が出るまで動かない。lock だけの固定の理由（connection_pool は Rails 7.1 のキャッシュストア、racc・date・timeout は Ruby 3.1 の default gem のころの名残）はもうない。scratchpad の Gemfile と lock のコピーで、`bundle lock --conservative --update <間接の gem すべて>` を試した（`--conservative` がないと、RP で直接の gem の faraday まで 2.15.0 に動いた）。rack 3 を許すと rack・rack-session・rackup（RP は rack-protection 4）も動き、webrick が消える。devise の `error_status` の書き直しにもつながる（7 章の devise の行）ので、別の PR にする。rake は 13.2.0 で OpenStruct を Struct にした（History.rdoc の #545）が、rack 2.2.24 の `lib/rack/show_exceptions.rb` も `require "ostruct"` するので、ostruct の行を外せるかは rack 3 とつながる。json に依存する gem は rubocop（`>= 2.3`）だけ。まとまりにするのは、1 gem ずつでは約 49 コミットになり、本文もほぼ同じになるため（検査が落ちたら、まとまりを gem ごとに分けて原因を探す）。最新にする 3 つは、人間が「今後のメンテナンスが先になるかもしれないので最新にしたい」として、修正内容を調べて決めた。rack-test 2.3.0 は不具合の修正 5 つで、2.2.0 の `build_multipart` が返らなくなる不具合（rack-test#368）を直す版。3 アプリはテストで multipart を使わず、`follow_redirect!` は Rails 自前の実装。net-imap 0.6.8 は `SequenceSet` などの修正で、mail の IMAP の受信でしか読まれない（3 アプリは使わない）。hashie 5.2.0 は、10-21〜23 に 30 近い PR を取り込んだ大きな版（lib +2,926 −321 行。`mash.rb` を含む）で、RP のログインの AuthHash（`OmniAuth::KeyStore < Hashie::Mash`）を通る。公開から 1 日で、実績がないことを示したうえで、人間が上げると判断した。結合テストと E2E で確かめ、コミットの直前と verify の前に、公開後の issue と advisory を見直す。3 つとも advisory（ruby-advisory-db・GitHub Advisory Database・各リポジトリの Security Advisories）はなく、公開後の issue は rack-test#368（閉じた。2.3.0 で直った）だけ |
+| 2 手動確認の要否と時期 | 手動確認は 1 回、verify ですべてのコミットの後に行う。直前に 3 アプリの development DB を `tmp/manual_check_backup/` に写す（写すときに人間に確かめる）。パスワードの入力と同意は人間が行う | development のサーバーが読む gem が動く（i18n、connection_pool、nio4r・racc・date の C 拡張、responders、RP の hashie・rack-protection・cgi、RS の hashie など）。画面の文字・リダイレクト先・ログインとセッションを通る。各コミットで、応答のスナップショットと E2E（development 環境で 3 アプリを起動する。`e2e/README.md`）を流すので、まとまりごとの変化はそこで拾い、手動確認は全部がそろった状態で 1 回にする（Step 9 と同じ） |
+
 ### スキルについて気づいたこと
 
 Step 3〜9 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。Step 9 までの気づきで、この仕上げでまた当たったものは、その番号を書いた。
@@ -3717,3 +3732,11 @@ gems:
 11. `cd` を含むコマンドで、Bash の作業ディレクトリが RS に移った（Step 9 の気づきの 6）。以降は、サブシェル `( cd ... )` と絶対パスにした
 12. 検査のログの警告の行を前後で比べると、minitest の進み具合の点の数がテストの順番で変わり、同じ警告でも違う行に見えた。比べる前に行頭の点を落とした。scratchpad の小さなスクリプトで比べたが、決まった道具はない
 13. zsh では、空白で区切った文字列の変数がコマンドの引数に分かれず、`shasum` が 1 つのファイル名として読んだ（resume で 12 ファイルのハッシュを取るとき）。配列で渡した
+
+間接の依存の gem の research:
+
+14. セッションの途中で、scratchpad の場所が変わった（前の場所の中身は残っていたので、新しい場所に写して続けた）。ハッシュの控えと試行の lock が scratchpad にしかない点は、Step 9 の気づきの 7 と同じ
+15. 間接の gem をまとめて試す手順が、TIPS.md の「gem の更新」にない。`bundle lock --update <間接の gem すべて>` に `--conservative` を付けないと、名指しした gem の依存の直接の gem（RP の faraday。oauth2 の依存）まで動いた。公開から 2 週間の上限は、rubygems.org の版の一覧から scratchpad の小さなスクリプトで付けた
+16. `cd` を含むコマンドで、Bash の作業ディレクトリが RS に移った（2 回。仕上げの気づきの 11 と同じ）
+17. `mise exec` を付けずに `bundle exec bundle-audit update` を流し、macOS 標準の Ruby で止まった（TIPS.md の「コマンドの実行」にある注意）
+18. 論点 1 で、人間は「固定するなら Gemfile に」「止める gem は最新の修正内容を見て、問題なければ最新に」と 2 回掘り下げた。最初の示し方に、止める gem の最新版の修正内容と、止めるときの書き方（Gemfile か lock か）を入れておけば、往復が減った（Step 9 の気づきの 11 と同じ形）。公開から 2 週間の例外を判断する材料（advisory の 3 か所、公開後の issue）を調べる手順がスキルにないのは、仕上げの気づきの 7 と同じ
