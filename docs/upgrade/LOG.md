@@ -3715,6 +3715,7 @@ rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAm
 | 0 rack の固定 | rack 2.2.24（3 アプリ。版は変えない） | json の行の後に `gem 'rack', '~> 2.2', '>= 2.2.24', require: false` と理由のコメントを足して `bundle lock`。lock で動いたのは `DEPENDENCIES` の rack の行だけ（落とす gem はない）。RS `49f77a7`、RP `7dd3aed`、OP `d7679be` |
 | 1 Rails の構成 gem の依存 | builder 3.2.4→3.3.0、connection_pool 2.5.5→3.0.2、globalid 1.0.1→1.4.0、i18n 1.8.10→1.15.2、marcel 1.0.1→1.2.1、nio4r 2.5.9→2.7.5、racc 1.5.2→1.8.1、rack-test 1.1.0→2.3.0、rake 13.0.6→13.4.2（3 アプリ） | `bundle lock --update <9 つ> --conservative` → `git diff`。lock で動いたのは 9 つと、依存の要件の 2 行（globalid の activesupport `>= 6.1`、rack-test の rack `>= 1.3`）だけ。`.gem` 9 個（計 448,512 B）は RS の `bundle install` で落とし（`Fetching` は 9 つだけ。nio4r・racc は C 拡張をビルド）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 3 アプリとも 9 個で一致。RS・RP は ostruct の行のコメントを「rack 2.2.24 の `rack/show_exceptions.rb` が require する（rake は 13.2.0 から読まない）。rack 3 にするときに外せるかを見直す」に直した。connection_pool は、Rails 8.1.4 では mem_cache_store・redis_cache_store だけがキーワード引数で使い、3 アプリ（memory_store・null_store）では読まれない。RS `a7388ad`、RP `b1d5078`、OP `dd421d2` |
 | 2 mail の依存 | mini_mime 1.1.1（RS）/ 1.1.0（RP・OP）→1.1.5、net-imap 0.5.15→0.6.8、date 3.5.1→3.6.0（3 アプリ） | 同じ手順。lock で動いたのは 3 つだけ。`.gem` 3 個（計 314,880 B）は RS で落とし（date は C 拡張をビルド）、RP・OP にコピーした。照合は 3 アプリとも 3 個で一致。RS `4cc358e`、RP `c3c4f72`、OP `74c0311` |
+| 3 認可の gem の依存 | RS: jwt 2.10.3→3.3.0、multi_xml 0.6.0→0.9.1、hashie 5.1.0→5.2.0。RP: multi_xml 0.6.0→0.9.1、hashie 4.1.0→5.2.0、rack-protection 2.1.0→3.2.0。OP: responders 3.1.1→3.2.1 | 先に hashie の公開後の issue と advisory を見直した（16:16。公開後に作られた issue はなく、ruby-advisory-db・GitHub Advisory Database・リポジトリの Security Advisories にもない。新しい版もない）。lock で動いたのは各アプリの gem と、依存の要件の行だけ（multi_xml 0.9.1 → bigdecimal `>= 3.1, < 5`、RP の hashie 5.2.0 → logger、rack-protection 3.2.0 → base64・rack `~> 2.2, >= 2.2.4`、responders → actionpack・railties `>= 7.0`）。指す先の bigdecimal・logger・base64 は Gemfile のまとまりの版、rack は 2.2.24 のままで動いていない。RS は hashie・multi_xml を落とし、jwt 3.3.0 はキャッシュにあった `.gem` を使った。RP は rack-protection と一緒に hashie・multi_xml も rubygems.org から落とした（計画では RS からコピーする予定だったが、道具を落とす形で流した。計 155,136 B。照合は一致）。OP は responders を落とした。照合は RS 3・RP 3・OP 1 個で一致。rack-protection は、omniauth の既定の設定が `OmniAuth::AuthenticityTokenProtection` を参照して読まれるが、RP では omniauth-rails_csrf_protection が判定を差し替える。OP に responders の generator の雛形はない。RS `e299908`、RP `cdb3add`、OP `aac478e` |
 
 #### 前後の比較
 
@@ -3722,6 +3723,7 @@ rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAm
 - まとまり 0: 各アプリの 11 の検査と E2E（ほかのアプリの変更は退避）が通り、件数は前と同じ。スナップショットの差分はない。検査のログの警告の行（行頭の点を落として比べた）と compare-config も前と同じ
 - まとまり 1: まとまり 0 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数は前と同じ。スナップショットの差分はない。検査のログの警告の行と compare-config も前と同じ。`-w` の警告は、RS・OP の i18n 1.8.10 の「CGI library is removed from Ruby 4.0」が消えた（i18n 1.14.8 の #713 で `cgi` の require がなくなった）。RP は lock に cgi があるので、もともと出ていない。ほかの `-w` の警告は前と同じ。以降は、ほかのアプリに変更がない状態で `RUBYOPT=-W:deprecated scripts/check-apps --app <アプリ>` を流し（`commit-per-app` と同じく、そのアプリの変更だけで検査と E2E を流すことになる）、通ったらそのアプリのファイルを指定してコミットした
 - まとまり 2: まとまり 1 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数・スナップショット・検査のログの警告の行・compare-config・`-w` の警告は前と同じ
+- まとまり 3: まとまり 2 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数・スナップショット（RP のログインの AuthHash、OP の devise の応答を含む）・検査のログの警告の行・compare-config・`-w` の警告は前と同じ（multi_xml の `MultiXml` の非推奨の警告も出ていない）
 
 #### 遭遇した問題
 
@@ -3767,3 +3769,4 @@ gems:
 
 19. 前後の比較の警告の行は、`RUBYOPT=-W:deprecated` を付けた検査のログで取るが、同じ環境変数を付けて `scripts/commit-per-app` を流すと、git hooks の Ruby（macOS 標準の 2.6）が `-W:` を受け付けず、コミットだけが失敗した（上の「遭遇した問題」）。before-after.md と commit.md は、比べるための検査と、コミットの前の検査を、別に流すのか兼ねるのかを書いていない
 20. `scripts/check-apps` のログは `01.log` から番号だけで、どの検査のログかがファイル名から分からない。前後で警告の行を比べるとき、アプリごとの番号の範囲（3 アプリなら 1〜11・12〜22・23〜33、1 アプリなら 1〜11）で拾った
+21. 同じ手順をまとまりとアプリの数だけ繰り返すので、lock・入れる・照合・検査・比較を流す小さな道具を scratchpad に作った。RP のまとまり 3 では、RS にない gem（rack-protection）があるので道具を「落とす」形で流し、RS で照合済みの hashie・multi_xml も落とし直した（計画は RS からコピー）。gems.md と TIPS.md は、アプリによって増える gem が違うときに、どれを落としてどれをコピーするかを書いていない
