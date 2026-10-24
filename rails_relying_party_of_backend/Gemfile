@@ -3,7 +3,7 @@
 source 'https://rubygems.org'
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-ruby '3.4.11'
+ruby '4.0.9'
 
 # config/application.rb や gem の require が、起動の途中で Rails の部品（ActiveRecord::Base など）を読み込むと検出する。
 # ほかの gem の initializer と config/initializers は検出できない（docs/upgrade/PLAN.md の Step 1-b-1）。
@@ -31,7 +31,7 @@ gem 'bootsnap', '>= 1.4.4', require: false
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
-  gem 'byebug', platforms: %i[mri mingw x64_mingw]
+  gem 'byebug', platforms: %i[mri windows]
 
   # 静的解析と脆弱性チェック。rubocop 系はバージョンを固定し、更新は単独のコミットで行う
   gem 'brakeman', require: false
@@ -50,16 +50,16 @@ group :development do
 end
 
 group :test do
-  # minitest 5.14.4 が require "mutex_m" する。Rails 7.2 で activesupport の依存から外れ、lock にないと
-  # Ruby 3.3 の bundled_gems の警告が出るので明示する（docs/upgrade/PLAN.md の Step 5）
-  gem 'mutex_m'
+  # activesupport の依存。5.14.4 は Ruby 4.0 に入らない（required_ruby_version が < 4.0）ので、Rails 8.1.4 が使う
+  # 6 系の版を明示する（docs/upgrade/PLAN.md の Step 9）
+  gem 'minitest', '6.0.6', require: false
   # カバレッジの計測と、外部への HTTP 通信の遮断・差し替え
   gem 'simplecov', require: false
   gem 'webmock', require: false
 end
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
-gem 'tzinfo-data', platforms: %i[mingw mswin x64_mingw jruby]
+gem 'tzinfo-data', platforms: %i[windows jruby]
 
 # 追加
 # omniauthまわり
@@ -79,10 +79,30 @@ gem 'activerecord-session_store'
 # OPからもらった client_id と client_secret を .env ファイルから読み込むため
 gem 'dotenv-rails', groups: %i[development test]
 
-# Ruby 3.4 の default gem の json（2.9.1）は CVE-2026-54696 の対象なので、修正版を明示する。
+# Ruby 4.0 の default gem の json（2.18.0）は CVE-2026-54696・CVE-2026-33210 の対象なので、修正版を明示する。
 # json 3 は既定値が変わる（重複キー・コメントで例外）ので、2 系にとどめる（docs/upgrade/PLAN.md の Step 8）
 gem 'json', '~> 2.21', '>= 2.21.2'
 
-# rake 13.0.6 が require "ostruct" する。Ruby 3.4 では lock にないと bundled_gems の警告が出て、Ruby 4.0 では読み込めなくなる
-# 見込みなので明示する。起動の途中では読み込まない（docs/upgrade/PLAN.md の Step 8）
-gem 'ostruct', require: false
+# rake 13.0.6 が require "ostruct" する。Ruby 4.0 の bundled gems で、lock にないと読み込めないので明示する。
+# 版は Ruby 4.0.9 の bundled gems と同じにする。起動の途中では読み込まない（docs/upgrade/PLAN.md の Step 8・Step 9）
+gem 'ostruct', '0.6.3', require: false
+
+# lock にある Ruby の default gem・bundled gems のうち、版を Ruby に合わせ直してきたもの（docs/upgrade/PLAN.md の 7 章・8 章の 4）は、
+# Ruby 4.0.9 が持つ版と同じにする。Ruby を上げるときに版を合わせ直し、まだ依存されているかを見直す。起動の途中では読み込まない
+gem 'base64', '0.3.0', require: false
+gem 'bigdecimal', '4.0.1', require: false
+gem 'drb', '2.2.3', require: false
+gem 'erb', '6.0.7', require: false
+gem 'io-console', '0.8.2', require: false
+gem 'irb', '1.16.0', require: false
+gem 'logger', '1.7.0', require: false
+gem 'net-http', '0.9.1', require: false
+gem 'pp', '0.6.3', require: false
+gem 'prettyprint', '0.2.0', require: false
+gem 'psych', '5.3.1', require: false
+gem 'rdoc', '7.0.4', require: false
+gem 'reline', '0.6.3', require: false
+gem 'securerandom', '0.4.1', require: false
+gem 'stringio', '3.2.0', require: false
+gem 'tsort', '0.2.0', require: false
+gem 'uri', '1.1.1', require: false

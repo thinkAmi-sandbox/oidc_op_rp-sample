@@ -37,7 +37,7 @@ jobs:
 
       # .ruby-version の Ruby を入れ、各アプリの vendor/bundle に bundle install してキャッシュする
       - id: ruby
-        uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+        uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
         with:
           working-directory: ${{ matrix.app }}
           bundler-cache: true
@@ -111,15 +111,15 @@ jobs:
           persist-credentials: false
 
       # E2E は 3 アプリを起動する（playwright.config.ts の webServer）。アプリごとに bundle install する
-      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+      - uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
         with:
           working-directory: rails_open_id_provider
           bundler-cache: true
-      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+      - uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
         with:
           working-directory: rails_relying_party_of_backend
           bundler-cache: true
-      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+      - uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
         with:
           working-directory: rails_resource_server
           bundler-cache: true

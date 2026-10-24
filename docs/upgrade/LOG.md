@@ -3308,7 +3308,7 @@ pr:
 
 ## Step 8: Ruby 3.4（2026-10-13）
 
-- ブランチ / PR: `upgrade/step8-ruby34` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step8-ruby34` / [#37](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/37)
 - バージョン: Ruby 3.3.12 → 3.4.11 / Rails 8.1.4（変更なし）
 - Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
 - Ruby 3.4.11 の default gem の json 2.9.1 が CVE-2026-54696 の対象なので、json は合わせ直さずに 2.21.2 に上げて Gemfile に明示した。RS・RP は ostruct を Gemfile に明示した。byebug の Ruby 3.4 の不具合は IMP-013 で見張る
@@ -3461,3 +3461,159 @@ pr:
 
 16. コードレビューで、`scripts/lib/dump_config.rb` が例外のメッセージをそのまま書き出すので、Ruby を上げると、メッセージの形の変化（Ruby 3.4 の引用符）が compare-config の差分に出ると分かった。Step 7 の気づきの 16（アプリのディレクトリの場所に頼る）と合わせて、道具の見直しで扱う候補
 17. 手動確認の記録で、`preview_logs` に残っている出力が初めから欠けていることがあり、起動の行や起動の直後の警告を後から確かめられなかった。manual-check.md の手順 4 は「サーバーの出力を読む」だけで、起動の直後に読む（残っているうちに控える）決まりがない
+
+## Step 9: Ruby 4.0（2026-10-14）
+
+- ブランチ / PR: `upgrade/step9-ruby40` / （PR 作成後に記入）
+- バージョン: Ruby 3.4.11 → 4.0.9 / Rails 8.1.4（変更なし）
+- Rails と gem の既定値・雛形への追随は 1 つ（DEF-8.1-30。Gemfile の `platforms` を `:windows` に）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
+- Ruby 4.0 に入らない minitest 5.14.4 を、Ruby の前に 6.0.6 にした。Ruby は、research の途中で出た 4.0.9（正規表現のエンジンの不具合の修正）にした（2 週間の決まりの例外）。lock にある default gem・bundled gems の版は、一時固定をやめて Gemfile のまとまりに書いた
+
+### 作業計画で決めたこと
+
+`/rails-upgrade` の research で調べた（サブエージェント 4 つ: Ruby 4.0 の事実、lock の gem の 4.0 への対応、Bundler 2.6.9 → 4.0.20 の変化、合わせ直すとメジャー版をまたぐ gem の変化。4.0.7 の版・tarball・保守の状況・json の版・bundled gems の一覧、minitest 5.14.4 の Ruby の要件、mise の ruby-build の版、lock の試行と bundler-audit、Bundler 4 の lock の書き直しと CHECKSUMS、faraday・oauth2 が Content-Type を付けること、railties の minitest 6 への対応は自分で確かめた）。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 Step 9 を行うか | 行う（PLAN.md の 14 章の未決事項）。research の前に、判断の材料を 1 論点として示した | 4.0 は公開から 10 か月で、パッチ版が 7 回出ている（4.0.7 は 2026-09-15）。主な gem の CI は 4.0 を含む。lock の gem で 4.0 に入らないのは minitest 5.14.4（`required_ruby_version` が `< 4.0`）だけで、Step 8 の json と同じく Ruby の前の gems の作業に分けられる。3.4 は normal maintenance で急ぐ理由はないが、外れる default gem と cgi の扱いを今の流れ（合わせ直し・前後の比較・試行）でまとめて片付けておくと、epic の後の保守が楽になる。リスク（Bundler 4 への移行、minitest を大きく上げること、byebug の `bt`（byebug#981））は、research の試行で確かめる |
+| 2 版と、research で入れて試すか。版を固定するときの書き方 | 4.0.7 にする。research で `mise install ruby@4.0.7` で入れ、scratchpad に HEAD の git worktree を作り、3 アプリを 4.0.7 にして、lock を 4.0.7 の default gem・bundled gems の版に合わせて解決し（json は 2.21.2 のまま）、`BUNDLE_PATH` を本体の各アプリの `vendor/bundle`（新しい `ruby/4.0.0`）に向けて入れる。worktree で `scripts/check-apps`（E2E を含む）、`RUBYOPT=-W:deprecated` の minitest・eager load・E2E のサーバーの出力、ログの WARN・ERROR、`scripts/check-console`（byebug を含む）、`TargetRubyVersion: 4.0` の RuboCop を流し、minitest は 5.27.0 と 6.0.6 の両方を試す。本体の Gemfile・lock と手動確認用の環境は変えず、research の出口で worktree を外す。ダウンロード（tarball 23,937,964 B、`.gem` 18 個・計 1,460,736 B）は、この論点への返事で承認を得た。`.gem` は RS で 1 回だけ落として照合し、RP・OP のキャッシュにコピーする。ruby-build に新しいリリースが出ていて取り直しが起きるときは止まる。**版を固定するときは、一時固定（Gemfile に足して lock を解決し、行を消す）をやめ、Gemfile に版・理由のコメント・`require: false` を書く**（人間の希望）。4.0.7 の版に合わせ直す gem（bigdecimal・base64・drb・logger・rdoc・irb・reline・ostruct・erb・uri・psych・stringio・io-console・pp・prettyprint・securerandom・tsort）は Gemfile の 1 つのまとまりにして、理由を先頭に 1 つ書く。net-http・minitest は行ごとに理由を書く。前の Step からの lock だけの固定（connection_pool・rack・racc・date・timeout、RP の cgi）は Step 9 では動かさず、PLAN.md の 7 章に書いて、14 章の間接の gem の更新で扱う。8 章の 4 と TIPS.md の一時固定の手順は、research の出口でこの書き方に直す | 4.0.7 は 4.0 系の最新（2026-09-15）で、公開から 2 週間たっている。CI の setup-ruby v1.329.0 は 4.0.7 を持つ。Bundler 4.0.20 での lock の書き直しと `--local --no-cache`、minitest の版ごとのテストと simplecov、RP に残る cgi 0.4.2 のビルド、RS・OP で cgi が消えた後の `require 'cgi'`、net-http 0.9.1（0.7.0 から本文のある要求に Content-Type を自動で付けない。#207）での RP・RS・OP の間のやり取り（WebMock の minitest では検出できない）、byebug の `bt`（#981）は、入れて流さないと分からない。Bundler 4 が lock を書き直すのはファイルの形（`BUNDLED WITH`・`RUBY VERSION`）だけで、gem の版は動かない（rubygems v4.0.20 の `definition.rb:401-413`）。一時固定は Bundler の文書にある手順ではなく（man の `bundle-update`・`bundle-install` は、lock の版が更新を指定しない限り変わらないことだけを書く）、版は lock にしか残らない。Rails 自身の Gemfile（v8.1.4 の uri・connection_pool・json）と GitLab の Gemfile（logger・fugit・zeitwerk）は、間接の gem の制約を理由のコメント付きで Gemfile に書いている。lock だけの固定は、仕上げで入れる Dependabot の security updates から見ると固定ではない。4.0.7 の版に合わせる目的では範囲の制約では足りないので `=` で固定する。`require: false` がないと `Bundler.require` が起動のときに irb・rdoc・pp などを読み込む |
+| 3 minitest の版と作業の順 | minitest を 5.14.4 → 6.0.6 にする（案 b）。Ruby の前に gems の作業で上げる（Ruby 3.4.11 のまま、RS → RP → OP）。Gemfile に `gem 'minitest', '6.0.6', require: false` と理由のコメント（5.14.4 は Ruby 4.0 に入らない）を書き、同じコミットで test グループの mutex_m の行（Step 5）を外す。`.gem` は research で落として照合したものを、3.4.0 のキャッシュにコピーして使う。assertions の件数の変化は、gems の作業の前後の比較で理由とともに記録する | minitest 5.14.4 は `required_ruby_version` が `>= 2.2, < 4.0` で Ruby 4.0 に入らない。6.0.6 は 6 系の最新（2026-05-01）で、Gemfile に書く直接の gem になるので 7 章の「直接の gem は最新版に」に当たる。Rails v8.1.4 の開発用の lock も 6.0.6 で、Rails は 8.1.2 から minitest 6 に対応している（#56434。railties 8.1.4 の `rails_plugin.rb:108`）。5.27.0（5 系の最終版）は post install message で 5 系の EOL を告げている。6.0.0（Ruby 4.0.7 の bundled gems の版）は 6.0.1〜6.0.6 の直しを含まない。試行で、3 アプリのテストはすべて通り、simplecov のカバレッジも出た。assertions の件数は RP 71 → 82、OP 123 → 129 になった（runs は同じ）。minitest 6 の `assert_operator`・`assert_predicate` が先に `assert_respond_to` を数え（minitest 6.0.6 の `assertions.rb:295`・`374`）、Rails の `assert_redirected_to`（actionpack 8.1.4 の `response.rb:71`）と `assert_select`（rails-dom-testing 2.3.0 の `selector_assertions.rb:347`）がそれを使うため。RP のテストごとの比較で、増えたのはリダイレクトと `assert_select` を確かめるテストだけだった。5.21.0 から mutex_m を読まず、lock に mutex_m を読むほかの gem はない。Ruby の前に分けるのは、minitest と Ruby の変化を別の前後の比較にするため（Step 8 の json と同じ） |
+| 4 Ruby の版の見直し（論点 2 の後に 4.0.8・4.0.9 が出た） | 4.0.7 をやめて **4.0.9** にする（案 a。人間が選んだ）。Ruby 4.0.9・ruby-build v20261023・setup-ruby v1.334.0（`26e5b7d197ebf60545ee9667bcbace0be11ccaec`）を、公開から 2 週間の決まりの例外にする。4.0.9 は research の中で入れ、worktree での試行はやり直さない（ruby の作業で検査・E2E・前後の比較をすべて流す）。CI の setup-ruby の 4 か所は、ruby の作業の最初のコミットで v1.334.0 にする。ダウンロード（tarball 23,946,524 B、mise が取り直す ruby-build 約 3 MB）は、この論点への返事で承認を得た。`.gem` は増えない（4.0.7 のときに落として照合したものを使う）。入れた 4.0.7 は mise に残す | 論点 2 の返事の後（10-14 → 10-24）に、4.0.8（10-22、bugfix）と 4.0.9（10-23）が出た。4.0.9・3.4.12・3.3.13 は、正規表現のエンジン（Onigmo）の不具合の修正を含む（ruby-lang.org「Regexp compilation fixes related to GitLab's CVE-2026-89078, CVE-2026-93577, CVE-2026-97229 and CVE-2026-110264」、2026-10-23）。GitLab はリモートでのコード実行の CVE を付け、Ruby 自身は CVE を求めていない。4.0.7 は 3 つの修正のうち #13332 だけを含み、#19020（4.0.8）・#16801（4.0.9）を含まない。今の epic の 3.4.11 も対象。影響は、攻撃者が制御する文字列から正規表現を作るときだけで、3 アプリの `app`・`lib`・`config` にその書き方はなく、doorkeeper 5.9.9・rack 2.2.24 の `Regexp.union` は固定の文字列か設定から作る。AI は、影響の経路が見当たらないので 4.0.7 で進めて 2 週間後に 4.0.9 に上げる案 b を推したが、人間は、セキュリティの修正であることと、間接の gem での使い方を調べきれないことから、案 a を選んだ。4.0.7 → 4.0.9 の差分（94 ファイル）で版のファイルが変わったのは prism 1.8.1 → 1.8.2（lock は 1.9.0 で、合わせ直す対象ではない）だけで、bundled gems・Bundler 4.0.20・json 2.18.0・ABI は同じ。ruby-build v20261023 は定義の追加と OpenSSL の条件を `1.1.1-4.x.x` に広げた変更で、4.0.9 の定義の SHA256 は ruby-lang.org と同じ。setup-ruby v1.329.0 → v1.334.0 は 6 コミット（版の一覧、Windows の一覧、版が見つからないときのメッセージ、`rubygems:` の入力の版の比べ方を semver から `Gem::Version` に）で、ci.yml は `rubygems:` を使わない（`index.js:80`）。`dist/index.js` はモジュールごとに比べ、semver の削除とこれらの変更だけだと確かめた |
+| 5 lock の合わせ直しと、Gemfile のまとまり | ruby の作業の各アプリの Ruby を上げるコミットで、Gemfile の「# 追加」の節の後に、4.0.9 の版に合わせ直す gem のまとまり（先頭に理由のコメントを 1 つ、各行は `= 版`・`require: false`）を書く。bundled gems は base64 0.3.0・bigdecimal 4.0.1・drb 2.2.3・irb 1.16.0・logger 1.7.0・ostruct 0.6.3・rdoc 7.0.4・reline 0.6.3、default gem は erb 6.0.7・io-console 0.8.2・net-http 0.9.1（RS・RP）・pp 0.6.3・prettyprint 0.2.0・psych 5.3.1・securerandom 0.4.1・stringio 3.2.0・tsort 0.2.0・uri 1.1.1。RS・RP の ostruct は今の行（rake 13.0.6 のため）に版を足し、コメントに 4.0.9 の版にすることを足す。OP の ostruct はまとまりに入れる。json の行はそのままにして、コメントを 4.0 の default gem の json（2.18.0）が CVE-2026-54696・CVE-2026-33210 の対象と直す。RS・OP から cgi 0.4.2 が消えるのは受け入れる。RP の cgi 0.4.2 は 0.4.2 のままにし、`-w` のときの「method redefined」の警告と、14 章の間接の gem の更新で cgi 0.5 系を見直すことを 7 章に書く。手順は、Ruby を上げる作業では、Gemfile を直して `BUNDLER_VERSION=4.0.20 bundle lock --local` → `git diff` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/4.0.0/cache bundle install --local --no-cache` → `scripts/verify-gem-checksums <アプリ> --changed HEAD`。minitest の作業（Ruby 3.4.11）では、照合済みの `.gem` を 3.4.0 のキャッシュにコピーし、Gemfile を直して目録だけを取る `bundle lock`（`--local` なし）→ `git diff` → `bundle install --local --no-cache` → 照合。8 章の 4 と TIPS.md の手順は research の出口でこの形に直す | 試行（4.0.7）で、lock で動いたのはまとまりの gem・minitest・増える pp・prettyprint（irb 1.15.0 からの依存）・消える mutex_m と cgi（RS・OP。erb 5.0.0 から依存しない）だけで、3 アプリの検査と E2E が通った。4.0.9 の default gem・bundled gems の版は、4.0.7 と prism（合わせ直す対象外）のほかは同じ。Ruby 4.0 の `lib/cgi.rb` は `cgi/escape` を読む stub で、Rails 8.1.4 は 4.0 で `cgi/util` を読まない。`-w` のときだけ、RS・OP で i18n 1.8.10 の `require 'cgi'` の警告、RP で cgi 0.4.2 の C 拡張が Ruby の `cgi/escape` のメソッドを定義し直す警告が出る。RP の cgi は activerecord-session_store の `cgi >= 0.3.6` で残り、論点 2 の「前の Step の lock だけの固定は動かさない」に当たる。`bundle lock` は Gemfile.lock だけを書く（scratchpad のコピーで流し、書き換わったのが Gemfile.lock だけで、`vendor/bundle`・`~/.bundle`・`~/.gem` は変わらないことを確かめた）。`--local` は rubygems.org につながず（`cli/lock.rb:68`）、候補は入れ済みの gem と、見つからないときの default gem だけ（`source/rubygems.rb:161-170`）で、キャッシュの `.gem` は候補にしない。ruby の作業で `--local` で正しい lock になるのは、版を `=` で決め、その版の `.gem` を照合して research の試行で本体の `vendor/bundle/ruby/4.0.0` に入れてあり（3 アプリとも、まとまりの版と minitest 6.0.6 の gemspec と `.gem` がそろっていることを確かめた）、入れ済みの gemspec の依存と Ruby の要件が rubygems.org と同じ（irb 1.16.0・minitest 6.0.6・rdoc 7.0.4 で比べた）だから。scratchpad のコピーで `bundle lock --local --print` を流し、rubygems.org につながずに試行と同じ解決になった。minitest の作業の `vendor/bundle/ruby/3.4.0` には minitest 6.0.6 が入っていないので、`--local` は使えない |
+| 6 Bundler 4 の `platforms` の非推奨の警告 | 案 a。ruby の作業の各アプリの Ruby を上げるコミットで、byebug の `platforms: %i[mri mingw x64_mingw]` を `%i[mri windows]` に、tzinfo-data の `%i[mingw mswin x64_mingw jruby]` を `%i[windows jruby]` に直す（Rails の雛形の形）。既定値・雛形への追随（A）として DEF-8.1-30（種類「Ruby」）に記録し、コミットの前に理解の関門で解説する | Bundler 4.0.20 は `platforms:` の mingw・mswin を非推奨にし、`bundle lock`・`bundle install` で `[DEPRECATED] Platform :mingw, :mswin, :x64_mingw will be removed in the future. Please use platform :windows instead.` を出す（`bundler/dsl.rb:431-435`。2.6.9 は出さない。`bundle exec` とアプリの起動では出なかった）。Rails の雛形は 7.1 から `:windows`（rails/rails#46009、2022-09-15 マージ。`railties-8.1.4/lib/rails/generators/rails/app/templates/Gemfile.tt:13・56`）。`app:update` は Gemfile を上書きしないので、Rails を上げる Step では上がらなかった。scratchpad の RS の Gemfile のコピーで直して `bundle lock --local` を流し、lock は変わらず、警告も出なくなった。`:windows` は 2.6.9 でも使える（`bundler/current_ruby.rb:23`）。違いが出るのは Windows のときだけ |
+| 7 byebug 13.0.0 の Ruby 4.0 での扱い | CLAUDE.md の ①（対応版を待つ）。byebug は 13.0.0 のままにする。research の出口で、IMP-013 の「現状」に Ruby 4.0 でも `where` が失敗することと byebug#981 を足し、「対象」の Gemfile の行を論点 6 の後の形（`platforms: %i[mri windows]`）に直し、「記録した Step」に 9 を足す。7 章の byebug の行にも Ruby 4.0 のことを書き足す（今ある項目の書き足しで、新しい項目は足さない） | 試行（4.0.7）の RS の `scripts/check-console` で、`next`・`continue` は動き（終了の状態は 0）、`where` は Ruby 3.4 と同じく `undefined method 'Kernel.require' for class 'Kernel'` で失敗した（byebug#867。直す #967 は未リリース）。byebug#981（Ruby 4.0 で、スタックに `public_send` があると `bt` が失敗する）は open で、コメントも新しい版もない（10-24 の時点で 13.0.0 が最新）。アプリのコードは byebug を呼ばず、業務的な挙動には関わらない。② は lock に git の参照が入り `.gem` を照合できず、④ debug gem への置き換え（IMP-013）は開発の道具を替える改善なので epic の後に行う（Step 8 の論点 7 と同じ） |
+| 8 rubocop・webmock をいつ上げるか | 案 b。Step 9 では上げず、仕上げの最初の作業にする（仕上げのチェックリストの先頭に `gems: rubocop・webmock` を足す）。その日に公開から 2 週間たった最新にし、これ以上先に送らない。仕上げを 11-05 より前に始めるなら、rubocop を 1.92.0 にするか 1.92.1 を待つかを人間に確かめる | 10-24 の時点で、rubocop 1.92.0（10-10）と webmock 3.27.0・3.28.0（10-10）が 2 週間たった。rubocop 1.92.1（10-22）は 1.92.0 の誤り（多くは自動修正）を 96 件直していて 11-05 から、webmock 3.34.0（10-14）は 10-28 から 2 週間たつ。rubocop-rails 2.38.0・rubocop-ast 1.50.0・rubocop-minitest 0.41.0 は最新。webmock 3.27.0〜3.34.0 はマッチの改善と直しで、3.28.0 の `to_rack` の変更は 3 アプリのテストに当たらない（Step 5 の着手時）。どちらも開発・テストの道具で、業務的な挙動には関わらない。Step 9 を Ruby 4.0 に絞れる。送り先を仕上げのチェックリストで固定し、Step 6 の気づきの 7（送りが続く）を繰り返さない |
+| 9 手動確認の時期と DB の写し | verify で 1 回、すべての変更（minitest 6.0.6、Ruby 4.0.9、Gemfile のまとまり、`:windows`、`TargetRubyVersion` 4.0）の後に行う。直前に 12 ファイルのハッシュを確かめ、3 アプリの development DB を `tmp/manual_check_backup/` に写す。research の出口で、Step 8 の写し（3 アプリの `tmp/manual_check_backup/`）を消す。この論点への返事を作業計画の承認とした | RP・OP・RS の間のやり取りは、Ruby 4.0.9 と net-http 0.9.1（本文のある要求に Content-Type を自動で付けない）で変わり得る。minitest は WebMock で差し替えるので検出できず、E2E とブラウザでの流れ（RP の my_op でのログインと introspection 用 RP）で確かめる。Step 8 の写しは、#37 が epic に入ったので消してよい（resume で確かめた問いに返事がなかったので、ここで改めて確かめた） |
+
+### 作業計画からの変更点
+
+| 変更 | 理由 |
+|---|---|
+| ruby の作業の始めに、3 アプリの `vendor/bundle/ruby/4.0.0` の `cache` 以外（入れ済みの gem・拡張・gemspec など）を消し、照合済みの `.gem` から 4.0.9 で入れ直した（人間が案 a を選んだ） | research の試行で 4.0.7 でビルドした C 拡張は、4.0.7 の `libruby.4.0.dylib` に絶対パスでリンクしていて（mise の Ruby は `--enable-shared`）、4.0.9 が読むのを断った（下の「遭遇した問題」）。論点 4・5 で「ABI の版が同じなので入れ直しは要らない」としたのは誤りだった |
+| RP の lock は、`bundle lock --local` ではなく `bundle install --local --no-cache` が書いた（lock を書くのと入れるのを一度に行い、差分は入れた後に確かめた）。OP は、目録だけを取る `bundle lock`（`--local` なし。`.gem` は落とさない）で lock を書き、差分を確かめてから入れた | 入れ済みの gem を消したので、`bundle lock --local` の候補（入れ済みの gem）がなくなり、`Could not find gem 'ostruct (= 0.6.3)' in locally installed gems.` で止まった（論点 5 の条件の「入れてあること」が崩れた）。`bundle install --local` はキャッシュの `.gem` を候補にするので通った。RS は消す前に `bundle lock --local` で書けていた。どのアプリの lock も、論点 5 の見込みと同じ形になった |
+| PR を作った後に、crass を 1.0.7 → 1.0.8 に上げた（gems の作業。RS → RP → OP。公開から 2 週間の決まりの例外。人間が判断） | PR #38 の CI の bundler-audit が、10-23 の ruby-advisory-db で crass 1.0.7 の GHSA-pq4g-8rxf-4g29 を指摘した（下の「遭遇した問題」）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」に当たる |
+
+### 手動確認用の環境
+
+resume で、前のセッションのサーバーが残っていないこと（`ps` とポートの待ち受け）を確かめてから、12 ファイルのハッシュを控えた。件数は、本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 8 の手動確認の後と同じだった（OP `oauth_access_grants` 33・`oauth_access_tokens` 82（revoke 済み 15）、RP `sessions` 14・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま。`-wal` はない）。
+
+- research の途中（10-14 → 10-24）で scratchpad の中身が消え、ハッシュの控えもなくなった。resume のときにチャットに出した先頭 12 桁と比べ、12 ファイルとも同じだった。research の出口で控え直した
+- research の試行の worktree（scratchpad）は、scratchpad と一緒に消えていた。git の記録は `git worktree prune` で片付けた。試行で入れた gem は、本体の各アプリの `vendor/bundle/ruby/4.0.0` に残っている（ruby の作業で使う）
+- Step 8 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/` を、research の出口で、人間に確かめて消した（論点 9）。消した後も、12 ファイルのハッシュは開始時と同じで、`-wal` はない
+
+### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| minitest | 5.14.4 → 6.0.6（3 アプリ。Ruby 3.4.11 のまま） | test グループの mutex_m の行（Step 5）とそのコメントを、`gem 'minitest', '6.0.6', require: false` と理由のコメントに置き換えた。照合済みの `minitest-6.0.6.gem` を 4.0.0 のキャッシュから 3.4.0 のキャッシュにコピーし（SHA-256 は rubygems.org と一致）、目録だけを取る `bundle lock`（Bundler 2.6.9）→ `git diff` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.4.0/cache bundle install --local --no-cache`。lock で動いたのは minitest（依存の drb・prism は lock にある版）と、消えた mutex_m と、`DEPENDENCIES` の行だけ。`Fetching` はなく、`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 1 個で一致。minitest は `vendor/bundle` から読まれ、mutex_m は読まれない。RS `ca2704e`、RP `1ba3c43`、OP `133da35`（作業計画の論点 3） |
+| Ruby | 3.4.11 → 4.0.9（3 アプリ） | `.ruby-version`・Gemfile の `ruby` を 4.0.9 にし、Gemfile の「# 追加」の節の後に、Ruby 4.0.9 の default gem・bundled gems のまとまり（`= 版`・`require: false`、先頭に理由のコメント）を書いた。json のコメントを 4.0 の内容に直し、RS・RP の ostruct の行に版を書いた（OP はまとまりに入れた）。byebug・tzinfo-data の `platforms` を `:windows` にした（DEF-8.1-30。理解の関門で人間が承認）。`BUNDLED WITH` は 4.0.20、`RUBY VERSION` は `ruby 4.0.9`（2 スペース）。CHECKSUMS の節は足されていない。RS `35f1331`、RP `9efec51`、OP `99bd957`。CI の setup-ruby は、その前に v1.334.0 にした（`2c14e37`。論点 4）。RuboCop の `TargetRubyVersion` は 4.0 にした（`22866bf`。指摘なし） |
+| default gem・bundled gems（lock） | 3 アプリ: base64 0.2.0→0.3.0、bigdecimal 3.1.8→4.0.1、drb 2.2.1→2.2.3、erb 4.0.4.1→6.0.7、io-console 0.8.1→0.8.2、irb 1.14.3→1.16.0、logger 1.6.4→1.7.0、ostruct 0.6.1→0.6.3、psych 5.2.2→5.3.1、rdoc 6.14.0→7.0.4、reline 0.6.0→0.6.3、stringio 3.1.2→3.2.0、uri 1.0.4→1.1.1。RS・RP: net-http 0.6.0→0.9.1。増えた: pp 0.6.3・prettyprint 0.2.0（3 アプリ）。消えた: cgi 0.4.2（RS・OP） | 作業計画の論点 5。securerandom 0.4.1・tsort 0.2.0・RP の cgi 0.4.2 と、前の Step からの lock だけの固定（connection_pool・rack・racc・date・timeout）は動いていない。`.gem` は research で落として照合したものを `--local --no-cache` で入れ、`Fetching` はない。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は RS 16・RP 16・OP 15 個で一致。lock の gem は bundler を除いてすべて `vendor/bundle/ruby/4.0.0` から読まれ、C 拡張は 4.0.9 の `libruby.4.0.dylib` にリンクしている。Bundler の下で読まれる json は 2.21.2、resolv は 0.7.2、erb は 6.0.7 |
+| crass | 1.0.7 → 1.0.8（3 アプリ。Ruby 4.0.9 の後） | loofah の依存。`bundle lock --update crass --conservative`（目録だけを取る）→ `git diff` → 照合済みの `.gem` を `--local --no-cache` で入れた。lock で動いたのは crass だけ。`.gem`（21,504 B）は RS で落として SHA-256 を rubygems.org と照合し、RP・OP のキャッシュにコピーした（`--changed HEAD` で 3 アプリとも一致）。`RUBYOPT=-W:deprecated` を付けた各アプリの検査と E2E は同じ件数で通り、新しい警告はなく、compare-config は前と同じ。10-23 の ruby-advisory-db（`bundle-audit update` で手元も合わせた）で 3 アプリとも `No vulnerabilities found`。RS `d323f85`、RP `fe298fb`、OP `040a9cf` |
+
+### 非推奨警告と対応
+
+| 警告 | 対応 |
+|---|---|
+| Bundler 4.0.20: `[DEPRECATED] Platform :mingw, :mswin, :x64_mingw will be removed in the future. Please use platform :windows instead.`（`bundle lock`・`bundle install` のとき） | Gemfile の byebug・tzinfo-data の `platforms` を Rails の雛形の形（`:windows`）にした（DEF-8.1-30。Ruby を上げたコミット）。直した後は出ない |
+| chilled string などの Ruby の非推奨（`RUBYOPT=-W:deprecated`） | research の試行（4.0.7）と各アプリの前後の比較（4.0.9）で、minitest・E2E のサーバーの出力・development の eager load のどれにも出なかった |
+| cgi（`-w` のときだけ） | RS・OP は i18n 1.8.10 の `require 'cgi'` で「CGI library is removed from Ruby 4.0」、RP は cgi 0.4.2 の C 拡張の「method redefined」。通常の起動と `-W:deprecated` では出ない。7 章の cgi の行に書き、14 章の間接の gem の更新で見直す |
+| OP: doorkeeper-openid_connect の `auth_time_from_resource_owner` の DEPRECATION | 元からある（IMP-011）。Step 9 で変わっていない |
+
+### 意図的な仕様変更
+
+なし
+
+### 前後の比較
+
+- minitest（gems）: 作業の前（`41495c8`、Ruby 3.4.11）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った）、`scripts/compare-config dump`（3 アプリの test・development）、`RUBYOPT=-W:deprecated` の development の eager load を取った。各アプリの後に、同じものを取って比べた。`rails c` は irb・reline が動かないので比べていない
+  - 検査: 各アプリの 11 の検査と E2E（10 passed）が通った。runs は RS 11・RP 33・OP 69 で前と同じ。`CI=1` も同じ。応答のスナップショットと E2E のスナップショットの差分はない
+  - assertions の件数: RS 15（前と同じ）、RP 71 → 82、OP 123 → 129。minitest 6 の `assert_operator` が先に `assert_respond_to` を数え（`minitest-6.0.6/lib/minitest/assertions.rb:295`）、Rails の `assert_redirected_to`（`actionpack-8.1.4/lib/action_dispatch/testing/assertions/response.rb:71`）と rails-dom-testing の `assert_select`（`rails-dom-testing-2.3.0/lib/rails/dom/testing/assertions/selector_assertions.rb:347`）がそれを使うため。RS のテストはどちらも使わない。research の試行（4.0.7）で、RP のテストごとの数を 5.27.0 と比べ、増えたのはリダイレクトと `assert_select` を確かめるテストだけだと確かめた。通る・落ちるが変わったテストはない
+  - 警告: `RUBYOPT=-W:deprecated` の minitest・E2E のサーバーの出力・development の eager load で、新しい警告はない（OP の IMP-011 の DEPRECATION は前と同じ）
+  - compare-config: 3 アプリとも test・development で前と同じ
+- Ruby（ruby）: 前の書き出しは、minitest の各アプリの後（Ruby 3.4.11）に取ったもの（`RUBYOPT=-W:deprecated` の `scripts/check-apps --app <アプリ>`（E2E を含む）、`scripts/compare-config dump`、eager load）と、Ruby の作業の前に取った `scripts/check-console`（irb 1.14.3）、test.log・development.log の行数。各アプリを 4.0.9 にした後に、同じものを取って比べた
+- 検査: 各アプリの 11 の検査と E2E（10 passed）が通った。件数は RS 11 runs・15 assertions、RP 33・82、OP 69・129 で、minitest の作業の後と同じ。`CI=1` も同じ。応答のスナップショットと E2E のスナップショットの差分はない
+- 警告: `RUBYOPT=-W:deprecated` の minitest・E2E のサーバーの出力・development の eager load で、新しい警告はない（OP の IMP-011 の DEPRECATION は前と同じ）。Bundler 4 の `platforms` の非推奨の警告は、直したので出ない。test.log・development.log の新しい行に WARN・ERROR・warning はない
+- compare-config: 3 アプリとも test・development で前と同じ（Step 8 で差分になった `NoMethodError` のメッセージの形も、3.4.11 と 4.0.9 で同じ）
+- `rails c`: 3 アプリとも起動し、Tab の補完と複数行の入力ができる（irb 1.16.0・reline 0.6.3・io-console 0.8.2）
+
+### 手動確認
+
+verify で、すべての変更（minitest 6.0.6、Ruby 4.0.9、Gemfile のまとまり、`:windows`、`TargetRubyVersion` 4.0）と記録のコミットの後（`d38c33b`）に、`.claude/launch.json` から 3 アプリを起動してブラウザペインで確かめた（操作は人間）。起動の直後にプレビューの出力を読み、3 アプリとも Ruby 4.0.9・Puma 8.0.2・threads 3 で起動したことを控えた（Step 8 の気づきの 17）。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが research の出口で控えたものと同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しは元と同じ。作業計画の論点 9）
+- 操作を頼む前に、ブラウザペインが隠れていたので表示してもらった（Step 8 の気づきの 15 と同じ）。操作の返事の後に、3 アプリのサーバーが起動のときから動き続けていたことを `preview_list` で確かめた（Step 8 の気づきの 14）
+- ログイン（RP の my_op）: 人間が「Login」を押した。OP の認可エンドポイントは未ログインで 401 になり、ログイン画面（200）、ログイン（303）の後、認可エンドポイントが 302（同意画面は出ない）、トークン・userinfo・JWKS が 200。OP のログの「Redirected to」行は `code=[FILTERED]`
+- introspection 用 RP: 同意画面と Authorize の後、RS は正しいトークンで 200、その後 401 が 2 回。OP はクライアントクレデンシャルのトークンを 3 回、introspect を 3 回、revoke を 1 回受けた。Step 8 と同じ
+- 起動の直後: プレビューが同時に送った `HEAD "/"`・`GET "/"` は、3 アプリとも 200
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない（`preview_logs` の検索）。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ。Active Storage の image_processing gem の行（DEF-8.1-29）は、3 アプリとも起動のときに development.log に出た（Step 7・8 と同じ）
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 33 → 35 件、`oauth_access_tokens` が 82 → 87 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 15 → 16）。RP は `sessions` が 14 → 16 件、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。ファイルの見出しは WAL のまま（見出しの 18・19 バイト目で確かめた）。変わったのは OP・RP の DB の本体だけで、RS の DB（写しと同じ）・署名鍵・`.env`・3 アプリの secret は変わっていない。手動確認の後の 12 ファイルのハッシュを新しい基準にした（控えは scratchpad）。写しは、この Step の PR が epic に入った後に、人間に確かめてから消す
+- RP の `sessions` が増えたこと: 増えたのは id 35（13:26:29。プレビューが起動の直後に開いた、クッキーのない要求）と id 36（13:28。今回のログイン）で、前回（Step 8）のログインの行（id 33）が残った。OP でもログイン画面が出たので、Step 8 と同じく、ブラウザのセッションのクッキーが消えていた見込み（確かめたのは行の id と時刻、OP のログイン画面が出たこと）
+
+### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`d38c33b`）に、36 の検査がすべて通った。各コミットの前には、そのアプリと E2E を `RUBYOPT=-W:deprecated` 付きで流した
+- minitest: RS 11 runs・15 assertions、RP 33・82、OP 69・129、0 failures。`CI=1`（eager load あり）でも同じ。assertions の件数の変化は minitest 6 によるもの（上の「前後の比較」）
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この Step を通して出なかった
+- RuboCop（`TargetRubyVersion: 4.0`）・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った（`check-apps` の項目）
+- lock: epic（`a9a3fba`）からの動きは、作業計画の論点 3・5 のとおり（minitest 6.0.6、まとまりの gem、増えた pp・prettyprint、消えた mutex_m・cgi（RS・OP）、`RUBY VERSION`・`BUNDLED WITH`、`DEPENDENCIES`）。前の Step からの lock だけの固定（connection_pool 2.5.5・rack 2.2.24・racc 1.5.2・date 3.5.1・timeout 0.6.1、RP の cgi 0.4.2）と json 2.21.2 は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.16.0・reline 0.6.3・io-console 0.8.2。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）。setup-ruby v1.334.0 で 4.0.9 を入れられることと、Bundler 4.0.20 で入れられることも、そのときに見る
+- CI（PR #38）: setup-ruby v1.334.0 で Ruby 4.0.9・Bundler 4.0.20 が入り、bundler-audit のほかのステップと E2E は通った。bundler-audit は crass の新しい advisory で落ちたので、crass を 1.0.8 にした（上の「遭遇した問題」）。直した後の CI は push の後に確かめる
+- 手動確認用の環境: 上の「手動確認」。手動確認の後の 12 ファイルのハッシュを新しい基準にした
+
+### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RS を 4.0.9 にして `bundle install --local --no-cache` を流すと、`LoadError: linked to incompatible <HOME>/.local/share/mise/installs/ruby/4.0.7/lib/libruby.4.0.dylib - .../vendor/bundle/ruby/4.0.0/gems/date-3.5.1/lib/date_core.bundle` で止まった（json 2.21.2 の拡張でも同じ）。research の試行で、本体の `vendor/bundle/ruby/4.0.0` に 4.0.7 でビルドして入れた C 拡張（RS 15・RP 17・OP 17 個）が、`otool -L` で 4.0.7 の libruby（current version 4.0.7）にリンクしていた | 止まって人間に確かめ、3 アプリの `vendor/bundle/ruby/4.0.0` の `cache` 以外を消して、4.0.9 で照合済みの `.gem` から入れ直した（上の「作業計画からの変更点」）。入れ直した後、拡張は 4.0.9 の libruby にリンクし、`Fetching` はない。TIPS.md の「Ruby を上げる」に、パッチ版を上げても C 拡張は作り直しが要ることを書いた |
+| 入れ済みの gem を消した後、RP の `bundle lock --local` が `Could not find gem 'ostruct (= 0.6.3)' in locally installed gems.` で止まった | `--local` の候補が入れ済みの gem だけのため（論点 5）。RP は `bundle install --local --no-cache`（キャッシュの `.gem` を候補にする）で lock を書いて入れ、OP は目録だけを取る `bundle lock` で lock を書いてから入れた（上の「作業計画からの変更点」） |
+| PR #38 の CI で、3 アプリの bundler-audit だけが落ちた。CI は `--update` で 10-23 の ruby-advisory-db を取り、crass 1.0.7 を GHSA-pq4g-8rxf-4g29（Incorrect tokenization of bad URLs enables CSS sanitizer bypass。medium。2026-10-21 公表。修正は 1.0.8）で指摘した。手元の検査が通ったのは、手元の DB が 10-10 のままだったため（TIPS.md の「CI の結果を読む」）。Step 9 の変更によるものではなく、epic（3.4.11）の lock も同じ | crass の誤りは、CSS を crass で解析して作り直すサニタイザー（Loofah の `scrub_css`、rails-html-sanitizer の `sanitize_css` と `style` を許した `sanitize`）をすり抜けられるもの。3 アプリの `app`・`lib`・`config` に CSS や `style` 属性のサニタイズはなく、影響する経路は見当たらなかったが、修正版を即時に入れた（上の「gem ごとの対応」。人間が判断） |
+
+### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| TIPS.md が「ruby の作業は `bundle lock --local` で書ける」としたままで、入れ直しの後は使えなかった実際と食い違う | 直した。試行と違うパッチ版で作業するときは `--local` が使えないこと、Step 9 で各アプリをどう書いたか、迷ったら目録だけを取る `bundle lock` にすることを書いた（`f798ff5`。人間が判断） |
+| Gemfile のまとまりの先頭のコメントが「lock にある default gem・bundled gems は 4.0.9 の版にする」と書くが、date・timeout・racc・rake・prism・rexml・net-imap などは lock にあってもまとまりにない | 直した。「版を Ruby に合わせ直してきたもの（PLAN.md の 7 章・8 章の 4）」と絞った。コメントだけで lock は変わらない。`scripts/commit-per-app` で各アプリの検査と E2E を流してコミットした（RS `33a9ffc`、RP `ba9021d`、OP `a87cb8b`。人間が判断） |
+| DEF-8.1-30 の「コミット」に実際のハッシュがない | 直した（`f798ff5`。人間が判断） |
+| RS・RP の ostruct の版がまとまりの外（Step 8 の行）にあり、OP はまとまりの中 | 直さない。RS・RP の行には rake 13.0.6 のための別の理由があり、論点 5 でそう決めた。TIPS.md の一覧に置き場所の違いを書いてある（人間が判断） |
+| 同じまとまりが 3 つの Gemfile に重なっている（`eval_gemfile` で 1 つにできる） | 直さない。3 アプリは別々のアプリで、CI もアプリごとに入れる。共有のファイルはアプリどうしを結び付ける構成の変更で、アップグレードの範囲を越える。IMPROVEMENTS.md にも足さない（人間が判断） |
+| RP の cgi 0.4.2 が lock だけの固定で、C 拡張が Ruby 4.0.9 の `cgi/escape` を定義し直す | 直さない。論点 5 で残すと決め、7 章に `-w` の警告と、14 章の間接の gem の更新で見直すことを書いてある。通常の起動では警告は出ず、検査・E2E・手動確認も通った（人間が判断） |
+
+- 直した後に、3 アプリの検査と E2E が通り（各アプリの `commit-per-app`）、手動確認用の 12 ファイルのハッシュは手動確認の後の基準と同じだった
+
+### スキルについて気づいたこと
+
+Step 3〜8 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。
+
+resume:
+
+1. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#37 の取り込みが入っていなかった（Step 5〜8 と同じ）。人間の指示にあったので、fetch して早送りしてから切った。前のセッションのサーバーは、人間の指示にあったので `ps` と `lsof` で確かめた（残っていなかった）
+2. resume.md は、Step 8 の後の次の作業を「次の Step の始めなら research」と決める。ロードマップで任意の Step（Step 9）を行うかを決める手順がなく、その判断でブランチ名（`upgrade/step9-...` か仕上げの名前）が変わるので、手順 2・3（ブランチを切る・最初のコミット）を判断の後に回した。今回は人間の指示で、判断の材料を 1 論点として示した
+3. 手動確認の写し（Step 8 の `tmp/manual_check_backup/`）を消すかの問いに返事がないまま、Step 9 を行うかの論点を示した（それぞれのメッセージで 1 論点）。返事は Step 9 の論点にだけあったので、写しは消さずに残し、research の手動確認の論点で改めて確かめることにした。resume で確かめることと、Step の始めの論点が重なるときの順番が決まっていない
+
+research:
+
+4. mise が使う ruby-build の置き場所（macOS では `~/Library/Caches/mise/ruby/ruby-build`）が TIPS.md にない。版（v20261013、最新）を確かめるのに探した。最新なら、入れるときに取り直しは起きない（Step 8 の気づきの 2）
+5. サブエージェントの報告で、版や番号の食い違いがあった（Ruby 4.0.7 の bundled gems の minitest は 6.0.0、net-http の Content-Type の変更は issue #205 を直した PR #207）。報告どうしを突き合わせ、要点を一次の出典で確かめて拾えた（research の手順 2）
+6. `cd` を含むコマンドで Bash の作業ディレクトリが変わり、次のコマンドがアプリやスキルのディレクトリで動いた（2 回）。TIPS.md の「コマンドの実行」の注意と同じ
+7. research の途中で日付が変わり（10-14 → 10-24）、その間に scratchpad の中身（試行の worktree、作業計画の下書き、手動確認用の環境のハッシュの控え）が消えた。決めた論点は LOG.md にコミットしてあったので、聞き直さずに続けられた（research の手順 7 の狙いどおり）。ハッシュの控えは、resume でチャットに出した先頭 12 桁と比べて確かめた。設定の「手動確認用の環境」とスキルは、ハッシュの控えを scratchpad に置く前提で、消えたときの手順がない
+8. 論点 2 の返事から論点 3 の返事までの 10 日の間に、Ruby 4.0.8・4.0.9（正規表現のエンジンの不具合の修正）が出て、決めた版（4.0.7）を見直す論点が増えた。research.md は、論点の間に時間が空いたときに、版と advisory を確かめ直す手順がない（Step 8 の気づきの 4 と同じく、日付が変わった）
+9. 試行の worktree で、OP の署名鍵（`jwtRS256.key`）を先に作らずに `scripts/check-apps` を流し、OP の zeitwerk:check と minitest が `Errno::ENOENT` で落ちた（E2E の起動スクリプトが鍵を作った後に流し直して通った）。Step 8 の気づきの 5 の手順（OP の署名鍵を使い捨てで作る）が research.md にないので、また抜けた
+10. minitest のテストごとの assertions の数を出すのに、`RUBYOPT=-r` で TracePoint を使う形は何も出さず、worktree の `test/test_helper.rb` に一時的に数行足す形にした。worktree は使い捨てなので本体は変えていない
+11. 人間は、論点 2 で一時固定の書き方、論点 5 で `bundle lock --local` の中身（何を書くか、なぜネットワークなしで正しいか、何が条件か）を掘り下げた。掘り下げの中で、AI の「今回の手順は 2 つの条件を先に満たす」という説明が、Ruby 3.4.11 のまま行う minitest の作業には当たらないと分かり、手順を分けた。Step 8 の気づきの 10 と同じく、最初の示し方に、コマンドが書く・読むもの（ファイル・ネットワーク・入れ済みの gem）と、その前提が成り立つ作業の範囲を入れておけば、往復が減った
+12. コミットのコマンドに `grep -n` を同じ呼び出しで続けたら、Claude Code の hooks（`scripts/check-public-safety --claude-hook`）が `git commit -n` と見なして止めた。コミットは単独の呼び出しにする
+13. scratchpad の coverage のディレクトリを、シェルの変数を使った `rm -rf` で消そうとして、Claude Code の安全チェックに止められた（変数が空なら `/` になるため）。消さずに更新日時で比べる形に変えた
+14. `ruby -e` に日本語を渡すときの `LC_ALL=ja_JP.UTF-8` を付け忘れ、`invalid multibyte character` で止まった（TIPS.md の「コマンドの実行」にある注意）
+
+ruby:
+
+15. Ruby のパッチ版を上げるとき（4.0.7 → 4.0.9）、ABI の版（`vendor/bundle/ruby/4.0.0`）が同じなら gem の入れ直しは要らないと考えたが、mise の Ruby は `--enable-shared` でビルドされ、C 拡張はその版の libruby に絶対パスでリンクするので、作り直しが要った。ruby.md と TIPS.md は、マイナーを上げるとき（ABI の版が変わる）の入れ直しだけを書いていた
+16. 入れ済みの gem を消して入れ直すと、`bundle lock --local` の前提（入れてあること）が崩れる。手順を決めた論点の前提が、後の作業（入れ直し）で崩れるのに、その場で気づけなかった（RP で止まってから気づいた）
+
+pr:
+
+17. 手元の ruby-advisory-db は 10-10 のままで、research・verify の bundler-audit は古い DB で通っていた。CI（`--update`）で初めて、10-23 に入った crass の advisory に気づいた。research の「advisory の確かめ」と verify の前に `bundle-audit update` を流す手順がない（Step 8 の気づきの 7 と同じく、advisory の確かめが試行の lock だけに頼っていた）
