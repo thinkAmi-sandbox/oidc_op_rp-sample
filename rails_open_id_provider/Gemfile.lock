@@ -329,6 +329,7 @@ DEPENDENCIES
   prettyprint (= 0.2.0)
   psych (= 5.3.1)
   puma (~> 8.0)
+  rack (~> 2.2, >= 2.2.24)
   rack-mini-profiler (~> 5.0)
   rails (~> 8.1.4)
   rdoc (= 7.0.4)
