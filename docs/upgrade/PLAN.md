@@ -1153,11 +1153,11 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 - [x] gems: minitest 5.14.4 → 6.0.6（RS。Ruby 3.4.11 のまま。Gemfile に `= 6.0.6`・`require: false`・理由のコメント。test グループの mutex_m の行を外す）
 - [x] gems: minitest 5.14.4 → 6.0.6（RP）
 - [x] gems: minitest 5.14.4 → 6.0.6（OP）
-- [ ] ruby: CI の setup-ruby を v1.329.0 から v1.334.0 にする（公開から 2 週間の決まりの例外）
-- [ ] ruby: RS（Ruby 4.0.9、Gemfile の default gem・bundled gems のまとまり、json のコメント、`platforms` を `:windows` に（DEF-8.1-30。最初のアプリのコミットの前に理解の関門）、`BUNDLED WITH` 4.0.20）
-- [ ] ruby: RP（同上）
-- [ ] ruby: OP（同上。ostruct はまとまりに入れる）
-- [ ] ruby: RuboCop の `TargetRubyVersion` を 4.0 にする
+- [x] ruby: CI の setup-ruby を v1.329.0 から v1.334.0 にする（公開から 2 週間の決まりの例外）
+- [x] ruby: RS（Ruby 4.0.9、Gemfile の default gem・bundled gems のまとまり、json のコメント、`platforms` を `:windows` に（DEF-8.1-30。最初のアプリのコミットの前に理解の関門）、`BUNDLED WITH` 4.0.20）
+- [x] ruby: RP（同上）
+- [x] ruby: OP（同上。ostruct はまとまりに入れる）
+- [x] ruby: RuboCop の `TargetRubyVersion` を 4.0 にする
 - [ ] verify（手動確認は 1 回。直前に 3 アプリの development DB を写す）
 - [ ] pr
 
@@ -1167,7 +1167,7 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 2. research で Ruby を入れ、worktree で試す。**版を固定するときは、一時固定（Gemfile に足して lock を解決し、行を消す）をやめ、Gemfile に版・理由のコメント・`require: false` を書く**（人間の希望）。前の Step からの lock だけの固定（connection_pool・rack・racc・date・timeout、RP の cgi）は Step 9 では動かさず、14 章の間接の gem の更新で扱う
 3. minitest は 6.0.6 にして、Ruby の前に gems の作業で上げる（RS → RP → OP）。同じコミットで mutex_m の行を外す。assertions の件数が増える（RP 71 → 82、OP 123 → 129。minitest 6 の `assert_operator` が `assert_respond_to` も数えるため）ことは、前後の比較で理由とともに記録する。`.gem` は research で落として照合したものを 3.4.0 のキャッシュにコピーし、目録だけを取る `bundle lock`（`--local` なし）で lock を書いてから、`bundle install --local --no-cache` で入れる
 4. Ruby は 4.0.9 にする（4.0.7 から変えた。人間が選んだ）。4.0.9 は正規表現のエンジンの不具合（GitLab の CVE-2026-89078 など）の修正を含み、4.0.7 は 3 つの修正のうち 1 つしか含まない。Ruby 4.0.9・ruby-build v20261023・setup-ruby v1.334.0（`26e5b7d197ebf60545ee9667bcbace0be11ccaec`）を、公開から 2 週間の決まりの例外にする。setup-ruby は、ruby の作業の最初のコミット（3 アプリの Ruby を上げる前）で 4 か所を変える
-5. lock にある Ruby の default gem・bundled gems は、Ruby 4.0.9 の版に合わせ直し、各アプリの Gemfile の「# 追加」の節の後のまとまりに書く（先頭に理由のコメントを 1 つ、各行は `= 版`・`require: false`）。RS・RP の ostruct は Step 8 で足した行に版を書き、OP はまとまりに入れる。json は 2.21.2 のまま（4.0.9 の json 2.18.0 も CVE-2026-54696・CVE-2026-33210 の対象）で、コメントを直す。RS・OP から cgi 0.4.2 が消えるのは受け入れ、RP の cgi 0.4.2 は残す。ruby の作業では `BUNDLER_VERSION=4.0.20 bundle lock --local` で lock を書き（research の試行で、まとまりの版と minitest 6.0.6 を本体の `vendor/bundle/ruby/4.0.0` に入れてある）、`git diff` で確かめてから入れる
+5. lock にある Ruby の default gem・bundled gems は、Ruby 4.0.9 の版に合わせ直し、各アプリの Gemfile の「# 追加」の節の後のまとまりに書く（先頭に理由のコメントを 1 つ、各行は `= 版`・`require: false`）。RS・RP の ostruct は Step 8 で足した行に版を書き、OP はまとまりに入れる。json は 2.21.2 のまま（4.0.9 の json 2.18.0 も CVE-2026-54696・CVE-2026-33210 の対象）で、コメントを直す。RS・OP から cgi 0.4.2 が消えるのは受け入れ、RP の cgi 0.4.2 は残す。ruby の作業では `BUNDLER_VERSION=4.0.20 bundle lock --local` で lock を書き（research の試行で、まとまりの版と minitest 6.0.6 を本体の `vendor/bundle/ruby/4.0.0` に入れてある）、`git diff` で確かめてから入れる。ruby の作業では、4.0.7 でビルドした C 拡張を 4.0.9 が読めず、`vendor/bundle/ruby/4.0.0` を `cache` だけ残して入れ直したので、RP は `bundle install --local`、OP は目録だけを取る `bundle lock` で lock を書いた（LOG.md の Step 9 の「作業計画からの変更点」）
 6. Bundler 4 が非推奨にした `platforms:` の mingw・mswin を、Rails の雛形の形（byebug は `%i[mri windows]`、tzinfo-data は `%i[windows jruby]`）に直す。Ruby を上げるコミットに入れ、DEF-8.1-30 に記録する（lock は変わらない）
 7. byebug は 13.0.0 のまま（CLAUDE.md の ①）。Ruby 4.0 でも `where` が失敗し、byebug#981 も open。IMP-013 に書き足した
 8. rubocop・webmock は Step 9 では上げず、仕上げの最初の作業にする（上の「仕上げ」のチェックリストの先頭）
