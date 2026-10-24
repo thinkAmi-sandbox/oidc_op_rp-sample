@@ -87,8 +87,9 @@ gem 'json', '~> 2.21', '>= 2.21.2'
 # 起動の途中では読み込まない（docs/upgrade/PLAN.md の仕上げの「間接の依存の gem で決めたこと」）
 gem 'rack', '~> 2.2', '>= 2.2.24', require: false
 
-# rake 13.0.6 が require "ostruct" する。Ruby 4.0 の bundled gems で、lock にないと読み込めないので明示する。
-# 版は Ruby 4.0.9 の bundled gems と同じにする。起動の途中では読み込まない（docs/upgrade/PLAN.md の Step 8・Step 9）
+# rack 2.2.24 の rack/show_exceptions.rb が require "ostruct" する（rake は 13.2.0 から読まない）。Ruby 4.0 の bundled gems で、
+# lock にないと読み込めないので明示する。rack 3 にするときに、外せるかを見直す。版は Ruby 4.0.9 の bundled gems と同じにする。
+# 起動の途中では読み込まない（docs/upgrade/PLAN.md の Step 8・Step 9・仕上げ）
 gem 'ostruct', '0.6.3', require: false
 
 # lock にある Ruby の default gem・bundled gems のうち、版を Ruby に合わせ直してきたもの（docs/upgrade/PLAN.md の 7 章・8 章の 4）は、
