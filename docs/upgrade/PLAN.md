@@ -1228,7 +1228,7 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 - [x] pr
 - [x] research: 間接の依存の gem（14 章の未決事項）を上げるか。上の pr が epic に入った後に決める（下の決めたことの 1）→ 上げる（下の「間接の依存の gem で決めたこと」）
 - [x] gems: rack を Gemfile で 2 系に固定（RS → RP → OP。`'~> 2.2', '>= 2.2.24', require: false` と理由のコメント。lock は動かない）
-- [ ] gems: Rails の構成 gem の依存（builder 3.3.0・connection_pool 3.0.2・globalid 1.4.0・i18n 1.15.2・marcel 1.2.1・nio4r 2.7.5・racc 1.8.1・rack-test 2.3.0・rake 13.4.2。RS → RP → OP。RS・RP は ostruct の行のコメントを直す）
+- [x] gems: Rails の構成 gem の依存（builder 3.3.0・connection_pool 3.0.2・globalid 1.4.0・i18n 1.15.2・marcel 1.2.1・nio4r 2.7.5・racc 1.8.1・rack-test 2.3.0・rake 13.4.2。RS → RP → OP。RS・RP は ostruct の行のコメントを直す）
 - [ ] gems: mail の依存（mini_mime 1.1.5・net-imap 0.6.8・date 3.6.0。RS → RP → OP）
 - [ ] gems: 認可の gem の依存（RS: jwt 3.3.0・multi_xml 0.9.1・hashie 5.2.0、RP: multi_xml 0.9.1・hashie 5.2.0・rack-protection 3.2.0、OP: responders 3.2.1。RS・RP の前に hashie の公開後の issue と advisory を見直す）
 - [ ] gems: activerecord-session_store の依存（RP: cgi 0.5.2）
