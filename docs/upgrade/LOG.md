@@ -3491,6 +3491,7 @@ pr:
 |---|---|
 | ruby の作業の始めに、3 アプリの `vendor/bundle/ruby/4.0.0` の `cache` 以外（入れ済みの gem・拡張・gemspec など）を消し、照合済みの `.gem` から 4.0.9 で入れ直した（人間が案 a を選んだ） | research の試行で 4.0.7 でビルドした C 拡張は、4.0.7 の `libruby.4.0.dylib` に絶対パスでリンクしていて（mise の Ruby は `--enable-shared`）、4.0.9 が読むのを断った（下の「遭遇した問題」）。論点 4・5 で「ABI の版が同じなので入れ直しは要らない」としたのは誤りだった |
 | RP の lock は、`bundle lock --local` ではなく `bundle install --local --no-cache` が書いた（lock を書くのと入れるのを一度に行い、差分は入れた後に確かめた）。OP は、目録だけを取る `bundle lock`（`--local` なし。`.gem` は落とさない）で lock を書き、差分を確かめてから入れた | 入れ済みの gem を消したので、`bundle lock --local` の候補（入れ済みの gem）がなくなり、`Could not find gem 'ostruct (= 0.6.3)' in locally installed gems.` で止まった（論点 5 の条件の「入れてあること」が崩れた）。`bundle install --local` はキャッシュの `.gem` を候補にするので通った。RS は消す前に `bundle lock --local` で書けていた。どのアプリの lock も、論点 5 の見込みと同じ形になった |
+| PR を作った後に、crass を 1.0.7 → 1.0.8 に上げた（gems の作業。RS → RP → OP。公開から 2 週間の決まりの例外。人間が判断） | PR #38 の CI の bundler-audit が、10-23 の ruby-advisory-db で crass 1.0.7 の GHSA-pq4g-8rxf-4g29 を指摘した（下の「遭遇した問題」）。CLAUDE.md の「脆弱性が公表されている gem の修正だけは即時に行ってよい」に当たる |
 
 ### 手動確認用の環境
 
@@ -3507,6 +3508,7 @@ resume で、前のセッションのサーバーが残っていないこと（`
 | minitest | 5.14.4 → 6.0.6（3 アプリ。Ruby 3.4.11 のまま） | test グループの mutex_m の行（Step 5）とそのコメントを、`gem 'minitest', '6.0.6', require: false` と理由のコメントに置き換えた。照合済みの `minitest-6.0.6.gem` を 4.0.0 のキャッシュから 3.4.0 のキャッシュにコピーし（SHA-256 は rubygems.org と一致）、目録だけを取る `bundle lock`（Bundler 2.6.9）→ `git diff` → `BUNDLE_CACHE_PATH=vendor/bundle/ruby/3.4.0/cache bundle install --local --no-cache`。lock で動いたのは minitest（依存の drb・prism は lock にある版）と、消えた mutex_m と、`DEPENDENCIES` の行だけ。`Fetching` はなく、`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 1 個で一致。minitest は `vendor/bundle` から読まれ、mutex_m は読まれない。RS `ca2704e`、RP `1ba3c43`、OP `133da35`（作業計画の論点 3） |
 | Ruby | 3.4.11 → 4.0.9（3 アプリ） | `.ruby-version`・Gemfile の `ruby` を 4.0.9 にし、Gemfile の「# 追加」の節の後に、Ruby 4.0.9 の default gem・bundled gems のまとまり（`= 版`・`require: false`、先頭に理由のコメント）を書いた。json のコメントを 4.0 の内容に直し、RS・RP の ostruct の行に版を書いた（OP はまとまりに入れた）。byebug・tzinfo-data の `platforms` を `:windows` にした（DEF-8.1-30。理解の関門で人間が承認）。`BUNDLED WITH` は 4.0.20、`RUBY VERSION` は `ruby 4.0.9`（2 スペース）。CHECKSUMS の節は足されていない。RS `35f1331`、RP `9efec51`、OP `99bd957`。CI の setup-ruby は、その前に v1.334.0 にした（`2c14e37`。論点 4）。RuboCop の `TargetRubyVersion` は 4.0 にした（`22866bf`。指摘なし） |
 | default gem・bundled gems（lock） | 3 アプリ: base64 0.2.0→0.3.0、bigdecimal 3.1.8→4.0.1、drb 2.2.1→2.2.3、erb 4.0.4.1→6.0.7、io-console 0.8.1→0.8.2、irb 1.14.3→1.16.0、logger 1.6.4→1.7.0、ostruct 0.6.1→0.6.3、psych 5.2.2→5.3.1、rdoc 6.14.0→7.0.4、reline 0.6.0→0.6.3、stringio 3.1.2→3.2.0、uri 1.0.4→1.1.1。RS・RP: net-http 0.6.0→0.9.1。増えた: pp 0.6.3・prettyprint 0.2.0（3 アプリ）。消えた: cgi 0.4.2（RS・OP） | 作業計画の論点 5。securerandom 0.4.1・tsort 0.2.0・RP の cgi 0.4.2 と、前の Step からの lock だけの固定（connection_pool・rack・racc・date・timeout）は動いていない。`.gem` は research で落として照合したものを `--local --no-cache` で入れ、`Fetching` はない。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は RS 16・RP 16・OP 15 個で一致。lock の gem は bundler を除いてすべて `vendor/bundle/ruby/4.0.0` から読まれ、C 拡張は 4.0.9 の `libruby.4.0.dylib` にリンクしている。Bundler の下で読まれる json は 2.21.2、resolv は 0.7.2、erb は 6.0.7 |
+| crass | 1.0.7 → 1.0.8（3 アプリ。Ruby 4.0.9 の後） | loofah の依存。`bundle lock --update crass --conservative`（目録だけを取る）→ `git diff` → 照合済みの `.gem` を `--local --no-cache` で入れた。lock で動いたのは crass だけ。`.gem`（21,504 B）は RS で落として SHA-256 を rubygems.org と照合し、RP・OP のキャッシュにコピーした（`--changed HEAD` で 3 アプリとも一致）。`RUBYOPT=-W:deprecated` を付けた各アプリの検査と E2E は同じ件数で通り、新しい警告はなく、compare-config は前と同じ。10-23 の ruby-advisory-db（`bundle-audit update` で手元も合わせた）で 3 アプリとも `No vulnerabilities found`。RS `d323f85`、RP `fe298fb`、OP `040a9cf` |
 
 ### 非推奨警告と対応
 
@@ -3559,6 +3561,7 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 - `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（irb 1.16.0・reline 0.6.3・io-console 0.8.2。Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認で 3 アプリとも起動した
 - 公開物の安全チェック: 各コミットの hooks で通った
 - CI: push の後に確かめる（push は人間が行う）。setup-ruby v1.334.0 で 4.0.9 を入れられることと、Bundler 4.0.20 で入れられることも、そのときに見る
+- CI（PR #38）: setup-ruby v1.334.0 で Ruby 4.0.9・Bundler 4.0.20 が入り、bundler-audit のほかのステップと E2E は通った。bundler-audit は crass の新しい advisory で落ちたので、crass を 1.0.8 にした（上の「遭遇した問題」）。直した後の CI は push の後に確かめる
 - 手動確認用の環境: 上の「手動確認」。手動確認の後の 12 ファイルのハッシュを新しい基準にした
 
 ### 遭遇した問題
@@ -3567,6 +3570,7 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。
 |---|---|
 | RS を 4.0.9 にして `bundle install --local --no-cache` を流すと、`LoadError: linked to incompatible <HOME>/.local/share/mise/installs/ruby/4.0.7/lib/libruby.4.0.dylib - .../vendor/bundle/ruby/4.0.0/gems/date-3.5.1/lib/date_core.bundle` で止まった（json 2.21.2 の拡張でも同じ）。research の試行で、本体の `vendor/bundle/ruby/4.0.0` に 4.0.7 でビルドして入れた C 拡張（RS 15・RP 17・OP 17 個）が、`otool -L` で 4.0.7 の libruby（current version 4.0.7）にリンクしていた | 止まって人間に確かめ、3 アプリの `vendor/bundle/ruby/4.0.0` の `cache` 以外を消して、4.0.9 で照合済みの `.gem` から入れ直した（上の「作業計画からの変更点」）。入れ直した後、拡張は 4.0.9 の libruby にリンクし、`Fetching` はない。TIPS.md の「Ruby を上げる」に、パッチ版を上げても C 拡張は作り直しが要ることを書いた |
 | 入れ済みの gem を消した後、RP の `bundle lock --local` が `Could not find gem 'ostruct (= 0.6.3)' in locally installed gems.` で止まった | `--local` の候補が入れ済みの gem だけのため（論点 5）。RP は `bundle install --local --no-cache`（キャッシュの `.gem` を候補にする）で lock を書いて入れ、OP は目録だけを取る `bundle lock` で lock を書いてから入れた（上の「作業計画からの変更点」） |
+| PR #38 の CI で、3 アプリの bundler-audit だけが落ちた。CI は `--update` で 10-23 の ruby-advisory-db を取り、crass 1.0.7 を GHSA-pq4g-8rxf-4g29（Incorrect tokenization of bad URLs enables CSS sanitizer bypass。medium。2026-10-21 公表。修正は 1.0.8）で指摘した。手元の検査が通ったのは、手元の DB が 10-10 のままだったため（TIPS.md の「CI の結果を読む」）。Step 9 の変更によるものではなく、epic（3.4.11）の lock も同じ | crass の誤りは、CSS を crass で解析して作り直すサニタイザー（Loofah の `scrub_css`、rails-html-sanitizer の `sanitize_css` と `style` を許した `sanitize`）をすり抜けられるもの。3 アプリの `app`・`lib`・`config` に CSS や `style` 属性のサニタイズはなく、影響する経路は見当たらなかったが、修正版を即時に入れた（上の「gem ごとの対応」。人間が判断） |
 
 ### コードレビュー（`/code-review`）
 

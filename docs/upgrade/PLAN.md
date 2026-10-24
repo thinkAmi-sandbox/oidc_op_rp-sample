@@ -1159,6 +1159,7 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 - [x] ruby: OP（同上。ostruct はまとまりに入れる）
 - [x] ruby: RuboCop の `TargetRubyVersion` を 4.0 にする
 - [x] verify（手動確認は 1 回。直前に 3 アプリの development DB を写した。RP の `sessions` が 14 → 16 件になったのは、Step 8 と同じくブラウザのセッションのクッキーが消えていたためと見ている。結果は LOG.md の Step 9 の「手動確認」と「確認結果」。CI は push の後）
+- [x] gems: crass 1.0.7 → 1.0.8（RS・RP・OP。PR #38 の CI の bundler-audit が GHSA-pq4g-8rxf-4g29 を指摘したため。advisory の修正なので公開から 2 週間の決まりの例外）
 - [x] pr
 
 着手時の作業計画で決めたこと（人間が 1 つずつ判断した。理由は LOG.md の Step 9 の「作業計画で決めたこと」）:
@@ -1278,7 +1279,7 @@ Gemfile に書いた直接の gem は、Ruby が対応していて特に不具�
 | connection_pool（activesupport 7.1 経由） | — | Step 3 で 2.5.5 に一時固定（済）→ Step 5（Rails 7.2.4）で一時固定の理由がなくなった（済。lock は 2.5.5 のまま。activesupport 7.2.4 が `>= 2.2.5, < 3`。7-2-stable の 0b6af0411a。Step 5 の着手時）→ Step 6（Rails 8.0.5.1）で上限が外れる（`>= 2.2.5`）。8.0.5.1 のキャッシュストアはキーワード引数で渡すので 3.x でも壊れない。間接の gem なので 2.5.5 のまま（Step 6 の着手時） | 固定しないと 3.0.2 が入る。3.0 はキーワード引数だけを受け付け、Rails 7.1.6 の Redis・Memcache のキャッシュストア（位置引数で渡す）が `ArgumentError` になる（rails/rails#56291）。7-1-stable は直らず、7-2-stable は `< 3` に固定した（#56620）。3 アプリは memory_store・null_store だけを使う（Step 3 の着手時） |
 | uri（activesupport 8.0 経由） | — | Step 6 で 0.13.3 に一時固定（Rails 8.0.5.1 と同じコミット）→ Ruby を上げる各 Step で合わせ直す（8 章の 4）→ Step 8 で 1.0.4（済。Ruby 3.4 で URI の既定のパーサが RFC 3986 になる。試行で応答のスナップショットと E2E に差分はない）→ Step 9 で 1.1.1（Gemfile のまとまり） | activesupport 8.0 は `uri >= 0.13.1`。Ruby 3.3.12 の default gem と同じ版。固定しないと 1.1.2 が lock に入り、アプリが読む uri が変わる（Step 6 の着手時） |
 | rack | 2.2.24（間接） | 3.x は時期未定 | Rails 7.1 から rack 3 を使える。Rails 8.0 で actionpack の `< 3.3` の上限が外れたが、必須ではない（Step 6 の着手時）。間接の gem なので Step 3 では動かさない。Rails 7.1 が足す rack-session・rackup は rack 2 用の 1.x（Step 3 の着手時） |
-| rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / bcrypt | — | 0-d-3（済） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられた。上げた版は LOG.md の Step 0-d-3（mail・msgpack・faraday・puma は上の行） |
+| rack / loofah・crass・rails-html-sanitizer / websocket-driver / globalid / bcrypt | — | 0-d-3（済） → Step 9 で crass 1.0.8（済。GHSA-pq4g-8rxf-4g29。PR を作った後に CI の bundler-audit が指摘した） | advisory があり、Rails 6.1・Ruby 3.1 のまま修正版に上げられた。上げた版は LOG.md の Step 0-d-3（mail・msgpack・faraday・puma は上の行） |
 | logger（mail 経由） | 1.5.0（0-d-3 で lock に入った） | Step 2 で 1.5.3（済）→ Step 4 で 1.6.0（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4）→ Step 8 で 1.6.4（済）→ Step 9 で 1.7.0（Ruby 4.0 で bundled gems。Gemfile のまとまり） | Ruby 3.1.7 の default gem と同じ版。そのままでは 1.7.0 が lock に入り、アプリが読む logger が変わるため、一時固定で 1.5.0 にした |
 | base64（websocket-driver 経由） | 0.1.1（0-d-3 で lock に入った） | Step 2 は同じ版（0.1.1）→ Step 4 で 0.2.0（済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4）→ Step 8 は同じ版（済。0.2.0。Ruby 3.4.11 の bundled gems の版）→ Step 9 で 0.3.0（Gemfile のまとまり） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.3.0 が lock に入り、アプリが読む base64 が変わるため、一時固定で 0.1.1 にした |
 | cgi（activerecord-session_store 経由、RP） | 0.3.7（0-f-1 で lock に入った） | Step 2 は同じ版（0.3.7）→ Step 4 で 0.4.2（3 アプリ。済）→ Ruby を上げる各 Step で合わせ直す（8 章の 4）→ Step 8 は同じ版（済。0.4.2）。RS・OP にも、erb 4.0.4.1 の依存で 0.4.2 が戻った→ Step 9 は 0.4.2 のまま（Ruby 4.0 で default gem でなくなり、合わせ直す先がない。前の Step の lock だけの固定は動かさない決まりで、Gemfile にも書かない。`-w` のときだけ、cgi 0.4.2 の C 拡張が Ruby の `cgi/escape` のメソッドを定義し直す警告が出る。14 章の間接の gem の更新で 0.5 系にするかを見直す） | Ruby 3.1.7 の default gem と同じ版。そのままでは 0.5.2 が lock に入り、アプリが読む cgi が変わるため、一時固定で 0.3.7 にした |
