@@ -1225,7 +1225,7 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 - [x] gems: rubocop 1.91.0 → 1.92.1（RS → RP → OP。公開から 2 週間の決まりの例外。下の決めたことの 2）
 - [x] gems: webmock 3.26.4 → 3.34.0（RS → RP → OP。同上）
 - [x] verify（手動確認はしない。下の決めたことの 2。結果は LOG.md の「仕上げ」の「確認結果」。CI は push の後）
-- [ ] pr
+- [x] pr
 - [ ] research: 間接の依存の gem（14 章の未決事項）を上げるか。上の pr が epic に入った後に決める（下の決めたことの 1）
 - [ ] Dependabot（bundler、npm、GitHub Actions をまとまった単位で更新）。CI ができてから有効にする
 - [ ] README の「Tested Environment」を更新。アップグレード前のコードはタグ `rails-6.1` にあること、Next.js 製 RP は新しい OP で確認していないことを書く
