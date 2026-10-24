@@ -3654,3 +3654,17 @@ resume で、前のセッションのサーバーが残っていないこと（`
 - 作業の前（`f9ec1ea`）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った）、`scripts/compare-config dump`（3 アプリの test・development）、各アプリの RuboCop の指摘の件数（`--format json`。3 アプリとも 0）を取った。各アプリを上げた後に、同じものを取って比べた
 - rubocop: 各アプリの 11 の検査と E2E（10 passed）が通った。runs・assertions は RS 11・15、RP 33・82、OP 69・129 で前と同じ。応答のスナップショットと E2E のスナップショットの差分はない。検査のログの警告の行は前と同じ（OP の IMP-011 の DEPRECATION だけ）。compare-config は 3 アプリとも test・development で前と同じ（rubocop は `require: false` で、起動では読み込まない）
 - webmock: rubocop を上げた後の各アプリの検査と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、runs・assertions は前と同じ（3 アプリのテストは `:get`・`:post` のシンボルだけで stub と確かめを書き、`to_rack` は使わないので、3.31.0・3.28.0・3.34.0 の変化に当たらない）。スナップショットの差分はなく、警告の行と compare-config も前と同じ。compare-config は、同じラベルの書き出しを消してから書くので、RS・RP の rubocop の後の書き出しは残っていない（消える前に、作業の前と同じことを確かめてあった）。webmock は作業の前（before-rubocop）と比べた
+
+#### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bundle-audit update` を流した（手元の DB は 10-23 の 03da937 で、最新のまま）。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`3b66814`）に、`RUBYOPT=-W:deprecated` を付けて流し、36 の検査がすべて通った。検査のログの警告の行は作業の前と同じ（OP の IMP-011 の DEPRECATION だけ）
+- minitest: RS 11 runs・15 assertions、RP 33・82、OP 69・129、0 failures。`CI=1`（eager load あり）でも同じ。作業の前と同じ件数
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この PR を通して出なかった。E2E は、E2E 用の DB を作り直し（`db:drop` → `db:setup`。RS は `db:create`）、3 アプリを `bin/rails server` で起動して流す
+- RuboCop（1.92.1）: 3 アプリとも指摘なし。`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った（`check-apps` の項目）
+- lock: epic（`3a83ea7`）からの動きは、rubocop・webmock と、rubocop の依存の要件の行（regexp_parser）、`DEPENDENCIES` の rubocop の行だけ。Gemfile のまとまりの default gem・bundled gems、json 2.21.2、lock だけの固定（connection_pool・rack・racc・date・timeout・rake、RS の jwt、RP の cgi）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（Tab の補完と複数行の入力ができた）。`bin/rails s`: E2E の起動で 3 アプリとも起動した（手動確認はしない。作業計画で決めたことの 2）
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: 12 ファイルのハッシュは、resume で控えたものと同じ。`-wal` はなく、サーバーは残っていない
