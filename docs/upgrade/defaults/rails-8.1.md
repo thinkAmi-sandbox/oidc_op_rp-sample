@@ -345,4 +345,4 @@ Ruby を 3.4.11 → 4.0.9（Bundler 2.6.9 → 4.0.20）にしたときに見つ�
 - 3 アプリへの影響: RS で直して `bundle lock --local` を流し、`platforms` に関わる lock の変化はなく（`PLATFORMS`・`DEPENDENCIES` の byebug・tzinfo-data の行は同じ）、非推奨の警告も出なくなった。research で、scratchpad のコピーでこの 2 行だけを直して lock が変わらないことも確かめた。macOS・Linux（CI）では、どちらの書き方でも byebug は入り tzinfo-data は入らない。`:windows` は mingw・mswin のどちらも含み、違いは Windows で使うときの書き方だけ。`bundle exec` とアプリの起動では、もとから警告は出なかった
 - 扱い: 追随（今後の Bundler で非推奨の書き方が外れると Gemfile が読めなくなるおそれがあるため。人間が判断。LOG.md の Step 9 の論点 6）
 - 出典: rails/rails#46009、`railties-8.1.4/lib/rails/generators/rails/app/templates/Gemfile.tt`（13 行目・56 行目）、Bundler 4.0.20 の `bundler/dsl.rb:431-435`、Bundler 2.6.9 の `bundler/current_ruby.rb:23`。日本語版の Rails ガイドに、この書き方を説明した節は見つけられなかった（Rails の版の変化ではないので、ガイドの出典は付けない）
-- コミット: Ruby を 4.0.9 に上げる各アプリのコミットに入れる（RS → RP → OP）
+- コミット: Ruby を 4.0.9 に上げる各アプリのコミット（RS `35f1331`、RP `9efec51`、OP `99bd957`）
