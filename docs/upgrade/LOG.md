@@ -3465,7 +3465,7 @@ pr:
 ## Step 9: Ruby 4.0（2026-10-14）
 
 - ブランチ / PR: `upgrade/step9-ruby40` / （PR 作成後に記入）
-- バージョン: Ruby 3.4.11 → 4.0 系（版は research で決める） / Rails 8.1.4（変更なし）
+- バージョン: Ruby 3.4.11 → 4.0.9 / Rails 8.1.4（変更なし）
 
 ### 作業計画で決めたこと
 
@@ -3481,6 +3481,15 @@ pr:
 | 6 Bundler 4 の `platforms` の非推奨の警告 | 案 a。ruby の作業の各アプリの Ruby を上げるコミットで、byebug の `platforms: %i[mri mingw x64_mingw]` を `%i[mri windows]` に、tzinfo-data の `%i[mingw mswin x64_mingw jruby]` を `%i[windows jruby]` に直す（Rails の雛形の形）。既定値・雛形への追随（A）として DEF-8.1-30（種類「Ruby」）に記録し、コミットの前に理解の関門で解説する | Bundler 4.0.20 は `platforms:` の mingw・mswin を非推奨にし、`bundle lock`・`bundle install` で `[DEPRECATED] Platform :mingw, :mswin, :x64_mingw will be removed in the future. Please use platform :windows instead.` を出す（`bundler/dsl.rb:431-435`。2.6.9 は出さない。`bundle exec` とアプリの起動では出なかった）。Rails の雛形は 7.1 から `:windows`（rails/rails#46009、2022-09-15 マージ。`railties-8.1.4/lib/rails/generators/rails/app/templates/Gemfile.tt:13・56`）。`app:update` は Gemfile を上書きしないので、Rails を上げる Step では上がらなかった。scratchpad の RS の Gemfile のコピーで直して `bundle lock --local` を流し、lock は変わらず、警告も出なくなった。`:windows` は 2.6.9 でも使える（`bundler/current_ruby.rb:23`）。違いが出るのは Windows のときだけ |
 | 7 byebug 13.0.0 の Ruby 4.0 での扱い | CLAUDE.md の ①（対応版を待つ）。byebug は 13.0.0 のままにする。research の出口で、IMP-013 の「現状」に Ruby 4.0 でも `where` が失敗することと byebug#981 を足し、「対象」の Gemfile の行を論点 6 の後の形（`platforms: %i[mri windows]`）に直し、「記録した Step」に 9 を足す。7 章の byebug の行にも Ruby 4.0 のことを書き足す（今ある項目の書き足しで、新しい項目は足さない） | 試行（4.0.7）の RS の `scripts/check-console` で、`next`・`continue` は動き（終了の状態は 0）、`where` は Ruby 3.4 と同じく `undefined method 'Kernel.require' for class 'Kernel'` で失敗した（byebug#867。直す #967 は未リリース）。byebug#981（Ruby 4.0 で、スタックに `public_send` があると `bt` が失敗する）は open で、コメントも新しい版もない（10-24 の時点で 13.0.0 が最新）。アプリのコードは byebug を呼ばず、業務的な挙動には関わらない。② は lock に git の参照が入り `.gem` を照合できず、④ debug gem への置き換え（IMP-013）は開発の道具を替える改善なので epic の後に行う（Step 8 の論点 7 と同じ） |
 | 8 rubocop・webmock をいつ上げるか | 案 b。Step 9 では上げず、仕上げの最初の作業にする（仕上げのチェックリストの先頭に `gems: rubocop・webmock` を足す）。その日に公開から 2 週間たった最新にし、これ以上先に送らない。仕上げを 11-05 より前に始めるなら、rubocop を 1.92.0 にするか 1.92.1 を待つかを人間に確かめる | 10-24 の時点で、rubocop 1.92.0（10-10）と webmock 3.27.0・3.28.0（10-10）が 2 週間たった。rubocop 1.92.1（10-22）は 1.92.0 の誤り（多くは自動修正）を 96 件直していて 11-05 から、webmock 3.34.0（10-14）は 10-28 から 2 週間たつ。rubocop-rails 2.38.0・rubocop-ast 1.50.0・rubocop-minitest 0.41.0 は最新。webmock 3.27.0〜3.34.0 はマッチの改善と直しで、3.28.0 の `to_rack` の変更は 3 アプリのテストに当たらない（Step 5 の着手時）。どちらも開発・テストの道具で、業務的な挙動には関わらない。Step 9 を Ruby 4.0 に絞れる。送り先を仕上げのチェックリストで固定し、Step 6 の気づきの 7（送りが続く）を繰り返さない |
+| 9 手動確認の時期と DB の写し | verify で 1 回、すべての変更（minitest 6.0.6、Ruby 4.0.9、Gemfile のまとまり、`:windows`、`TargetRubyVersion` 4.0）の後に行う。直前に 12 ファイルのハッシュを確かめ、3 アプリの development DB を `tmp/manual_check_backup/` に写す。research の出口で、Step 8 の写し（3 アプリの `tmp/manual_check_backup/`）を消す。この論点への返事を作業計画の承認とした | RP・OP・RS の間のやり取りは、Ruby 4.0.9 と net-http 0.9.1（本文のある要求に Content-Type を自動で付けない）で変わり得る。minitest は WebMock で差し替えるので検出できず、E2E とブラウザでの流れ（RP の my_op でのログインと introspection 用 RP）で確かめる。Step 8 の写しは、#37 が epic に入ったので消してよい（resume で確かめた問いに返事がなかったので、ここで改めて確かめた） |
+
+### 手動確認用の環境
+
+resume で、前のセッションのサーバーが残っていないこと（`ps` とポートの待ち受け）を確かめてから、12 ファイルのハッシュを控えた。件数は、本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 8 の手動確認の後と同じだった（OP `oauth_access_grants` 33・`oauth_access_tokens` 82（revoke 済み 15）、RP `sessions` 14・`op_users` 1。どちらの DB も `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま。`-wal` はない）。
+
+- research の途中（10-14 → 10-24）で scratchpad の中身が消え、ハッシュの控えもなくなった。resume のときにチャットに出した先頭 12 桁と比べ、12 ファイルとも同じだった。research の出口で控え直した
+- research の試行の worktree（scratchpad）は、scratchpad と一緒に消えていた。git の記録は `git worktree prune` で片付けた。試行で入れた gem は、本体の各アプリの `vendor/bundle/ruby/4.0.0` に残っている（ruby の作業で使う）
+- Step 8 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/` を、research の出口で、人間に確かめて消した（論点 9）。消した後も、12 ファイルのハッシュは開始時と同じで、`-wal` はない
 
 ### スキルについて気づいたこと
 
@@ -3497,3 +3506,11 @@ research:
 4. mise が使う ruby-build の置き場所（macOS では `~/Library/Caches/mise/ruby/ruby-build`）が TIPS.md にない。版（v20261013、最新）を確かめるのに探した。最新なら、入れるときに取り直しは起きない（Step 8 の気づきの 2）
 5. サブエージェントの報告で、版や番号の食い違いがあった（Ruby 4.0.7 の bundled gems の minitest は 6.0.0、net-http の Content-Type の変更は issue #205 を直した PR #207）。報告どうしを突き合わせ、要点を一次の出典で確かめて拾えた（research の手順 2）
 6. `cd` を含むコマンドで Bash の作業ディレクトリが変わり、次のコマンドがアプリやスキルのディレクトリで動いた（2 回）。TIPS.md の「コマンドの実行」の注意と同じ
+7. research の途中で日付が変わり（10-14 → 10-24）、その間に scratchpad の中身（試行の worktree、作業計画の下書き、手動確認用の環境のハッシュの控え）が消えた。決めた論点は LOG.md にコミットしてあったので、聞き直さずに続けられた（research の手順 7 の狙いどおり）。ハッシュの控えは、resume でチャットに出した先頭 12 桁と比べて確かめた。設定の「手動確認用の環境」とスキルは、ハッシュの控えを scratchpad に置く前提で、消えたときの手順がない
+8. 論点 2 の返事から論点 3 の返事までの 10 日の間に、Ruby 4.0.8・4.0.9（正規表現のエンジンの不具合の修正）が出て、決めた版（4.0.7）を見直す論点が増えた。research.md は、論点の間に時間が空いたときに、版と advisory を確かめ直す手順がない（Step 8 の気づきの 4 と同じく、日付が変わった）
+9. 試行の worktree で、OP の署名鍵（`jwtRS256.key`）を先に作らずに `scripts/check-apps` を流し、OP の zeitwerk:check と minitest が `Errno::ENOENT` で落ちた（E2E の起動スクリプトが鍵を作った後に流し直して通った）。Step 8 の気づきの 5 の手順（OP の署名鍵を使い捨てで作る）が research.md にないので、また抜けた
+10. minitest のテストごとの assertions の数を出すのに、`RUBYOPT=-r` で TracePoint を使う形は何も出さず、worktree の `test/test_helper.rb` に一時的に数行足す形にした。worktree は使い捨てなので本体は変えていない
+11. 人間は、論点 2 で一時固定の書き方、論点 5 で `bundle lock --local` の中身（何を書くか、なぜネットワークなしで正しいか、何が条件か）を掘り下げた。掘り下げの中で、AI の「今回の手順は 2 つの条件を先に満たす」という説明が、Ruby 3.4.11 のまま行う minitest の作業には当たらないと分かり、手順を分けた。Step 8 の気づきの 10 と同じく、最初の示し方に、コマンドが書く・読むもの（ファイル・ネットワーク・入れ済みの gem）と、その前提が成り立つ作業の範囲を入れておけば、往復が減った
+12. コミットのコマンドに `grep -n` を同じ呼び出しで続けたら、Claude Code の hooks（`scripts/check-public-safety --claude-hook`）が `git commit -n` と見なして止めた。コミットは単独の呼び出しにする
+13. scratchpad の coverage のディレクトリを、シェルの変数を使った `rm -rf` で消そうとして、Claude Code の安全チェックに止められた（変数が空なら `/` になるため）。消さずに更新日時で比べる形に変えた
+14. `ruby -e` に日本語を渡すときの `LC_ALL=ja_JP.UTF-8` を付け忘れ、`invalid multibyte character` で止まった（TIPS.md の「コマンドの実行」にある注意）

@@ -160,10 +160,10 @@ Ruby / Rails のアップグレード中は挙動を変えない方針（[docs/u
 
 ## IMP-013: byebug を debug gem に置き換える
 
-- 対象: 3 アプリの Gemfile の development・test グループの `gem 'byebug', platforms: %i[mri mingw x64_mingw]`（Rails 6.1 の雛形のまま）
-- 現状: byebug 13.0.0 は、Ruby 3.4 で `where`（バックトレースの表示）がフレームによって `undefined method 'Kernel.require' for class 'Kernel'` で失敗する（deivid-rodriguez/byebug#867。Ruby 3.4 でフレームのラベルの形が変わったため）。直す PR（#967）は 2026-04-25 にマージされたが、リリースは 13.0.0（2026-01-15）のまま。`next`・`continue` は動く。アプリのコードは byebug を呼ばない
-- 改善案: Rails 7.0 からの雛形と同じく、debug gem（`gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"`。`railties-8.1.4` の `Gemfile.tt`）に置き換える。debug は Ruby 3.4 の bundled gems（3.4.11 は 1.11.0）。byebug 13 が依存に足した reline の一時固定（docs/upgrade/PLAN.md の 7 章）と、`scripts/check-console` の byebug の手順も見直す
-- 経緯: LOG.md の Step 8 の作業計画の論点 7（research の試行の worktree で、3.4.11 で `where` の失敗を再現した）
+- 対象: 3 アプリの Gemfile の development・test グループの `gem 'byebug', platforms: %i[mri windows]`（Rails 6.1 の雛形の gem のまま。`platforms` は Step 9 で Bundler 4 の非推奨の警告に合わせて `:windows` にする。DEF-8.1-30）
+- 現状: byebug 13.0.0 は、Ruby 3.4 で `where`（バックトレースの表示）がフレームによって `undefined method 'Kernel.require' for class 'Kernel'` で失敗する（deivid-rodriguez/byebug#867。Ruby 3.4 でフレームのラベルの形が変わったため）。直す PR（#967）は 2026-04-25 にマージされたが、リリースは 13.0.0（2026-01-15）のまま。`next`・`continue` は動く。アプリのコードは byebug を呼ばない。Ruby 4.0 でも同じで（Step 9 の research の試行で、4.0.7 で `where` の失敗を再現した）、ほかに、スタックに `public_send` があると `bt` が `undefined method 'Kernel#public_send'` で失敗する報告がある（deivid-rodriguez/byebug#981。open。10-24 の時点で新しい版はない）
+- 改善案: Rails 7.0 からの雛形と同じく、debug gem（`gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"`。`railties-8.1.4` の `Gemfile.tt`）に置き換える。debug は Ruby 3.4 の bundled gems（3.4.11 は 1.11.0、4.0.9 は 1.11.1）。byebug 13 が依存に足した reline の一時固定（docs/upgrade/PLAN.md の 7 章）と、`scripts/check-console` の byebug の手順も見直す
+- 経緯: LOG.md の Step 8 の作業計画の論点 7（research の試行の worktree で、3.4.11 で `where` の失敗を再現した）と、Step 9 の作業計画の論点 7（Ruby 4.0 でも待つと決めた）
 - 見送った理由: 開発の道具を替える改善で、アップグレードの間は行わない（CLAUDE.md の「設定の改善は、epic を main に取り込んだ後に別作業で」）。業務的な挙動には関わらない。Step 8 では byebug 13.0.0 のままにし、直った版が出たら直接の gem の方針で上げる
 - 確かめ方: 3 アプリで `bin/rails c` と、`debugger` で止めてのステップ実行・バックトレースの表示（`scripts/check-console` の手順を debug gem に合わせる）、検査と E2E
-- 記録した Step: 8
+- 記録した Step: 8、9
