@@ -2,7 +2,7 @@
 
 - 版: Rails 8.0.5.1 → 8.1.4（Ruby 3.3.12）
 - Step: 7（ブランチ `upgrade/step7-rails81`）/ PR: [#36](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/36)
-- Step 9（Ruby 3.4.11 → 4.0.9。ブランチ `upgrade/step9-ruby40`）で見つけたものも、Rails 8.1.4 のままなのでこのファイルに入れる（DEF-8.1-30）
+- Step 9（Ruby 3.4.11 → 4.0.9。ブランチ `upgrade/step9-ruby40` / PR: [#38](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/38)）で見つけたものも、Rails 8.1.4 のままなのでこのファイルに入れる（DEF-8.1-30）
 - 記録のルールは [README.md](README.md)
 
 ## 一覧

@@ -3464,7 +3464,7 @@ pr:
 
 ## Step 9: Ruby 4.0（2026-10-14）
 
-- ブランチ / PR: `upgrade/step9-ruby40` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/step9-ruby40` / [#38](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/38)
 - バージョン: Ruby 3.4.11 → 4.0.9 / Rails 8.1.4（変更なし）
 - Rails と gem の既定値・雛形への追随は 1 つ（DEF-8.1-30。Gemfile の `platforms` を `:windows` に）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
 - Ruby 4.0 に入らない minitest 5.14.4 を、Ruby の前に 6.0.6 にした。Ruby は、research の途中で出た 4.0.9（正規表現のエンジンの不具合の修正）にした（2 週間の決まりの例外）。lock にある default gem・bundled gems の版は、一時固定をやめて Gemfile のまとまりに書いた
@@ -3617,3 +3617,103 @@ ruby:
 pr:
 
 17. 手元の ruby-advisory-db は 10-10 のままで、research・verify の bundler-audit は古い DB で通っていた。CI（`--update`）で初めて、10-23 に入った crass の advisory に気づいた。research の「advisory の確かめ」と verify の前に `bundle-audit update` を流す手順がない（Step 8 の気づきの 7 と同じく、advisory の確かめが試行の lock だけに頼っていた）
+
+## 仕上げ（2026-10-24）
+
+PLAN.md の 6 章の「仕上げ」の記録。PR ごとに小見出しを置き、スキルについて気づいたことは節の最後にまとめる。
+
+### 作業計画で決めたこと
+
+Step 9 が epic に入ってから（[#38](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/38)）、`/rails-upgrade` の resume の後に、仕上げの進め方を 1 論点として示した。続けて、最初の項目（rubocop・webmock）を research と同じ手順で調べ（版と公開日、CHANGELOG、lock の試行、advisory）、版を決めた。論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 仕上げの進め方 | rubocop・webmock（`upgrade/finish-rubocop-webmock`）→ 間接の依存の gem（14 章。rubocop・webmock の PR が epic に入った後に決め、上げるなら `upgrade/finish-indirect-gems`）→ Dependabot（`upgrade/finish-dependabot`）→ README の 2 項目とサポート終了時期の確認方法（`upgrade/finish-docs`）→ epic → main（人間）→ ルールセット（人間）。記録はこの節に PR ごとの小見出しで足す。Dependabot から後はスキルの作業にないので、スキルの外で計画と承認を経て進め、verify・pr の型を使う | 間接の gem を rubocop・webmock の後にするのは、その更新で依存の gem も動くため。Dependabot の前にするのは、Gemfile に `= 版` で書いた default gem・bundled gems（Step 9）と lock だけの固定の扱いで、Dependabot の `ignore`・`allow` が決まるため。Dependabot の version updates は、既定で manifest に明示した依存をすべて対象にし（Dependabot options reference の `allow`）、既定の枝（main）を見る（同 `target-branch`）。README とサポート終了時期の確認方法は文書だけで、ほかの項目に関わらない |
+| 2 rubocop・webmock の版と時期 | 今日（10-24）、rubocop 1.91.0 → 1.92.1（10-22）、webmock 3.26.4 → 3.34.0（10-14）にする。公開から 2 週間の決まりの例外（人間が判断。今回だけで、決まりは変えない）。手動確認はしない | 最初に示した案は、10-28 に rubocop 1.92.0・webmock 3.34.0（webmock の最新が 2 週間に届き、Gemfile に版を書かずに済む）。人間が、メンテナンスの間が開くので、1 日以上たち、脆弱性の情報がない今の最新を使いたいと返した。ruby-advisory-db（10-23）・GitHub Advisory Database・両リポジトリの Security Advisories に対象の advisory はなく、10-14〜10-24 に公表された RubyGems の advisory は crass（Step 9 で対応済み）だけ。公開後の issue は、rubocop が 2 件（#16141 は既定で無効の `Layout/ClassStructure` の、意図した挙動。3 アプリでも無効）、webmock は 0 件。2 つとも開発・テスト用で、development のサーバーは読まない |
+
+### 手動確認用の環境
+
+resume で、前のセッションのサーバーが残っていないこと（`ps` と 3780〜3782 の待ち受け）を確かめてから、12 ファイルのハッシュを控えた（控えは scratchpad）。DB 3 つの先頭 12 桁は、Step 9 のセッションでチャットに出した値と同じだった。ほかの 9 ファイルは比べる控えが残っていなかったので、更新日時（すべて 10-06）が変わっていないことで補った。件数は、本体を scratchpad にコピーして `immutable=1` で開いて数え、Step 9 の手動確認の後と同じだった（OP `oauth_access_grants` 35・`oauth_access_tokens` 87（revoke 済み 16）、RP `sessions` 16・`op_users` 1。どちらも `integrity_check` は ok。見出しの 18・19 バイト目は 2・2 で WAL のまま。`-wal` はない）。
+
+- Step 9 の手動確認の前に取った 3 アプリの `tmp/manual_check_backup/` を、人間に確かめて消した。消した後も、12 ファイルのハッシュは控えと同じ
+
+### rubocop・webmock
+
+- ブランチ / PR: `upgrade/finish-rubocop-webmock` / （PR 作成後に記入）
+- バージョン: rubocop 1.91.0 → 1.92.1、webmock 3.26.4 → 3.34.0（Ruby 4.0.9 / Rails 8.1.4 は変更なし）
+- Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
+- どちらも公開から 2 週間たっていない今の最新にした（作業計画で決めたことの 2。人間が判断）
+
+#### gem ごとの対応
+
+| gem | バージョン | 対応 |
+|---|---|---|
+| rubocop | 1.91.0 → 1.92.1（3 アプリ） | Gemfile の `'1.91.0'` を `'1.92.1'` にして `bundle lock` → `git diff` → 入れた。lock で動いたのは rubocop と、その依存の要件の行（regexp_parser `>= 2.11.3`。lock の 2.13.1 は動かない）だけ。`.gem`（896,512 B）は RS の `bundle install` で落とし（`Fetching` は rubocop だけ）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 3 アプリとも 1 個で一致。1.92.0・1.92.1 は新しい cop を足さないので、`NewCops: disable` のまま有効にするものはない。RuboCop の指摘は 3 アプリとも 0 件（前と同じ）。RS `ea608d2`、RP `a62f811`、OP `adb4819` |
+| webmock | 3.26.4 → 3.34.0（3 アプリ） | Gemfile は版を書かない形のまま、`bundle lock --update webmock --conservative`（目録だけを取る）→ `git diff` → 入れた。lock で動いたのは webmock だけ（依存の要件は 3.26.4 と同じ）。`.gem`（80,896 B）は RS の `bundle install` で落とし（`Fetching` は webmock だけ）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。照合は 3 アプリとも 1 個で一致。RP で `--local` を付けた `bundle lock --update` は platforms の不足で止まり、lock は変わらなかったので、`--local` なしで書いた（下の「遭遇した問題」）。RS `5a1e508`、RP `2833633`、OP `06a24c1` |
+
+#### 前後の比較
+
+- 作業の前（`f9ec1ea`）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った）、`scripts/compare-config dump`（3 アプリの test・development）、各アプリの RuboCop の指摘の件数（`--format json`。3 アプリとも 0）を取った。各アプリを上げた後に、同じものを取って比べた
+- rubocop: 各アプリの 11 の検査と E2E（10 passed）が通った。runs・assertions は RS 11・15、RP 33・82、OP 69・129 で前と同じ。応答のスナップショットと E2E のスナップショットの差分はない。検査のログの警告の行は前と同じ（OP の IMP-011 の DEPRECATION だけ）。compare-config は 3 アプリとも test・development で前と同じ（rubocop は `require: false` で、起動では読み込まない）
+- webmock: rubocop を上げた後の各アプリの検査と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、runs・assertions は前と同じ（3 アプリのテストは `:get`・`:post` のシンボルだけで stub と確かめを書き、`to_rack` は使わないので、3.31.0・3.28.0・3.34.0 の変化に当たらない）。スナップショットの差分はなく、警告の行と compare-config も前と同じ。compare-config は、同じラベルの書き出しを消してから書くので、RS・RP の rubocop の後の書き出しは残っていない（消える前に、作業の前と同じことを確かめてあった）。webmock は作業の前（before-rubocop）と比べた
+
+#### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bundle-audit update` を流した（手元の DB は 10-23 の 03da937 で、最新のまま）。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`3b66814`）に、`RUBYOPT=-W:deprecated` を付けて流し、36 の検査がすべて通った。検査のログの警告の行は作業の前と同じ（OP の IMP-011 の DEPRECATION だけ）
+- minitest: RS 11 runs・15 assertions、RP 33・82、OP 69・129、0 failures。`CI=1`（eager load あり）でも同じ。作業の前と同じ件数
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この PR を通して出なかった。E2E は、E2E 用の DB を作り直し（`db:drop` → `db:setup`。RS は `db:create`）、3 アプリを `bin/rails server` で起動して流す
+- RuboCop（1.92.1）: 3 アプリとも指摘なし。`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った（`check-apps` の項目）
+- lock: epic（`3a83ea7`）からの動きは、rubocop・webmock と、rubocop の依存の要件の行（regexp_parser）、`DEPENDENCIES` の rubocop の行だけ。Gemfile のまとまりの default gem・bundled gems、json 2.21.2、lock だけの固定（connection_pool・rack・racc・date・timeout・rake、RS の jwt、RP の cgi）は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（Tab の補完と複数行の入力ができた）。`bin/rails s`: E2E の起動で 3 アプリとも起動した（手動確認はしない。作業計画で決めたことの 2）
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: 12 ファイルのハッシュは、resume で控えたものと同じ。`-wal` はなく、サーバーは残っていない
+
+#### 意図的な仕様変更
+
+なし
+
+#### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| RP で `bundle lock --update webmock --conservative --local` を流すと、`sqlite3 (~> 2.9)` の解決で、手元の macOS (arm64) の具体的なプラットフォームが lock の platforms（`arm64-darwin`・`x86_64-darwin-19`・`x86_64-linux`）にないとして止まり、`bundle lock --add-platform` を勧めた。lock は変わらなかった | `--local` を付けずに、目録だけを取る `bundle lock` で書いた（RS と同じ）。`.gem` は落とさず、照合済みの `.gem` を `--local --no-cache` で入れた。後で、RP の作業の前の Gemfile と lock の scratchpad のコピーで再現し、止まるのは `--update` と `--local` を一緒に付けたときだけで、`--update` のない `bundle lock --local` は通ることを確かめた。`--update` で、入れ済みのネイティブ版の gem（`sqlite3-2.9.6-arm64-darwin`）を手元のプラットフォームで解決し直そうとし、そのプラットフォームは Step 0-a で lock から外してあるため。Step 9 の「作業計画からの変更点」（`--local` の候補が入れ済みの gem だけになる）とは別の原因 |
+| `scripts/compare-config dump <ラベル> --app <アプリ>` をアプリごとに同じラベルで流したら、前のアプリの書き出しが消えた（ラベルのディレクトリを消してから書く） | RS・RP の rubocop の後の書き出しは、消える前に作業の前と同じことを確かめてあった。webmock は作業の前の書き出しと比べ、アプリごとに別のラベルにした |
+
+#### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| 「遭遇した問題」と気づきの 9 で、RP の `bundle lock --local` が止まった原因を、確かめずに Step 9 と同じ（`--local` の候補が入れ済みの gem だけになる）と書いていた | 直した。scratchpad のコピーで再現し、`--update` と `--local` を一緒に付けたときだけ、手元のプラットフォームで解決し直して止まると確かめて、その内容に書き換えた（人間が判断） |
+| 同じ行に、手元の具体的なプラットフォーム名を書いていた（CLAUDE.md の「環境情報は『macOS (arm64)』程度まで」） | 直した。「手元の macOS (arm64) の具体的なプラットフォーム」と書いた。Step 0-a の節にある同じ名前は、過去の記録なので直していない（人間が判断） |
+| PLAN.md の 5 章のロードマップの仕上げの行が、rubocop・webmock と間接の依存の gem の判断を含んでいなかった | 直した。6 章のチェックリストに合わせた（人間が判断） |
+
+- 直したのは文書だけで、公開物の安全チェックを通した。手動確認用の 12 ファイルのハッシュは、resume で控えたものと同じ
+
+### スキルについて気づいたこと
+
+Step 3〜9 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。Step 9 までの気づきで、この仕上げでまた当たったものは、その番号を書いた。
+
+resume:
+
+1. resume.md は、Step の始めを前提にしている。仕上げは Step ではなく、research の作業計画がなく、チェックリストの 2 番目からの項目には作業名がない。そのため、入口の手順がない。ブランチ名が進め方の判断で決まるので、手順 2・3（ブランチを切る・最初のコミット）を判断の後に回した（Step 9 の気づきの 2 と同じ形）。今回は人間の指示で、進め方を 1 論点として示した
+2. resume で確かめること（Step 9 の写しを消すか）と、最初の論点（仕上げの進め方）が重なった（Step 9 の気づきの 3）。1 回に 1 論点の決まりに従い、写しのほうを先に聞いた
+3. ハッシュの控えは scratchpad にしかなく、DB 以外の 9 ファイルは比べる値がなかった（Step 9 の気づきの 7）。更新日時が変わっていないことで補った
+4. ローカルの `epic/rails-8.1-upgrade` が origin より古く、#38 の取り込みが入っていなかった（Step 5〜9 と同じ）。人間の指示にあったので、早送りしてから切った
+
+research（仕上げの最初の項目の調べ）:
+
+5. 仕上げにはまだ記録の節がなく、ブランチも論点 2 で決まるので、論点 1 を決めた時点では記録に足してコミットできなかった。research の手順 7 は、記録の節とブランチがある前提になっている
+6. webmock は Gemfile に版を書いていないので、2 週間たった最新より新しい版があると、`--conservative` でも最新まで上がる。一時固定をやめたので（Step 9）、版を止めるには Gemfile に版を書くしかない。最初の案（10-28 に始める）は、これを避けるための日付だった
+7. 論点 2 で人間は、メンテナンスの間が開くので、今の最新を使いたいと返した（1 日以上たっていて、脆弱性の情報がないもの）。公開から 2 週間の決まりの例外を判断する材料を調べる手順（advisory の 3 か所、公開後の issue）が、スキルにない
+8. advisory の確かめの前に `bundle-audit update` を流したのは、人間の指示による（Step 9 の気づきの 17。手順にはまだない）。今回は、手元の DB が最新（10-23）のままだった
+
+gems:
+
+9. RP の `bundle lock --update webmock --conservative --local` が platforms の不足で止まった（上の「遭遇した問題」。`--update` と `--local` を一緒に付けると、手元のプラットフォームで解決し直すため。Step 9 の気づきの 16 とは別の原因）。TIPS.md の「gem の更新」には、lock だけを書くのは `bundle lock --update <gem> --conservative` とあり、`--local` は付けない。Step 9 の手順の覚えで付けてしまった
+10. `scripts/compare-config dump` は、同じラベルの書き出しを消してから書く（上の「遭遇した問題」）。アプリごとに上げる作業では、アプリごとに別のラベルにする必要がある。スキルの before-after.md にも、道具の使い方にもその注意がない
+11. `cd` を含むコマンドで、Bash の作業ディレクトリが RS に移った（Step 9 の気づきの 6）。以降は、サブシェル `( cd ... )` と絶対パスにした
+12. 検査のログの警告の行を前後で比べると、minitest の進み具合の点の数がテストの順番で変わり、同じ警告でも違う行に見えた。比べる前に行頭の点を落とした。scratchpad の小さなスクリプトで比べたが、決まった道具はない
+13. zsh では、空白で区切った文字列の変数がコマンドの引数に分かれず、`shasum` が 1 つのファイル名として読んだ（resume で 12 ファイルのハッシュを取るとき）。配列で渡した
