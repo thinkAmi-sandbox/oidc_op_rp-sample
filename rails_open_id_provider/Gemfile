@@ -73,6 +73,10 @@ gem 'doorkeeper-openid_connect'
 # json 3 は既定値が変わる（重複キー・コメントで例外）ので、2 系にとどめる（docs/upgrade/PLAN.md の Step 8）
 gem 'json', '~> 2.21', '>= 2.21.2'
 
+# actionpack などの依存。rack 3 にするかは別の作業で決めるので、それまで 2 系にとどめる（2.2 系の修正版は受け取る）。
+# 起動の途中では読み込まない（docs/upgrade/PLAN.md の仕上げの「間接の依存の gem で決めたこと」）
+gem 'rack', '~> 2.2', '>= 2.2.24', require: false
+
 # lock にある Ruby の default gem・bundled gems のうち、版を Ruby に合わせ直してきたもの（docs/upgrade/PLAN.md の 7 章・8 章の 4）は、
 # Ruby 4.0.9 が持つ版と同じにする。Ruby を上げるときに版を合わせ直し、まだ依存されているかを見直す。起動の途中では読み込まない
 gem 'base64', '0.3.0', require: false

@@ -3639,7 +3639,7 @@ resume で、前のセッションのサーバーが残っていないこと（`
 
 ### rubocop・webmock
 
-- ブランチ / PR: `upgrade/finish-rubocop-webmock` / （PR 作成後に記入）
+- ブランチ / PR: `upgrade/finish-rubocop-webmock` / [#39](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/39)
 - バージョン: rubocop 1.91.0 → 1.92.1、webmock 3.26.4 → 3.34.0（Ruby 4.0.9 / Rails 8.1.4 は変更なし）
 - Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
 - どちらも公開から 2 週間たっていない今の最新にした（作業計画で決めたことの 2。人間が判断）
@@ -3692,6 +3692,97 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bu
 
 - 直したのは文書だけで、公開物の安全チェックを通した。手動確認用の 12 ファイルのハッシュは、resume で控えたものと同じ
 
+### 間接の依存の gem
+
+- ブランチ / PR: `upgrade/finish-indirect-gems` / （PR 作成後に記入）
+- バージョン: rack 2 のまま動く間接の gem（RS 17・RP 18・OP 15 個。下の「gem ごとの対応」）。rack は Gemfile で 2 系に固定した（Ruby 4.0.9 / Rails 8.1.4 と直接の gem は変更なし）
+- Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
+- rack-test 2.3.0・net-imap 0.6.8・hashie 5.2.0 は、公開から 2 週間たっていない今の最新にした（作業計画で決めたことの 1。人間が判断）
+- `-w` の警告が減った（RS・OP の i18n 1.8.10 の「CGI library is removed」、RP の cgi 0.4.2 の定義し直し）
+
+rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/39)）、`/rails-upgrade` の resume の後に research の手順で調べた（2026-10-24）。resume では、前のセッションのサーバーが残っていないことを確かめ、手動確認用の 12 ファイルのハッシュの先頭 12 桁が、前のセッションでチャットに出した値と同じことを確かめた。件数も「手動確認用の環境」の節と同じだった。`bundle-audit update` の後の DB は 10-23 の 03da937 で、3 アプリとも `No vulnerabilities found`。
+
+#### 作業計画で決めたこと
+
+論点を 1 つずつ人間と確かめ、決まるたびにこの表に足す。
+
+| 論点 | 決めたこと | 理由 |
+|---|---|---|
+| 1 上げるか、範囲・まとめ方・PR の分け方・ブランチ名 | 上げる。範囲は、rack 2 のまま動く間接の gem（RS 17・RP 18・OP 15 個）。版は公開から 2 週間たった最新にし、rack-test 2.3.0・net-imap 0.6.8・hashie 5.2.0（RS・RP）は今の最新にする（公開から 2 週間の決まりの例外。人間が判断）。版を固定するときは Gemfile に書く（人間の希望。Step 9 の決めたことの 2 と同じ）。固定するのは、rack 3 の PR まで 2 系にとどめる rack だけ（`'~> 2.2', '>= 2.2.24', require: false` と理由のコメント）。date・timeout・racc・rake・net-imap・cgi は、ふつうの間接の gem として扱う。Gemfile のまとまりの default gem・bundled gems と、json（直接の gem。2 系のまま）、ほかの直接の gem は対象外。依存元のまとまり 5 つ（Rails の構成 gem・mail・認可の gem・activerecord-session_store・開発とテストの道具）を、アプリごとに 1 コミットにする（RS → RP → OP）。rack 3 は別の PR（`upgrade/finish-rack3`）に分け、行うかは、この PR が epic に入った後に決める。RS・RP の ostruct の行の見直しは rack 3 の側で行う | 7 章の決まりのままでは、Dependabot の version updates も manifest に書いた依存だけを見るので、i18n 1.8.10・multi_xml 0.6.0・rack-test 1.1.0・racc 1.5.2 などは advisory が出るまで動かない。lock だけの固定の理由（connection_pool は Rails 7.1 のキャッシュストア、racc・date・timeout は Ruby 3.1 の default gem のころの名残）はもうない。scratchpad の Gemfile と lock のコピーで、`bundle lock --conservative --update <間接の gem すべて>` を試した（`--conservative` がないと、RP で直接の gem の faraday まで 2.15.0 に動いた）。rack 3 を許すと rack・rack-session・rackup（RP は rack-protection 4）も動き、webrick が消える。devise の `error_status` の書き直しにもつながる（7 章の devise の行）ので、別の PR にする。rake は 13.2.0 で OpenStruct を Struct にした（History.rdoc の #545）が、rack 2.2.24 の `lib/rack/show_exceptions.rb` も `require "ostruct"` するので、ostruct の行を外せるかは rack 3 とつながる。json に依存する gem は rubocop（`>= 2.3`）だけ。まとまりにするのは、1 gem ずつでは約 49 コミットになり、本文もほぼ同じになるため（検査が落ちたら、まとまりを gem ごとに分けて原因を探す）。最新にする 3 つは、人間が「今後のメンテナンスが先になるかもしれないので最新にしたい」として、修正内容を調べて決めた。rack-test 2.3.0 は不具合の修正 5 つで、2.2.0 の `build_multipart` が返らなくなる不具合（rack-test#368）を直す版。3 アプリはテストで multipart を使わず、`follow_redirect!` は Rails 自前の実装。net-imap 0.6.8 は `SequenceSet` などの修正で、mail の IMAP の受信でしか読まれない（3 アプリは使わない）。hashie 5.2.0 は、10-21〜23 に 30 近い PR を取り込んだ大きな版（lib +2,926 −321 行。`mash.rb` を含む）で、RP のログインの AuthHash（`OmniAuth::KeyStore < Hashie::Mash`）を通る。公開から 1 日で、実績がないことを示したうえで、人間が上げると判断した。結合テストと E2E で確かめ、コミットの直前と verify の前に、公開後の issue と advisory を見直す。3 つとも advisory（ruby-advisory-db・GitHub Advisory Database・各リポジトリの Security Advisories）はなく、公開後の issue は rack-test#368（閉じた。2.3.0 で直った）だけ |
+| 2 手動確認の要否と時期 | 手動確認は 1 回、verify ですべてのコミットの後に行う。直前に 3 アプリの development DB を `tmp/manual_check_backup/` に写す（写すときに人間に確かめる）。パスワードの入力と同意は人間が行う | development のサーバーが読む gem が動く（i18n、connection_pool、nio4r・racc・date の C 拡張、responders、RP の hashie・rack-protection・cgi、RS の hashie など）。画面の文字・リダイレクト先・ログインとセッションを通る。各コミットで、応答のスナップショットと E2E（development 環境で 3 アプリを起動する。`e2e/README.md`）を流すので、まとまりごとの変化はそこで拾い、手動確認は全部がそろった状態で 1 回にする（Step 9 と同じ） |
+| 3 作業計画の承認 | まとまり 0（rack の固定）〜 5 を、まとまりごとに RS → RP → OP の順でコミットする（計 16 コミット）。まとまり 1 の RS・RP では、ostruct の行のコメントを直す。まとまり 3 の RS・RP の前に、hashie の公開後の issue と advisory を見直す。ダウンロードは 19 個、1,102,848 B（RS で落として照合し、RP・OP にコピーする） | rack の固定は、ほかのまとまりと理由が違うので、まとまり 0 として分ける（1 コミット 1 理由）。rake 13.4.2 は ostruct を読まないので、RS・RP の ostruct の行のコメント（rake 13.0.6 が require する）が当たらなくなる。行は rack 2.2.24 のために残す。jwt 3.3.0（57,856 B）は RS のキャッシュに既にあるので落とさない（照合はする） |
+
+#### gem ごとの対応
+
+| まとまり | gem | 対応 |
+|---|---|---|
+| 0 rack の固定 | rack 2.2.24（3 アプリ。版は変えない） | json の行の後に `gem 'rack', '~> 2.2', '>= 2.2.24', require: false` と理由のコメントを足して `bundle lock`。lock で動いたのは `DEPENDENCIES` の rack の行だけ（落とす gem はない）。RS `49f77a7`、RP `7dd3aed`、OP `d7679be` |
+| 1 Rails の構成 gem の依存 | builder 3.2.4→3.3.0、connection_pool 2.5.5→3.0.2、globalid 1.0.1→1.4.0、i18n 1.8.10→1.15.2、marcel 1.0.1→1.2.1、nio4r 2.5.9→2.7.5、racc 1.5.2→1.8.1、rack-test 1.1.0→2.3.0、rake 13.0.6→13.4.2（3 アプリ） | `bundle lock --update <9 つ> --conservative` → `git diff`。lock で動いたのは 9 つと、依存の要件の 2 行（globalid の activesupport `>= 6.1`、rack-test の rack `>= 1.3`）だけ。`.gem` 9 個（計 448,512 B）は RS の `bundle install` で落とし（`Fetching` は 9 つだけ。nio4r・racc は C 拡張をビルド）、RP・OP のキャッシュにコピーして `--local --no-cache` で入れた。`scripts/verify-gem-checksums <アプリ> --changed HEAD` は 3 アプリとも 9 個で一致。RS・RP は ostruct の行のコメントを「rack 2.2.24 の `rack/show_exceptions.rb` が require する（rake は 13.2.0 から読まない）。rack 3 にするときに外せるかを見直す」に直した。connection_pool は、Rails 8.1.4 では mem_cache_store・redis_cache_store だけがキーワード引数で使い、3 アプリ（memory_store・null_store）では読まれない。RS `a7388ad`、RP `b1d5078`、OP `dd421d2` |
+| 2 mail の依存 | mini_mime 1.1.1（RS）/ 1.1.0（RP・OP）→1.1.5、net-imap 0.5.15→0.6.8、date 3.5.1→3.6.0（3 アプリ） | 同じ手順。lock で動いたのは 3 つだけ。`.gem` 3 個（計 314,880 B）は RS で落とし（date は C 拡張をビルド）、RP・OP にコピーした。照合は 3 アプリとも 3 個で一致。RS `4cc358e`、RP `c3c4f72`、OP `74c0311` |
+| 3 認可の gem の依存 | RS: jwt 2.10.3→3.3.0、multi_xml 0.6.0→0.9.1、hashie 5.1.0→5.2.0。RP: multi_xml 0.6.0→0.9.1、hashie 4.1.0→5.2.0、rack-protection 2.1.0→3.2.0。OP: responders 3.1.1→3.2.1 | 先に hashie の公開後の issue と advisory を見直した（16:16。公開後に作られた issue はなく、ruby-advisory-db・GitHub Advisory Database・リポジトリの Security Advisories にもない。新しい版もない）。lock で動いたのは各アプリの gem と、依存の要件の行だけ（multi_xml 0.9.1 → bigdecimal `>= 3.1, < 5`、RP の hashie 5.2.0 → logger、rack-protection 3.2.0 → base64・rack `~> 2.2, >= 2.2.4`、responders → actionpack・railties `>= 7.0`）。指す先の bigdecimal・logger・base64 は Gemfile のまとまりの版、rack は 2.2.24 のままで動いていない。RS は hashie・multi_xml を落とし、jwt 3.3.0 はキャッシュにあった `.gem` を使った。RP は rack-protection と一緒に hashie・multi_xml も rubygems.org から落とした（計画では RS からコピーする予定だったが、道具を落とす形で流した。計 155,136 B。照合は一致）。OP は responders を落とした。照合は RS 3・RP 3・OP 1 個で一致。rack-protection は、omniauth の既定の設定が `OmniAuth::AuthenticityTokenProtection` を参照して読まれるが、RP では omniauth-rails_csrf_protection が判定を差し替える。OP に responders の generator の雛形はない。RS `e299908`、RP `cdb3add`、OP `aac478e` |
+| 4 activerecord-session_store の依存 | cgi 0.4.2→0.5.2（RP） | lock で動いたのは cgi だけ。`.gem`（41,984 B）を RP で落とし（C 拡張をビルド）、照合は 1 個で一致。activerecord-session_store 2.3.0 は lib で cgi を使わず、RP は Rails の `require "cgi/escape"` で lock の cgi を読む。0.5.2 では gem の `cgi/escape.rb` と C 拡張が対で読まれ（``）、`CGI.escapeHTML` の結果は同じ。RP `8d5ef63` |
+| 5 開発とテストの道具の依存 | parallel 1.28.0→2.3.0（rubocop）、public_suffix 6.0.2→7.0.5（webmock の addressable）（3 アプリ） | lock で動いたのは 2 つだけ。`.gem` 2 個（計 121,344 B）は RS で落とし、RP・OP にコピーした。照合は 3 アプリとも 2 個で一致。default グループから届かないので、development のサーバーは読まない。RS `f277621`、RP `413cccc`、OP `fdaefee` |
+
+#### 前後の比較
+
+- 作業の前（`4bc6063`）に、`RUBYOPT=-W:deprecated` を付けた `scripts/check-apps`（36 の検査と E2E がすべて通った。RS 11 runs・15 assertions、RP 33・82、OP 69・129、E2E 10 passed）、`scripts/compare-config dump`（3 アプリの test・development）、3 アプリの `RUBYOPT=-w RAILS_ENV=test bin/rails runner 1` の警告を取った。`-w` の警告は、RP の cgi 0.4.2 の C 拡張が `cgi/escape` を定義し直すもの、RS・OP の i18n 1.8.10 の `exceptions.rb` が出す「CGI library is removed from Ruby 4.0」、OP の devise と warden の定義し直し
+- まとまり 0: 各アプリの 11 の検査と E2E（ほかのアプリの変更は退避）が通り、件数は前と同じ。スナップショットの差分はない。検査のログの警告の行（行頭の点を落として比べた）と compare-config も前と同じ
+- まとまり 1: まとまり 0 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数は前と同じ。スナップショットの差分はない。検査のログの警告の行と compare-config も前と同じ。`-w` の警告は、RS・OP の i18n 1.8.10 の「CGI library is removed from Ruby 4.0」が消えた（i18n 1.14.8 の #713 で `cgi` の require がなくなった）。RP は lock に cgi があるので、もともと出ていない。ほかの `-w` の警告は前と同じ。以降は、ほかのアプリに変更がない状態で `RUBYOPT=-W:deprecated scripts/check-apps --app <アプリ>` を流し（`commit-per-app` と同じく、そのアプリの変更だけで検査と E2E を流すことになる）、通ったらそのアプリのファイルを指定してコミットした
+- まとまり 2: まとまり 1 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数・スナップショット・検査のログの警告の行・compare-config・`-w` の警告は前と同じ
+- まとまり 3: まとまり 2 の後と比べた。各アプリの 11 の検査と E2E（10 passed）が通り、件数・スナップショット（RP のログインの AuthHash、OP の devise の応答を含む）・検査のログの警告の行・compare-config・`-w` の警告は前と同じ（multi_xml の `MultiXml` の非推奨の警告も出ていない）
+- まとまり 4（RP）: まとまり 3 の後と比べた。11 の検査と E2E（10 passed）が通り、件数・スナップショット・検査のログの警告の行・compare-config は前と同じ。`-w` の警告は、cgi 0.4.2 の C 拡張が Ruby 4.0 の `cgi/escape` を定義し直す 8 行が消え、RP の `-w` の警告はなくなった（PLAN.md の 7 章の cgi の行の「0.5 系にするかを見直す」の答え）
+- まとまり 5: まとまり 3（RS・OP）・4（RP）の後と比べた。各アプリの 11 の検査（RuboCop の指摘なし）と E2E（10 passed）が通り、件数・スナップショット・検査のログの警告の行・compare-config・`-w` の警告は前と同じ
+
+#### 遭遇した問題
+
+| 問題 | 対応 |
+|---|---|
+| まとまり 0 で、`RUBYOPT=-W:deprecated` を付けて `scripts/commit-per-app` を流すと、検査と E2E は通ったが、コミットが `ruby: invalid option -:` で失敗した（ステージは外れ、変更は作業ツリーに残った）。git hooks の `scripts/check-public-safety` は `#!/usr/bin/env ruby` で、リポジトリ直下では macOS 標準の Ruby 2.6 になり、`-W:` の形を受け付けない | 検査はそのアプリの変更だけ（ほかは退避）で通っていたので、そのアプリの Gemfile と lock を指定してステージし、`git commit -F` でコミットした（hooks の安全チェックは通った）。以降は、`RUBYOPT` を `commit-per-app` に付けない |
+| まとまり 3 の RP で、RS で照合済みの hashie・multi_xml も rubygems.org から落とし直した（計画は RS からコピー） | 照合は一致した。上の「gem ごとの対応」と、スキルについて気づいたことの 21 |
+
+#### 手動確認
+
+verify で、すべての変更と記録のコミットの後（`1e6991e`。2026-10-25）に、`.claude/launch.json` から OP・RS・RP の順に起動し、ブラウザペインで確かめた（操作は人間）。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが resume で控えたものと同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しは元と同じ。作業計画で決めたことの 2。人間に確かめた）
+- 起動の直後: 3 アプリとも Ruby 4.0.9・Puma 8.0.2・threads 3。プレビューが送った `HEAD "/"`・`GET "/"` は 3 アプリとも 200。RP のトップページは、ブラウザに前のセッションが残っていて、ログインした状態だった
+- 操作を頼む前に、ブラウザペインが隠れていたので表示してもらった。操作の返事の後に、3 アプリのサーバーが起動のときから動き続けていたことを `preview_list` で確かめた
+- ログイン（RP の my_op）: 人間が「Logout」（302 → トップ）を押してから「Login」を押した。OP はブラウザのセッションが残っていて、ログイン画面を出さずに認可エンドポイントが 302（同意画面は出ない。Step 9 と同じ）、トークン・userinfo・JWKS が 200。RP のコールバックは 302 でトップに戻った。OP のログの「Redirected to」行は 2 回とも `code=[FILTERED]`
+- introspection 用 RP: 同意画面（200）と Authorize（302）の後、RS は正しいトークンで 200、その後 401 が 2 回。OP はクライアントクレデンシャルのトークンを 3 回、introspect を 3 回、revoke を 1 回受けた。Step 9 と同じ
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない（development.log の今回の分と `preview_logs` の検索）。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 35 → 37 件、`oauth_access_tokens` が 87 → 92 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 16 → 17）。RP は `sessions` が 16 件のまま（Logout で前回のログインの行 id 36 が消え、Logout の後のトップページの行 id 37 はログインの `reset_session` で消え、今回のログインの行 id 38 が増えた）、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。3 つの DB の見出しの 18・19 バイト目は 2・2 で WAL のまま。変わったのは OP・RP の DB の本体だけで、RS の DB と、ほかの 9 ファイルのハッシュは同じ。手動確認の後の値を新しい基準として控えた（控えは scratchpad）
+- `tmp/manual_check_backup/` の写しは、次の作業の始めに消すかを人間に確かめる（Step 9 と同じ）
+
+#### 意図的な仕様変更
+
+なし
+
+#### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bundle-audit update` を流した（DB は 10-23 の 03da937 で、最新のまま）。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`1e6991e`）に、`RUBYOPT=-W:deprecated` を付けて流し、36 の検査がすべて通った。検査のログの警告の行は、作業の前と同じ（OP の IMP-011 の DEPRECATION だけ）
+- minitest: RS 11 runs・15 assertions、RP 33・82、OP 69・129、0 failures。`CI=1`（eager load あり）でも同じ。作業の前と同じ件数
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この PR を通して出なかった。E2E は、E2E 用の DB を作り直して流す
+- RuboCop・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った
+- compare-config: 3 アプリの test・development で、作業の前と同じ
+- `-w` の警告（`RAILS_ENV=test bin/rails runner 1`）: RS・OP の i18n 1.8.10 の 2 行と、RP の cgi 0.4.2 の 8 行が消えた。OP の devise と warden の定義し直しは残っている。増えたものはない
+- lock: epic（`a1b8eda`）からの動きは、作業計画の gem（RS 17・RP 18・OP 15 個）と依存の要件の行、`DEPENDENCIES` の rack の行だけ。Gemfile のまとまりの default gem・bundled gems、json 2.21.2、rack 2.2.24・rack-session・rackup、timeout 0.6.1 は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認と E2E の起動で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: 上の「手動確認」のとおり。手動確認の後の値を新しい基準にした
+
+#### コードレビュー（`/code-review`）
+
+| 指摘 | 対応 |
+|---|---|
+| LOG.md の論点 1 の行が範囲を「RS 16」と書いていて、PLAN.md と、この節のほかの箇所の「RS 17」と食い違っていた（hashie を名指しで上げるので 17 が正しい） | 直した（人間が判断） |
+| 3 アプリの Gemfile の rack の行のコメントが「rack 3 への更新は別の作業で行う」と言い切っていたが、rack 3 を行うかは、この PR が epic に入った後に決める | 直した。「rack 3 にするかは別の作業で決める」にした。RS `a85dd44`、RP `4c9508d`、OP `630722e`（人間が判断） |
+| RS・RP の ostruct の行を残す理由にした rack 2.2.24 の `rack/show_exceptions.rb` は、rack 2 の `Rack::Server` の既定のミドルウェアで、`bin/rails s` は `Rails::Server#middleware`（`railties-8.1.4/lib/rails/commands/server/server_command.rb`）で既定のミドルウェアを使わない。3 アプリの経路で読まれるかは確かめていなかった | 行は残し、コメントを事実に合わせた（読まれる経路は確かめていないこと、rack 3 の作業で経路を確かめてから外せるかを決めること）。行を外すと lock から ostruct が消え、計画にない gem の変化になるため、この PR では外さない。PLAN.md の 7 章の ostruct の行も同じ言い回しにした。RS `a85dd44`、RP `4c9508d`（人間が判断） |
+
+- 直したのはコメントと文書だけで、lock は動いていない。3 アプリとも `scripts/commit-per-app` で 11 の検査と E2E（10 passed）が通り、件数は前と同じ。手動確認用の 12 ファイルのハッシュは、手動確認の後に控えたものと同じで、`-wal` はない
+
 ### スキルについて気づいたこと
 
 Step 3〜9 と同じく、スキルの手順・型・設定で、足りない・合わない・迷ったところを控える（スキルを直すかは人間が判断する）。Step 9 までの気づきで、この仕上げでまた当たったものは、その番号を書いた。
@@ -3717,3 +3808,17 @@ gems:
 11. `cd` を含むコマンドで、Bash の作業ディレクトリが RS に移った（Step 9 の気づきの 6）。以降は、サブシェル `( cd ... )` と絶対パスにした
 12. 検査のログの警告の行を前後で比べると、minitest の進み具合の点の数がテストの順番で変わり、同じ警告でも違う行に見えた。比べる前に行頭の点を落とした。scratchpad の小さなスクリプトで比べたが、決まった道具はない
 13. zsh では、空白で区切った文字列の変数がコマンドの引数に分かれず、`shasum` が 1 つのファイル名として読んだ（resume で 12 ファイルのハッシュを取るとき）。配列で渡した
+
+間接の依存の gem の research:
+
+14. セッションの途中で、scratchpad の場所が変わった（前の場所の中身は残っていたので、新しい場所に写して続けた）。ハッシュの控えと試行の lock が scratchpad にしかない点は、Step 9 の気づきの 7 と同じ
+15. 間接の gem をまとめて試す手順が、TIPS.md の「gem の更新」にない。`bundle lock --update <間接の gem すべて>` に `--conservative` を付けないと、名指しした gem の依存の直接の gem（RP の faraday。oauth2 の依存）まで動いた。公開から 2 週間の上限は、rubygems.org の版の一覧から scratchpad の小さなスクリプトで付けた
+16. `cd` を含むコマンドで、Bash の作業ディレクトリが RS に移った（2 回。仕上げの気づきの 11 と同じ）
+17. `mise exec` を付けずに `bundle exec bundle-audit update` を流し、macOS 標準の Ruby で止まった（TIPS.md の「コマンドの実行」にある注意）
+18. 論点 1 で、人間は「固定するなら Gemfile に」「止める gem は最新の修正内容を見て、問題なければ最新に」と 2 回掘り下げた。最初の示し方に、止める gem の最新版の修正内容と、止めるときの書き方（Gemfile か lock か）を入れておけば、往復が減った（Step 9 の気づきの 11 と同じ形）。公開から 2 週間の例外を判断する材料（advisory の 3 か所、公開後の issue）を調べる手順がスキルにないのは、仕上げの気づきの 7 と同じ
+
+間接の依存の gem の gems:
+
+19. 前後の比較の警告の行は、`RUBYOPT=-W:deprecated` を付けた検査のログで取るが、同じ環境変数を付けて `scripts/commit-per-app` を流すと、git hooks の Ruby（macOS 標準の 2.6）が `-W:` を受け付けず、コミットだけが失敗した（上の「遭遇した問題」）。before-after.md と commit.md は、比べるための検査と、コミットの前の検査を、別に流すのか兼ねるのかを書いていない
+20. `scripts/check-apps` のログは `01.log` から番号だけで、どの検査のログかがファイル名から分からない。前後で警告の行を比べるとき、アプリごとの番号の範囲（3 アプリなら 1〜11・12〜22・23〜33、1 アプリなら 1〜11）で拾った
+21. 同じ手順をまとまりとアプリの数だけ繰り返すので、lock・入れる・照合・検査・比較を流す小さな道具を scratchpad に作った。RP のまとまり 3 では、RS にない gem（rack-protection）があるので道具を「落とす」形で流し、RS で照合済みの hashie・multi_xml も落とし直した（計画は RS からコピー）。gems.md と TIPS.md は、アプリによって増える gem が違うときに、どれを落としてどれをコピーするかを書いていない
