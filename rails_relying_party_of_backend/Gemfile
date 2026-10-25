@@ -83,12 +83,13 @@ gem 'dotenv-rails', groups: %i[development test]
 # json 3 は既定値が変わる（重複キー・コメントで例外）ので、2 系にとどめる（docs/upgrade/PLAN.md の Step 8）
 gem 'json', '~> 2.21', '>= 2.21.2'
 
-# actionpack などの依存。rack 3 への更新は別の作業で行うので、それまで 2 系にとどめる（2.2 系の修正版は受け取る）。
+# actionpack などの依存。rack 3 にするかは別の作業で決めるので、それまで 2 系にとどめる（2.2 系の修正版は受け取る）。
 # 起動の途中では読み込まない（docs/upgrade/PLAN.md の仕上げの「間接の依存の gem で決めたこと」）
 gem 'rack', '~> 2.2', '>= 2.2.24', require: false
 
-# rack 2.2.24 の rack/show_exceptions.rb が require "ostruct" する（rake は 13.2.0 から読まない）。Ruby 4.0 の bundled gems で、
-# lock にないと読み込めないので明示する。rack 3 にするときに、外せるかを見直す。版は Ruby 4.0.9 の bundled gems と同じにする。
+# rack 2.2.24 の rack/show_exceptions.rb（rack 2 の Rack::Server の既定のミドルウェア）が require "ostruct" する（rake は
+# 13.2.0 から読まない）。Ruby 4.0 の bundled gems で、lock にないと読み込めないので明示する。bin/rails s の経路で読まれるかは
+# 確かめていない。rack 3 の作業で、読まれる経路を確かめてから外せるかを決める。版は Ruby 4.0.9 の bundled gems と同じにする。
 # 起動の途中では読み込まない（docs/upgrade/PLAN.md の Step 8・Step 9・仕上げ）
 gem 'ostruct', '0.6.3', require: false
 
