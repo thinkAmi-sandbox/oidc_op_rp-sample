@@ -3695,6 +3695,10 @@ verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bu
 ### 間接の依存の gem
 
 - ブランチ / PR: `upgrade/finish-indirect-gems` / （PR 作成後に記入）
+- バージョン: rack 2 のまま動く間接の gem（RS 17・RP 18・OP 15 個。下の「gem ごとの対応」）。rack は Gemfile で 2 系に固定した（Ruby 4.0.9 / Rails 8.1.4 と直接の gem は変更なし）
+- Rails と gem の既定値・雛形への追随はなかった（defaults/ に記録はない）。業務的な挙動の変化（B）は起きなかった。bundler-audit の無視リストは空のまま、brakeman の無視の項目はない
+- rack-test 2.3.0・net-imap 0.6.8・hashie 5.2.0 は、公開から 2 週間たっていない今の最新にした（作業計画で決めたことの 1。人間が判断）
+- `-w` の警告が減った（RS・OP の i18n 1.8.10 の「CGI library is removed」、RP の cgi 0.4.2 の定義し直し）
 
 rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAmi-sandbox/oidc_op_rp-sample/pull/39)）、`/rails-upgrade` の resume の後に research の手順で調べた（2026-10-24）。resume では、前のセッションのサーバーが残っていないことを確かめ、手動確認用の 12 ファイルのハッシュの先頭 12 桁が、前のセッションでチャットに出した値と同じことを確かめた。件数も「手動確認用の環境」の節と同じだった。`bundle-audit update` の後の DB は 10-23 の 03da937 で、3 アプリとも `No vulnerabilities found`。
 
@@ -3748,6 +3752,10 @@ verify で、すべての変更と記録のコミットの後（`1e6991e`。2026
 - サーバーの出力: 3 アプリとも warning・DEPRECATION はない（development.log の今回の分と `preview_logs` の検索）。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ
 - 手動確認用の環境: OP の development DB は `oauth_access_grants` が 35 → 37 件、`oauth_access_tokens` が 87 → 92 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 16 → 17）。RP は `sessions` が 16 件のまま（Logout で前回のログインの行 id 36 が消え、Logout の後のトップページの行 id 37 はログインの `reset_session` で消え、今回のログインの行 id 38 が増えた）、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。3 つの DB の見出しの 18・19 バイト目は 2・2 で WAL のまま。変わったのは OP・RP の DB の本体だけで、RS の DB と、ほかの 9 ファイルのハッシュは同じ。手動確認の後の値を新しい基準として控えた（控えは scratchpad）
 - `tmp/manual_check_backup/` の写しは、次の作業の始めに消すかを人間に確かめる（Step 9 と同じ）
+
+#### 意図的な仕様変更
+
+なし
 
 #### 確認結果
 
