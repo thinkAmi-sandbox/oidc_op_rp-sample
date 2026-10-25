@@ -3734,6 +3734,36 @@ rubocop・webmock が epic に入ってから（[#39](https://github.com/thinkAm
 | 問題 | 対応 |
 |---|---|
 | まとまり 0 で、`RUBYOPT=-W:deprecated` を付けて `scripts/commit-per-app` を流すと、検査と E2E は通ったが、コミットが `ruby: invalid option -:` で失敗した（ステージは外れ、変更は作業ツリーに残った）。git hooks の `scripts/check-public-safety` は `#!/usr/bin/env ruby` で、リポジトリ直下では macOS 標準の Ruby 2.6 になり、`-W:` の形を受け付けない | 検査はそのアプリの変更だけ（ほかは退避）で通っていたので、そのアプリの Gemfile と lock を指定してステージし、`git commit -F` でコミットした（hooks の安全チェックは通った）。以降は、`RUBYOPT` を `commit-per-app` に付けない |
+| まとまり 3 の RP で、RS で照合済みの hashie・multi_xml も rubygems.org から落とし直した（計画は RS からコピー） | 照合は一致した。上の「gem ごとの対応」と、スキルについて気づいたことの 21 |
+
+#### 手動確認
+
+verify で、すべての変更と記録のコミットの後（`1e6991e`。2026-10-25）に、`.claude/launch.json` から OP・RS・RP の順に起動し、ブラウザペインで確かめた（操作は人間）。
+
+- 直前に、3 アプリのサーバーが止まっていて、12 ファイルのハッシュが resume で控えたものと同じことを確かめ、3 アプリの development DB の本体（`-wal` はない）を `tmp/manual_check_backup/` に写した（写しは元と同じ。作業計画で決めたことの 2。人間に確かめた）
+- 起動の直後: 3 アプリとも Ruby 4.0.9・Puma 8.0.2・threads 3。プレビューが送った `HEAD "/"`・`GET "/"` は 3 アプリとも 200。RP のトップページは、ブラウザに前のセッションが残っていて、ログインした状態だった
+- 操作を頼む前に、ブラウザペインが隠れていたので表示してもらった。操作の返事の後に、3 アプリのサーバーが起動のときから動き続けていたことを `preview_list` で確かめた
+- ログイン（RP の my_op）: 人間が「Logout」（302 → トップ）を押してから「Login」を押した。OP はブラウザのセッションが残っていて、ログイン画面を出さずに認可エンドポイントが 302（同意画面は出ない。Step 9 と同じ）、トークン・userinfo・JWKS が 200。RP のコールバックは 302 でトップに戻った。OP のログの「Redirected to」行は 2 回とも `code=[FILTERED]`
+- introspection 用 RP: 同意画面（200）と Authorize（302）の後、RS は正しいトークンで 200、その後 401 が 2 回。OP はクライアントクレデンシャルのトークンを 3 回、introspect を 3 回、revoke を 1 回受けた。Step 9 と同じ
+- サーバーの出力: 3 アプリとも warning・DEPRECATION はない（development.log の今回の分と `preview_logs` の検索）。エラーは、元からある RP の `/stylesheets/application.css`・OP の `/stylesheets/doorkeeper/application.css`・RS と OP の歓迎ページの `/icon.png` の `ActionController::RoutingError` だけ
+- 手動確認用の環境: OP の development DB は `oauth_access_grants` が 35 → 37 件、`oauth_access_tokens` が 87 → 92 件（my_op 1・introspection 用 1（revoke 済み）・RS のクライアントクレデンシャル 3。revoke 済みは 16 → 17）。RP は `sessions` が 16 件のまま（Logout で前回のログインの行 id 36 が消え、Logout の後のトップページの行 id 37 はログインの `reset_session` で消え、今回のログインの行 id 38 が増えた）、`op_users` は 1 件のまま。どちらも `integrity_check` は ok。サーバーを止めた後、`-wal` は残っていない。3 つの DB の見出しの 18・19 バイト目は 2・2 で WAL のまま。変わったのは OP・RP の DB の本体だけで、RS の DB と、ほかの 9 ファイルのハッシュは同じ。手動確認の後の値を新しい基準として控えた（控えは scratchpad）
+- `tmp/manual_check_backup/` の写しは、次の作業の始めに消すかを人間に確かめる（Step 9 と同じ）
+
+#### 確認結果
+
+verify で、PLAN.md の 10 章の完了条件を確かめた。その前に `bundle-audit update` を流した（DB は 10-23 の 03da937 で、最新のまま）。
+
+- `scripts/check-apps`（3 アプリと E2E）: すべての変更と記録のコミットの後（`1e6991e`）に、`RUBYOPT=-W:deprecated` を付けて流し、36 の検査がすべて通った。検査のログの警告の行は、作業の前と同じ（OP の IMP-011 の DEPRECATION だけ）
+- minitest: RS 11 runs・15 assertions、RP 33・82、OP 69・129、0 failures。`CI=1`（eager load あり）でも同じ。作業の前と同じ件数
+- E2E: 10 passed。応答のスナップショットと E2E のスナップショットの差分は、この PR を通して出なかった。E2E は、E2E 用の DB を作り直して流す
+- RuboCop・`zeitwerk:check`・起動の途中の読み込みの検査（test・`CI=1`・development）・bundler-audit（無視リストは空。3 アプリとも `No vulnerabilities found`）・brakeman（3 アプリとも `Security Warnings: 0`）: すべて通った
+- compare-config: 3 アプリの test・development で、作業の前と同じ
+- `-w` の警告（`RAILS_ENV=test bin/rails runner 1`）: RS・OP の i18n 1.8.10 の 2 行と、RP の cgi 0.4.2 の 8 行が消えた。OP の devise と warden の定義し直しは残っている。増えたものはない
+- lock: epic（`a1b8eda`）からの動きは、作業計画の gem（RS 17・RP 18・OP 15 個）と依存の要件の行、`DEPENDENCIES` の rack の行だけ。Gemfile のまとまりの default gem・bundled gems、json 2.21.2、rack 2.2.24・rack-session・rackup、timeout 0.6.1 は動いていない
+- `bin/rails c`: `scripts/check-console` で 3 アプリとも起動した（Tab の補完と複数行の入力ができた）。`bin/rails s`: 手動確認と E2E の起動で 3 アプリとも起動した
+- 公開物の安全チェック: 各コミットの hooks で通った
+- CI: push の後に確かめる（push は人間が行う）
+- 手動確認用の環境: 上の「手動確認」のとおり。手動確認の後の値を新しい基準にした
 
 ### スキルについて気づいたこと
 

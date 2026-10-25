@@ -1233,7 +1233,7 @@ Step 8 が epic に入ってから（[#37](https://github.com/thinkAmi-sandbox/o
 - [x] gems: 認可の gem の依存（RS: jwt 3.3.0・multi_xml 0.9.1・hashie 5.2.0、RP: multi_xml 0.9.1・hashie 5.2.0・rack-protection 3.2.0、OP: responders 3.2.1。RS・RP の前に hashie の公開後の issue と advisory を見直す）
 - [x] gems: activerecord-session_store の依存（RP: cgi 0.5.2）
 - [x] gems: 開発とテストの道具の依存（parallel 2.3.0・public_suffix 7.0.5。RS → RP → OP）
-- [ ] verify（手動確認は 1 回。直前に 3 アプリの development DB を写す。下の「間接の依存の gem で決めたこと」の 2）
+- [x] verify（手動確認は 1 回。直前に 3 アプリの development DB を写す。下の「間接の依存の gem で決めたこと」の 2。結果は LOG.md の「仕上げ」の「間接の依存の gem」の「手動確認」と「確認結果」。CI は push の後）
 - [ ] pr
 - [ ] Dependabot（bundler、npm、GitHub Actions をまとまった単位で更新）。CI ができてから有効にする
 - [ ] README の「Tested Environment」を更新。アップグレード前のコードはタグ `rails-6.1` にあること、Next.js 製 RP は新しい OP で確認していないことを書く
